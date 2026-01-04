@@ -126,6 +126,8 @@ async function checkServerDependencies() {
 async function startServer() {
   // Importer et exécuter le serveur
   console.log('Démarrage du serveur...');
+  // Pour Plesk, on sert aussi le client depuis le serveur
+  process.env.SERVE_CLIENT = 'true';
   await import('./server/index.js');
 }
 

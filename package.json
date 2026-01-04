@@ -5,13 +5,15 @@
   "main": "app.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "dev": "node start.js",
     "dev:server": "cd server && nodemon index.js",
     "dev:client": "cd client && npm run dev",
+    "start": "node start.js",
+    "start:server": "cd server && node index.js",
+    "start:client": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
-    "build:client": "cd client && npm install && npm run build",
-    "start": "cd server && node index.js",
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install"
+    "build:client": "cd client && npm install && npm run build"
   },
   "keywords": ["typing", "test", "battle", "1v1"],
   "author": "",

@@ -80,21 +80,29 @@ setOnlineUsers(onlineUsers);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/matches', matchesRoutes);
 
-// Servir les fichiers statiques du client (frontend)
-// Chemin relatif depuis server/ vers client/dist
-const clientDistPath = join(__dirname, '..', 'client', 'dist');
-app.use(express.static(clientDistPath));
-
-// Route catch-all : servir index.html pour toutes les routes non-API
-// Cela permet au React Router de gérer le routing côté client
-app.get('*', (req, res) => {
-  // Ne pas intercepter les routes API
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-  // Servir index.html pour toutes les autres routes
-  res.sendFile(join(clientDistPath, 'index.html'));
-});
+// Servir les fichiers statiques du client (frontend) - UNIQUEMENT si SERVE_CLIENT=true
+// Par défaut, le client est servi séparément sur un autre port
+if (process.env.SERVE_CLIENT === 'true') {
+  const clientDistPath = join(__dirname, '..', 'client', 'dist');
+  app.use(express.static(clientDistPath));
+  
+  // Route catch-all : servir index.html pour toutes les routes non-API
+  app.get('*', (req, res) => {
+    // Ne pas intercepter les routes API
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API route not found' });
+    }
+    // Servir index.html pour toutes les autres routes
+    res.sendFile(join(clientDistPath, 'index.html'));
+  });
+} else {
+  // Si le client n'est pas servi par le serveur, retourner 404 pour les routes non-API
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'Not found. Client is served separately.' });
+    }
+  });
+}
 
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
