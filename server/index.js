@@ -741,6 +741,7 @@ io.on('connection', (socket) => {
 export { onlineUsers };
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interfaces pour PulseHeberg
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
 });
