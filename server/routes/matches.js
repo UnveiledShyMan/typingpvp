@@ -1,5 +1,5 @@
 import express from 'express';
-import { getUserMatches, recordMatch } from '../db.js';
+import { getUserMatches, recordMatch, updateUser } from '../db.js';
 import { getUserById } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -9,11 +9,11 @@ const router = express.Router();
  * Récupère l'historique des matchs de l'utilisateur connecté
  * GET /api/matches?limit=50&type=solo|multiplayer
  */
-router.get('/', authenticateToken, (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const type = req.query.type; // 'solo', 'multiplayer', ou undefined pour tous
-    const matches = getUserMatches(req.user.id, limit, type);
+    const matches = await getUserMatches(req.user.id, limit, type);
     res.json({ matches });
   } catch (error) {
     console.error('Error fetching matches:', error);
@@ -26,7 +26,7 @@ router.get('/', authenticateToken, (req, res) => {
  * POST /api/matches/solo
  * IMPORTANT: Cette route doit être avant GET /:userId pour éviter les conflits de routing
  */
-router.post('/solo', authenticateToken, (req, res) => {
+router.post('/solo', authenticateToken, async (req, res) => {
   try {
     const { wpm, accuracy, language } = req.body;
     const user = req.user;
@@ -36,7 +36,7 @@ router.post('/solo', authenticateToken, (req, res) => {
     }
     
     // Enregistrer le match
-    const matchId = recordMatch({
+    const matchId = await recordMatch({
       type: 'solo',
       language: language,
       players: [{
@@ -56,6 +56,9 @@ router.post('/solo', authenticateToken, (req, res) => {
       won: false
     });
     
+    // Sauvegarder dans la base de données
+    await updateUser(user);
+    
     res.json({ success: true, matchId });
   } catch (error) {
     console.error('Error recording solo match:', error);
@@ -67,12 +70,12 @@ router.post('/solo', authenticateToken, (req, res) => {
  * Récupère l'historique des matchs d'un utilisateur spécifique (public)
  * GET /api/matches/:userId?limit=50&type=solo|multiplayer
  */
-router.get('/:userId', (req, res) => {
+router.get('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
     const type = req.query.type; // 'solo', 'multiplayer', ou undefined pour tous
-    const matches = getUserMatches(userId, limit, type);
+    const matches = await getUserMatches(userId, limit, type);
     res.json({ matches });
   } catch (error) {
     console.error('Error fetching user matches:', error);

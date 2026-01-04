@@ -11,7 +11,7 @@ import rankingsRoutes from './routes/rankings.js';
 import meRoutes from './routes/me.js';
 import friendsRoutes from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
-import { getUserById, recordMatch } from './db.js';
+import { getUserById, recordMatch, updateUser } from './db.js';
 import { calculateNewMMR } from './utils/elo.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -231,7 +231,7 @@ io.on('connection', (socket) => {
       
       // Mettre à jour MMR et stats si c'est un match compétitif (matchmaking ou room avec userId)
       if (room.matchmaking || room.players.some(p => p.userId)) {
-        updateMatchResults(room);
+        updateMatchResults(room).catch(err => console.error('Error updating match results:', err));
       }
       
       io.to(roomId).emit('game-finished', { results: room.results, players: room.players });
@@ -246,7 +246,7 @@ io.on('connection', (socket) => {
   });
 
   // Fonction pour mettre à jour MMR et stats après un match
-  function updateMatchResults(room) {
+  async function updateMatchResults(room) {
     if (room.players.length !== 2) return;
     
     const [player1, player2] = room.players;
@@ -264,8 +264,8 @@ io.on('connection', (socket) => {
     }
     
     // Récupérer les utilisateurs
-    const user1 = getUserById(player1.userId);
-    const user2 = getUserById(player2.userId);
+    const user1 = await getUserById(player1.userId);
+    const user2 = await getUserById(player2.userId);
     
     if (!user1 || !user2) return;
     
@@ -292,6 +292,29 @@ io.on('connection', (socket) => {
       won: !player1Won,
       wpm: result2.wpm,
       accuracy: result2.accuracy
+    });
+    
+    // Sauvegarder dans la base de données
+    await updateUser(user1);
+    await updateUser(user2);
+    
+    // Enregistrer le match
+    await recordMatch({
+      type: 'battle',
+      language: language,
+      players: [{
+        userId: user1.id,
+        username: user1.username,
+        wpm: result1.wpm,
+        accuracy: result1.accuracy,
+        won: player1Won
+      }, {
+        userId: user2.id,
+        username: user2.username,
+        wpm: result2.wpm,
+        accuracy: result2.accuracy,
+        won: !player1Won
+      }]
     });
     
     console.log(`Match results updated: ${user1.username} (${mmr1} → ${newMMR1}) vs ${user2.username} (${mmr2} → ${newMMR2}), Winner: ${player1Won ? user1.username : user2.username}`);
@@ -367,8 +390,8 @@ io.on('connection', (socket) => {
     matchmakingQueue.delete(socketId2);
     
     // Récupérer les noms d'utilisateurs
-    const user1 = getUserById(player1.userId);
-    const user2 = getUserById(player2.userId);
+    const user1 = await getUserById(player1.userId);
+    const user2 = await getUserById(player2.userId);
     
     // Créer une nouvelle room
     const roomId = nanoid(8);
@@ -611,7 +634,7 @@ io.on('connection', (socket) => {
   });
 
   // Finir une compétition
-  socket.on('competition-finished', (data) => {
+  socket.on('competition-finished', async (data) => {
     const playerData = players.get(socket.id);
     if (!playerData || !playerData.competitionId) return;
     
@@ -645,10 +668,10 @@ io.on('connection', (socket) => {
       const language = competition.language || 'en';
       
       // Préparer les données des joueurs pour l'enregistrement du match (utiliser le leaderboard trié)
-      const competitionPlayers = leaderboard
+      const competitionPlayersPromises = leaderboard
         .filter(p => p.userId)
-        .map((p, index) => {
-          const user = getUserById(p.userId);
+        .map(async (p, index) => {
+          const user = await getUserById(p.userId);
           const position = index + 1;
           const won = position <= 3;
           return {
@@ -661,9 +684,11 @@ io.on('connection', (socket) => {
           };
         });
       
+      const competitionPlayers = await Promise.all(competitionPlayersPromises);
+      
       // Enregistrer le match une seule fois pour toute la compétition
       if (competitionPlayers.length > 0) {
-        recordMatch({
+        await recordMatch({
           type: 'competition',
           language: language,
           players: competitionPlayers
@@ -671,16 +696,18 @@ io.on('connection', (socket) => {
       }
       
       // Mettre à jour les stats de chaque joueur
-      competitionPlayers.forEach((playerData) => {
-        const user = getUserById(playerData.userId);
+      for (const playerData of competitionPlayers) {
+        const user = await getUserById(playerData.userId);
         if (user) {
           user.updateStats({
+            type: 'competition',
             won: playerData.won,
             wpm: playerData.wpm,
             accuracy: playerData.accuracy
           });
+          await updateUser(user);
         }
-      });
+      }
       
       io.to(competition.id).emit('competition-ended', {
         leaderboard: leaderboard

@@ -1,12 +1,12 @@
 import express from 'express';
-import { getUserById, getAllUsers } from '../db.js';
+import { getUserById, getAllUsers, updateUser } from '../db.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Obtenir un utilisateur par ID
-router.get('/:id', optionalAuth, (req, res) => {
-  const user = getUserById(req.params.id);
+router.get('/:id', optionalAuth, async (req, res) => {
+  const user = await getUserById(req.params.id);
 
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
@@ -32,7 +32,7 @@ router.get('/:id', optionalAuth, (req, res) => {
 });
 
 // Mettre à jour le profil (nécessite authentification)
-router.put('/:id', authenticateToken, (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   if (req.user.id !== req.params.id) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
@@ -57,6 +57,9 @@ router.put('/:id', authenticateToken, (req, res) => {
       ...socialMedia
     };
   }
+
+  // Sauvegarder dans la base de données
+  await updateUser(req.user);
 
   res.json({
     id: req.user.id,

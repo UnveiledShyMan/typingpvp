@@ -15,11 +15,13 @@ router.post('/register', async (req, res) => {
     }
 
     // Vérifier si l'utilisateur existe déjà
-    if (getUserByUsername(username)) {
+    const existingUserByUsername = await getUserByUsername(username);
+    if (existingUserByUsername) {
       return res.status(400).json({ error: 'Username already taken' });
     }
 
-    if (getUserByEmail(email)) {
+    const existingUserByEmail = await getUserByEmail(email);
+    if (existingUserByEmail) {
       return res.status(400).json({ error: 'Email already taken' });
     }
 
@@ -55,7 +57,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Missing credentials' });
     }
 
-    const user = getUserByUsername(username) || getUserByEmail(username);
+    const user = await getUserByUsername(username) || await getUserByEmail(username);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });

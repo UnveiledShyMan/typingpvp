@@ -1,149 +1,333 @@
-// Base de données en mémoire (peut être migrée vers MongoDB/PostgreSQL)
+// Base de données PostgreSQL
+import pool from './db/connection.js';
 import { User } from './models/User.js';
 import { nanoid } from 'nanoid';
 import bcrypt from 'bcryptjs';
 
-// Stockage en mémoire
-export const users = new Map(); // userId -> User
-export const usersByUsername = new Map(); // username -> userId
-export const usersByEmail = new Map(); // email -> userId
-
-// Fonctions helper
+/**
+ * Crée un nouvel utilisateur
+ */
 export async function createUser(username, email, password) {
   const id = nanoid();
   const passwordHash = await bcrypt.hash(password, 10);
   
-  const user = new User({
-    id,
-    username,
-    email,
-    passwordHash,
-    mmr: {} // MMR par langue
-  });
-  
-  users.set(id, user);
-  usersByUsername.set(username.toLowerCase(), id);
-  usersByEmail.set(email.toLowerCase(), id);
-  
-  return user;
+  try {
+    const result = await pool.query(
+      `INSERT INTO users (id, username, email, password_hash, mmr, stats)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        id,
+        username,
+        email.toLowerCase(),
+        passwordHash,
+        JSON.stringify({}), // MMR vide au départ
+        JSON.stringify({
+          totalMatches: 0,
+          wins: 0,
+          losses: 0,
+          totalWPM: 0,
+          bestWPM: 0,
+          averageAccuracy: 0
+        })
+      ]
+    );
+    
+    return rowToUser(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') { // Unique violation
+      if (error.constraint === 'users_username_key') {
+        throw new Error('Username already taken');
+      }
+      if (error.constraint === 'users_email_key') {
+        throw new Error('Email already taken');
+      }
+    }
+    throw error;
+  }
 }
 
-export function getUserById(id) {
-  return users.get(id);
+/**
+ * Récupère un utilisateur par son ID
+ */
+export async function getUserById(id) {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (result.rows.length === 0) return null;
+    return rowToUser(result.rows[0]);
+  } catch (error) {
+    console.error('Error getting user by id:', error);
+    return null;
+  }
 }
 
-export function getUserByUsername(username) {
-  const userId = usersByUsername.get(username.toLowerCase());
-  return userId ? users.get(userId) : null;
+/**
+ * Récupère un utilisateur par son username
+ */
+export async function getUserByUsername(username) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
+      [username]
+    );
+    if (result.rows.length === 0) return null;
+    return rowToUser(result.rows[0]);
+  } catch (error) {
+    console.error('Error getting user by username:', error);
+    return null;
+  }
 }
 
-export function getUserByEmail(email) {
-  const userId = usersByEmail.get(email.toLowerCase());
-  return userId ? users.get(userId) : null;
+/**
+ * Récupère un utilisateur par son email
+ */
+export async function getUserByEmail(email) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+      [email]
+    );
+    if (result.rows.length === 0) return null;
+    return rowToUser(result.rows[0]);
+  } catch (error) {
+    console.error('Error getting user by email:', error);
+    return null;
+  }
 }
 
+/**
+ * Vérifie le mot de passe d'un utilisateur
+ */
 export async function verifyPassword(user, password) {
   return await bcrypt.compare(password, user.passwordHash);
 }
 
-export function getAllUsers() {
-  return Array.from(users.values());
+/**
+ * Récupère tous les utilisateurs
+ */
+export async function getAllUsers() {
+  try {
+    const result = await pool.query('SELECT * FROM users');
+    return result.rows.map(row => rowToUser(row));
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    return [];
+  }
 }
 
-// Récupérer le classement par langue
-export function getRankingsByLanguage(language, limit = 100) {
-  const allUsers = getAllUsers();
-  
-  return allUsers
-    .map(user => ({
-      id: user.id,
-      username: user.username,
-      avatar: user.avatar,
-      gear: user.gear || '',
-      mmr: user.getMMR(language),
-      stats: user.stats
-    }))
-    .filter(user => user.mmr > 0)
-    .sort((a, b) => b.mmr - a.mmr)
-    .slice(0, limit)
-    .map((user, index) => ({
-      ...user,
-      rank: index + 1
-    }));
+/**
+ * Récupère le classement par langue
+ */
+export async function getRankingsByLanguage(language, limit = 100) {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        id, username, avatar, gear, mmr, stats
+       FROM users
+       WHERE mmr ? $1
+       ORDER BY (mmr->>$1)::INTEGER DESC NULLS LAST
+       LIMIT $2`,
+      [language, limit]
+    );
+    
+    return result.rows
+      .map((row, index) => {
+        // mmr est déjà un JSONB, on peut l'utiliser directement
+        const mmrObj = row.mmr || {};
+        const mmrValue = parseInt(mmrObj[language] || 1000);
+        return {
+          id: row.id,
+          username: row.username,
+          avatar: row.avatar,
+          gear: row.gear || '',
+          mmr: mmrValue,
+          stats: row.stats || {},
+          rank: index + 1
+        };
+      })
+      .filter(user => user.mmr > 0);
+  } catch (error) {
+    console.error('Error getting rankings:', error);
+    return [];
+  }
 }
 
-// Stockage des matchs (historique)
-export const matches = new Map(); // matchId -> Match
-export const userMatches = new Map(); // userId -> Array of matchIds
+/**
+ * Met à jour un utilisateur dans la base de données
+ */
+export async function updateUser(user) {
+  try {
+    await pool.query(
+      `UPDATE users 
+       SET username = $1, email = $2, password_hash = $3, avatar = $4, 
+           bio = $5, gear = $6, social_media = $7, friends = $8, 
+           friend_requests_sent = $9, friend_requests_received = $10, 
+           mmr = $11, stats = $12
+       WHERE id = $13`,
+      [
+        user.username,
+        user.email,
+        user.passwordHash,
+        user.avatar,
+        user.bio,
+        user.gear,
+        JSON.stringify(user.socialMedia),
+        user.friends,
+        user.friendRequests.sent,
+        user.friendRequests.received,
+        JSON.stringify(user.mmr),
+        JSON.stringify(user.stats),
+        user.id
+      ]
+    );
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error;
+  }
+}
 
 /**
  * Enregistre un match dans l'historique
- * @param {Object} matchData - Données du match
- * @returns {string} matchId
  */
-export function recordMatch(matchData) {
+export async function recordMatch(matchData) {
   const matchId = nanoid();
-  const match = {
-    id: matchId,
-    type: matchData.type, // 'solo', 'battle', 'matchmaking', 'competition'
-    date: new Date().toISOString(),
-    language: matchData.language || 'en',
-    players: matchData.players, // Array of { userId, username, wpm, accuracy, won }
-    ...matchData
-  };
+  const client = await pool.connect();
   
-  matches.set(matchId, match);
-  
-  // Ajouter le match à l'historique de chaque joueur
-  match.players.forEach(player => {
-    if (player.userId) {
-      if (!userMatches.has(player.userId)) {
-        userMatches.set(player.userId, []);
+  try {
+    await client.query('BEGIN');
+    
+    // Insérer le match
+    await client.query(
+      `INSERT INTO matches (id, type, language, date, data)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        matchId,
+        matchData.type,
+        matchData.language || 'en',
+        new Date().toISOString(),
+        JSON.stringify(matchData)
+      ]
+    );
+    
+    // Insérer les performances de chaque joueur
+    for (const player of matchData.players) {
+      if (player.userId) {
+        await client.query(
+          `INSERT INTO user_matches (user_id, match_id, wpm, accuracy, won, position)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (user_id, match_id) DO NOTHING`,
+          [
+            player.userId,
+            matchId,
+            player.wpm,
+            player.accuracy,
+            player.won || false,
+            player.position || null
+          ]
+        );
       }
-      userMatches.get(player.userId).push(matchId);
     }
-  });
-  
-  return matchId;
+    
+    await client.query('COMMIT');
+    return matchId;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error recording match:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**
  * Récupère l'historique des matchs d'un utilisateur
- * @param {string} userId - ID de l'utilisateur
- * @param {number} limit - Nombre maximum de matchs à retourner
- * @param {string} type - Type de match à filtrer ('solo', 'multiplayer', ou undefined pour tous)
- * @returns {Array} Liste des matchs
  */
-export function getUserMatches(userId, limit = 50, type = undefined) {
-  const matchIds = userMatches.get(userId) || [];
-  let filteredMatches = matchIds
-    .map(matchId => matches.get(matchId))
-    .filter(Boolean);
-  
-  // Filtrer par type si spécifié
-  if (type === 'solo') {
-    filteredMatches = filteredMatches.filter(match => match.type === 'solo');
-  } else if (type === 'multiplayer') {
-    filteredMatches = filteredMatches.filter(match => match.type !== 'solo');
-  }
-  
-  return filteredMatches
-    .slice(-limit) // Prendre les N derniers
-    .reverse() // Plus récents en premier
-    .map(match => {
-      // Trouver les données du joueur dans ce match
-      const playerData = match.players.find(p => p.userId === userId);
+export async function getUserMatches(userId, limit = 50, type = undefined) {
+  try {
+    let query = `
+      SELECT 
+        m.id, m.type, m.language, m.date, m.data,
+        um.wpm, um.accuracy, um.won, um.position
+      FROM user_matches um
+      JOIN matches m ON um.match_id = m.id
+      WHERE um.user_id = $1
+    `;
+    
+    const params = [userId];
+    
+    // Filtrer par type si spécifié
+    if (type === 'solo') {
+      query += ' AND m.type = $2';
+      params.push('solo');
+    } else if (type === 'multiplayer') {
+      query += ' AND m.type != $2';
+      params.push('solo');
+    }
+    
+    query += ' ORDER BY m.date DESC LIMIT $' + (params.length + 1);
+    params.push(limit);
+    
+    const result = await pool.query(query, params);
+    
+    return result.rows.map(row => {
+      const matchData = row.data;
+      const players = matchData.players || [];
+      
+      // Trouver l'adversaire (autre joueur)
+      const opponent = players.find(p => p.userId !== userId);
+      
       return {
-        id: match.id,
-        type: match.type,
-        date: match.date,
-        language: match.language,
-        wpm: playerData?.wpm || 0,
-        accuracy: playerData?.accuracy || 0,
-        won: playerData?.won || false,
-        opponent: match.players.find(p => p.userId !== userId)?.username || null,
-        position: match.type === 'competition' ? playerData?.position : null
+        id: row.id,
+        type: row.type,
+        date: row.date,
+        language: row.language,
+        wpm: row.wpm,
+        accuracy: parseFloat(row.accuracy),
+        won: row.won,
+        opponent: opponent?.username || null,
+        position: row.position
       };
     });
+  } catch (error) {
+    console.error('Error getting user matches:', error);
+    return [];
+  }
 }
 
+/**
+ * Convertit une ligne de la base de données en objet User
+ */
+function rowToUser(row) {
+  if (!row) return null;
+  
+  return new User({
+    id: row.id,
+    username: row.username,
+    email: row.email,
+    passwordHash: row.password_hash,
+    avatar: row.avatar,
+    bio: row.bio || '',
+    gear: row.gear || '',
+    socialMedia: row.social_media || {
+      twitter: '',
+      github: '',
+      discord: '',
+      website: ''
+    },
+    friends: row.friends || [],
+    friendRequests: {
+      sent: row.friend_requests_sent || [],
+      received: row.friend_requests_received || []
+    },
+    createdAt: row.created_at,
+    mmr: row.mmr || {},
+    stats: row.stats || {
+      totalMatches: 0,
+      wins: 0,
+      losses: 0,
+      totalWPM: 0,
+      bestWPM: 0,
+      averageAccuracy: 0
+    }
+  });
+}

@@ -1,0 +1,39 @@
+// Script d'initialisation de la base de données
+// Exécute le schéma SQL pour créer les tables
+import pool from './connection.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * Initialise la base de données en exécutant le schéma SQL
+ */
+async function initDatabase() {
+  try {
+    console.log('Connecting to database...');
+    
+    // Lire le fichier schema.sql
+    const schemaPath = join(__dirname, 'schema.sql');
+    const schema = readFileSync(schemaPath, 'utf8');
+    
+    // Exécuter le schéma
+    await pool.query(schema);
+    
+    console.log('✅ Database schema created successfully');
+    console.log('Tables created: users, matches, user_matches');
+    
+    await pool.end();
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error initializing database:', error);
+    await pool.end();
+    process.exit(1);
+  }
+}
+
+// Exécuter l'initialisation
+initDatabase();
+
