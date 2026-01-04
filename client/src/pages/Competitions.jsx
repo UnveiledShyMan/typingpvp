@@ -41,7 +41,10 @@ export default function Competitions() {
 
   const connectSocket = () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    socketRef.current = io(apiUrl);
+    socketRef.current = io(apiUrl, {
+      transports: ['polling'], // Utiliser polling pour Plesk
+      reconnection: true
+    });
 
     socketRef.current.on('competitions-list', (data) => {
       setCompetitions(data);

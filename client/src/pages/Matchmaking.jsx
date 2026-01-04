@@ -55,7 +55,10 @@ export default function Matchmaking() {
     }
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    socketRef.current = io(apiUrl);
+    socketRef.current = io(apiUrl, {
+      transports: ['polling'], // Utiliser polling pour Plesk
+      reconnection: true
+    });
 
     const socket = socketRef.current;
     const mmr = user.mmr[selectedLang] || 1000;
