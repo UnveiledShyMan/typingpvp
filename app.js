@@ -1,0 +1,169 @@
+// Script principal pour Plesk Node.js
+// Ce fichier est le point d'entrée que Plesk va exécuter
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Configuration
+const SERVER_DIR = join(__dirname, 'server');
+const CLIENT_DIST_DIR = join(__dirname, 'client', 'dist');
+
+/**
+ * Vérifie si la base de données est initialisée
+ */
+async function checkDatabase() {
+  try {
+    const pool = (await import('./server/db/connection.js')).default;
+    const result = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users'
+      );
+    `);
+    
+    const tablesExist = result.rows[0].exists;
+    await pool.end();
+    
+    return tablesExist;
+  } catch (error) {
+    console.error('Erreur lors de la vérification de la base de données:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Initialise la base de données
+ */
+async function initDatabase() {
+  try {
+    console.log('Initialisation de la base de données...');
+    const { readFileSync } = await import('fs');
+    const pool = (await import('./server/db/connection.js')).default;
+    const { join } = await import('path');
+    
+    const schemaPath = join(__dirname, 'server', 'db', 'schema.sql');
+    const schema = readFileSync(schemaPath, 'utf8');
+    
+    await pool.query(schema);
+    await pool.end();
+    
+    console.log('✅ Base de données initialisée avec succès');
+    return true;
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'initialisation de la base de données:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Vérifie si le client est buildé
+ */
+function checkClientBuild() {
+  const indexHtml = join(CLIENT_DIST_DIR, 'index.html');
+  return existsSync(indexHtml);
+}
+
+/**
+ * Build le client si nécessaire
+ */
+async function buildClient() {
+  if (checkClientBuild()) {
+    console.log('✅ Client déjà buildé');
+    return true;
+  }
+  
+  try {
+    console.log('Build du client en cours...');
+    const clientDir = join(__dirname, 'client');
+    
+    // Vérifier si node_modules existe
+    if (!existsSync(join(clientDir, 'node_modules'))) {
+      console.log('Installation des dépendances client...');
+      await execAsync('npm install', { cwd: clientDir });
+    }
+    
+    // Builder
+    console.log('Build en cours...');
+    await execAsync('npm run build', { cwd: clientDir });
+    
+    console.log('✅ Client buildé avec succès');
+    return true;
+  } catch (error) {
+    console.error('❌ Erreur lors du build du client:', error.message);
+    console.error('⚠️ Le serveur va démarrer quand même, mais le client ne sera pas accessible');
+    return false;
+  }
+}
+
+/**
+ * Vérifie et installe les dépendances du serveur si nécessaire
+ */
+async function checkServerDependencies() {
+  const nodeModulesPath = join(SERVER_DIR, 'node_modules');
+  
+  if (!existsSync(nodeModulesPath)) {
+    try {
+      console.log('Installation des dépendances serveur...');
+      await execAsync('npm install', { cwd: SERVER_DIR });
+      console.log('✅ Dépendances serveur installées');
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'installation des dépendances:', error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Démarre le serveur
+ */
+async function startServer() {
+  // Importer et exécuter le serveur
+  console.log('Démarrage du serveur...');
+  await import('./server/index.js');
+}
+
+/**
+ * Fonction principale
+ */
+async function main() {
+  console.log('🚀 Démarrage de TypingPVP...\n');
+  
+  try {
+    // 1. Vérifier les dépendances serveur
+    await checkServerDependencies();
+    
+    // 2. Vérifier et builder le client (en mode non-bloquant)
+    buildClient().catch(err => {
+      console.error('Avertissement: Le build du client a échoué, mais le serveur continue:', err.message);
+    });
+    
+    // 3. Vérifier et initialiser la base de données
+    const dbInitialized = await checkDatabase();
+    if (!dbInitialized) {
+      console.log('⚠️ Base de données non initialisée');
+      const initialized = await initDatabase();
+      if (!initialized) {
+        console.error('❌ Impossible d\'initialiser la base de données. Vérifiez les variables d\'environnement DB_*');
+        process.exit(1);
+      }
+    }
+    
+    // 4. Démarrer le serveur
+    await startServer();
+    
+  } catch (error) {
+    console.error('❌ Erreur fatale:', error);
+    process.exit(1);
+  }
+}
+
+// Lancer l'application
+main();
+

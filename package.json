@@ -2,7 +2,8 @@
   "name": "typing-battle",
   "version": "1.0.0",
   "description": "Site de test de dactylo avec batailles 1v1",
-  "main": "server/index.js",
+  "main": "app.js",
+  "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && nodemon index.js",
