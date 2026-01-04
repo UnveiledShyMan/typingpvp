@@ -35,7 +35,7 @@
 
 8. **Test** : Vérifier que l'API fonctionne en visitant `https://votre-url.railway.app/api/rankings`
 
-### 2. Déployer le client (Frontend)
+### 2. Déployer le client (Frontend)    
 
 **Option A : Vercel** (Recommandé pour React - gratuit, simple)
 
