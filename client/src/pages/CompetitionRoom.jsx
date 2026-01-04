@@ -30,6 +30,7 @@ export default function CompetitionRoom() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     socketRef.current = io(apiUrl, {
       transports: ['polling'], // Utiliser polling pour Plesk
+      upgrade: false, // Empêcher l'upgrade vers WebSocket
       reconnection: true
     });
     const socket = socketRef.current;

@@ -24,7 +24,10 @@ const io = new Server(httpServer, {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  // Forcer polling pour compatibilité avec Plesk/nginx
+  transports: ['polling'],
+  allowUpgrades: false // Empêcher l'upgrade vers WebSocket
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
