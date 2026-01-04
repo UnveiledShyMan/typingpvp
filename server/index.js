@@ -74,6 +74,22 @@ setOnlineUsers(onlineUsers);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/matches', matchesRoutes);
 
+// Servir les fichiers statiques du client (frontend)
+// Chemin relatif depuis server/ vers client/dist
+const clientDistPath = join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientDistPath));
+
+// Route catch-all : servir index.html pour toutes les routes non-API
+// Cela permet au React Router de gérer le routing côté client
+app.get('*', (req, res) => {
+  // Ne pas intercepter les routes API
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  // Servir index.html pour toutes les autres routes
+  res.sendFile(join(clientDistPath, 'index.html'));
+});
+
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
