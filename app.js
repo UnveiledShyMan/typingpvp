@@ -16,6 +16,7 @@ const CLIENT_DIST_DIR = join(__dirname, 'client', 'dist');
 
 /**
  * Vérifie si la base de données est initialisée
+ * IMPORTANT: Ne pas fermer le pool, il est partagé avec l'application
  */
 async function checkDatabase() {
   try {
@@ -29,7 +30,8 @@ async function checkDatabase() {
     `);
     
     const tablesExist = result.rows[0].exists;
-    await pool.end();
+    // NE PAS fermer le pool, il est partagé avec l'application
+    // Le pool sera fermé automatiquement à la fin du processus
     
     return tablesExist;
   } catch (error) {
@@ -40,6 +42,7 @@ async function checkDatabase() {
 
 /**
  * Initialise la base de données
+ * IMPORTANT: Ne pas fermer le pool, il est partagé avec l'application
  */
 async function initDatabase() {
   try {
@@ -52,7 +55,8 @@ async function initDatabase() {
     const schema = readFileSync(schemaPath, 'utf8');
     
     await pool.query(schema);
-    await pool.end();
+    // NE PAS fermer le pool, il est partagé avec l'application
+    // Le pool sera fermé automatiquement à la fin du processus
     
     console.log('✅ Base de données initialisée avec succès');
     return true;
@@ -87,6 +91,16 @@ async function buildClient() {
     if (!existsSync(join(clientDir, 'node_modules'))) {
       console.log('Installation des dépendances client...');
       await execAsync('npm install', { cwd: clientDir });
+    }
+    
+    // Créer .env.production si il n'existe pas
+    const envProdPath = join(clientDir, '.env.production');
+    if (!existsSync(envProdPath)) {
+      console.log('Création de .env.production avec URL du serveur...');
+      const clientUrl = process.env.CLIENT_URL || 'https://typingpvp.com';
+      const envContent = `VITE_API_URL=${clientUrl}\n`;
+      const { writeFileSync } = await import('fs');
+      writeFileSync(envProdPath, envContent, 'utf8');
     }
     
     // Builder

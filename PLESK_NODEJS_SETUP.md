@@ -19,13 +19,14 @@ Dans la section **Environment Variables**, ajoutez :
 NODE_ENV=production
 PORT=3001
 HOST=0.0.0.0
+SERVE_CLIENT=true
+CLIENT_URL=https://typingpvp.com
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=votre_nom_db_postgresql
 DB_USER=votre_utilisateur_db
 DB_PASSWORD=votre_mot_de_passe_db
 JWT_SECRET=votre_secret_jwt_aleatoire_et_securise
-CLIENT_URL=https://typingpvp.com
 ```
 
 **Important** :
@@ -35,7 +36,9 @@ CLIENT_URL=https://typingpvp.com
 
 ### 3. Démarrer l'application
 
-Cliquez sur **Enable Node.js** puis **Restart App**
+1. Cliquez sur **Enable Node.js** (bouton en haut)
+2. Cliquez sur **Restart App** (ou **Restart Application**)
+3. Vérifiez les logs pour voir "Server running on 0.0.0.0:3001"
 
 ## 🔧 Ce que fait app.js
 
