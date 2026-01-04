@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { nanoid } from 'nanoid';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import rankingsRoutes from './routes/rankings.js';
@@ -11,6 +13,9 @@ import friendsRoutes from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 import { getUserById, recordMatch } from './db.js';
 import { calculateNewMMR } from './utils/elo.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
