@@ -94,7 +94,8 @@ export default function Matchmaking() {
       // Rediriger vers la battle room
       navigate(`/battle/${data.roomId}`, { 
         state: { 
-          playerName: user.username, 
+          playerName: user.username,
+          userId: user.id,
           isCreator: false,
           matchmaking: true 
         } 

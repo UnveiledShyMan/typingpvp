@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
+import LogoIconSmall from '../components/icons/LogoIconSmall'
 
 export default function BattleRoom() {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { playerName, isCreator } = location.state || {};
+  const { playerName, userId, isCreator, matchmaking } = location.state || {};
   
   const [text, setText] = useState('');
   const [input, setInput] = useState('');
@@ -17,9 +18,37 @@ export default function BattleRoom() {
   const [opponentStats, setOpponentStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
   const [results, setResults] = useState(null);
   const [errors, setErrors] = useState(0);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
   const inputRef = useRef(null);
   const socketRef = useRef(null);
   const textContainerRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
+  // Récupérer l'utilisateur courant si userId est fourni
+  useEffect(() => {
+    if (userId || matchmaking) {
+      const fetchUser = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        try {
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+          const response = await fetch(`${API_URL}/api/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (response.ok) {
+            const userData = await response.json();
+            setCurrentUser(userData);
+          }
+        } catch (error) {
+          console.error('Error fetching user:', error);
+        }
+      };
+      fetchUser();
+    }
+  }, [userId, matchmaking]);
 
   useEffect(() => {
     if (!playerName) {
@@ -35,11 +64,19 @@ export default function BattleRoom() {
     });
     const socket = socketRef.current;
 
-    socket.emit('join-room', { roomId, playerName });
+    // Pour les rooms matchmaking, envoyer userId pour permettre la reconnexion
+    socket.emit('join-room', { 
+      roomId, 
+      playerName,
+      userId: userId || currentUser?.id || null
+    });
 
     socket.on('room-joined', (data) => {
       setText(data.text);
       setPlayers(data.players);
+      if (data.chatMessages) {
+        setChatMessages(data.chatMessages);
+      }
     });
 
     socket.on('player-joined', (data) => {
@@ -82,6 +119,16 @@ export default function BattleRoom() {
       setResults(data.results);
     });
 
+    socket.on('chat-message', (message) => {
+      setChatMessages(prev => [...prev, message]);
+      // Auto-scroll chat vers le bas
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+      }, 100);
+    });
+
     socket.on('error', (error) => {
       alert(error.message);
       window.location.href = '/';
@@ -95,16 +142,46 @@ export default function BattleRoom() {
       socket.off('opponent-update');
       socket.off('opponent-finished');
       socket.off('game-finished');
+      socket.off('chat-message');
       socket.off('error');
       socket.disconnect();
     };
-  }, [roomId, playerName]);
+  }, [roomId, playerName, currentUser]);
 
   useEffect(() => {
     if (inputRef.current && gameStatus === 'playing') {
       inputRef.current.focus();
     }
   }, [gameStatus]);
+
+  // Auto-scroll chat vers le bas quand de nouveaux messages arrivent
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  // Fonction pour envoyer un message de chat
+  const handleSendChatMessage = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !socketRef.current) return;
+    
+    socketRef.current.emit('chat-message', {
+      roomId,
+      message: chatInput.trim(),
+      username: currentUser?.username || playerName
+    });
+    
+    setChatInput('');
+  };
+
+  // Formater l'heure du message
+  const formatMessageTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
 
   const handleStartGame = () => {
     if (players.length === 2 && socketRef.current) {
@@ -211,12 +288,16 @@ export default function BattleRoom() {
     });
   };
 
-  const myPlayer = players.find(p => p.name === playerName);
-  const opponent = players.find(p => p.name !== playerName);
+  const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));
+  const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
 
   return (
-    <div className="page-container p-8">
-        <div className="bg-bg-secondary rounded-lg p-10 border border-border-primary shadow-lg relative overflow-hidden">
+    <div className="page-container p-4 lg:p-8">
+        <div className="bg-bg-secondary rounded-lg p-6 lg:p-10 border border-border-primary shadow-lg relative overflow-hidden">
+          {/* Layout en deux colonnes : jeu à gauche, chat à droite */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+            {/* Colonne principale : jeu */}
+            <div className="min-w-0">
           {/* Effet de fond éthéré amélioré */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent-primary rounded-full blur-3xl animate-pulse-subtle"></div>
@@ -377,6 +458,70 @@ export default function BattleRoom() {
                 </button>
             </div>
           )}
+          </div>
+            </div>
+
+            {/* Colonne droite : Chat */}
+            <div className="lg:border-l lg:border-text-secondary/10 lg:pl-6">
+              <div className="bg-bg-primary rounded-lg border border-text-secondary/10 h-full flex flex-col" style={{ minHeight: '500px', maxHeight: 'calc(100vh - 200px)' }}>
+                {/* En-tête du chat */}
+                <div className="p-4 border-b border-text-secondary/10">
+                  <h3 className="text-text-primary font-semibold" style={{ fontFamily: 'Inter' }}>Chat</h3>
+                </div>
+
+                {/* Messages du chat */}
+                <div 
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto p-4 space-y-3"
+                  style={{ scrollBehavior: 'smooth' }}
+                >
+                  {chatMessages.length === 0 ? (
+                    <div className="text-text-secondary text-sm text-center py-8">
+                      No messages yet. Start the conversation!
+                    </div>
+                  ) : (
+                    chatMessages.map((msg) => (
+                      <div key={msg.id} className="flex gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold">
+                          {msg.username[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <span className="text-text-primary text-sm font-semibold">{msg.username}</span>
+                            <span className="text-text-secondary text-xs">{formatMessageTime(msg.timestamp)}</span>
+                          </div>
+                          <div className="text-text-secondary text-sm break-words">{msg.message}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Input du chat */}
+                <form onSubmit={handleSendChatMessage} className="p-4 border-t border-text-secondary/10">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Type a message..."
+                      className="flex-1 px-3 py-2 bg-bg-secondary border border-text-secondary/20 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50 transition-colors"
+                      disabled={gameStatus === 'playing'}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim() || gameStatus === 'playing'}
+                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Send
+                    </button>
+                  </div>
+                  {gameStatus === 'playing' && (
+                    <p className="text-text-secondary text-xs mt-2">Chat disabled during game</p>
+                  )}
+                </form>
+              </div>
+            </div>
           </div>
         </div>
     </div>

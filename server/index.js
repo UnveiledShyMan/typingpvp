@@ -122,7 +122,8 @@ io.on('connection', (socket) => {
       players: [],
       status: 'waiting', // waiting, playing, finished
       startTime: null,
-      results: {}
+      results: {},
+      chatMessages: [] // Historique du chat pour la room
     };
     
     rooms.set(roomId, room);
@@ -134,7 +135,7 @@ io.on('connection', (socket) => {
 
   // Rejoindre une room
   socket.on('join-room', (data) => {
-    const { roomId, playerName } = data;
+    const { roomId, playerName, userId } = data;
     const room = rooms.get(roomId);
     
     if (!room) {
@@ -142,7 +143,22 @@ io.on('connection', (socket) => {
       return;
     }
     
-    if (room.players.length >= 2) {
+    // Pour les rooms de matchmaking, vérifier si le joueur fait déjà partie de la room
+    if (room.matchmaking && userId) {
+      const existingPlayer = room.players.find(p => p.userId === userId);
+      if (existingPlayer) {
+        // Le joueur fait déjà partie de la room (matchmaking), mettre à jour son socket.id
+        existingPlayer.id = socket.id;
+        players.set(socket.id, { roomId, player: existingPlayer });
+        socket.join(roomId);
+        socket.emit('room-joined', { roomId, text: room.text, players: room.players });
+        console.log(`Player ${playerName} reconnected to matchmaking room ${roomId}`);
+        return;
+      }
+    }
+    
+    // Vérification normale pour les rooms non-matchmaking
+    if (!room.matchmaking && room.players.length >= 2) {
       socket.emit('error', { message: 'Room is full' });
       return;
     }
@@ -154,6 +170,7 @@ io.on('connection', (socket) => {
     
     const player = {
       id: socket.id,
+      userId: userId || null,
       name: playerName || `Player ${room.players.length + 1}`,
       progress: 0,
       wpm: 0,
@@ -166,7 +183,7 @@ io.on('connection', (socket) => {
     players.set(socket.id, { roomId, player });
     
     socket.join(roomId);
-    socket.emit('room-joined', { roomId, text: room.text, players: room.players });
+    socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
     io.to(roomId).emit('player-joined', { players: room.players });
     
     console.log(`Player ${playerName} joined room ${roomId}`);
@@ -416,7 +433,8 @@ io.on('connection', (socket) => {
       startTime: null,
       results: {},
       language: language,
-      matchmaking: true
+      matchmaking: true,
+      chatMessages: [] // Historique du chat pour la room
     };
     
     rooms.set(roomId, room);
