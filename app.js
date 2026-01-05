@@ -96,35 +96,82 @@ async function buildClient() {
     // Vérifier si node_modules existe
     if (!existsSync(join(clientDir, 'node_modules'))) {
       console.log('Installation des dépendances client...');
-      await execAsync('npm install', { cwd: clientDir });
+      try {
+        const { stdout, stderr } = await execAsync('npm install', { 
+          cwd: clientDir,
+          shell: true,
+          maxBuffer: 10 * 1024 * 1024 // 10MB buffer pour les gros outputs
+        });
+        if (stdout) console.log(stdout);
+        if (stderr) console.error('npm install stderr:', stderr);
+        console.log('✅ Dépendances client installées');
+      } catch (installError) {
+        console.error('❌ Erreur lors de l\'installation des dépendances:', installError.message);
+        if (installError.stdout) console.error('stdout:', installError.stdout);
+        if (installError.stderr) console.error('stderr:', installError.stderr);
+        throw installError;
+      }
+    } else {
+      console.log('✅ node_modules existe déjà');
     }
     
     // Créer .env.production si il n'existe pas
     const envProdPath = join(clientDir, '.env.production');
+    // VITE_API_URL doit pointer vers l'API (le serveur), pas vers le client
+    // En production, si client et serveur sont sur le même domaine, utiliser l'URL du domaine
+    const apiUrl = process.env.VITE_API_URL || process.env.CLIENT_URL || 'https://typingpvp.com';
     if (!existsSync(envProdPath)) {
-      console.log('Création de .env.production avec URL du serveur...');
-      const clientUrl = process.env.CLIENT_URL || 'https://typingpvp.com';
-      const envContent = `VITE_API_URL=${clientUrl}\n`;
+      console.log('Création de .env.production avec URL de l\'API...');
+      const envContent = `VITE_API_URL=${apiUrl}\n`;
       const { writeFileSync } = await import('fs');
       writeFileSync(envProdPath, envContent, 'utf8');
+      console.log(`✅ .env.production créé avec VITE_API_URL=${apiUrl}`);
     } else {
       // Mettre à jour .env.production avec la bonne URL si nécessaire
       const { readFileSync, writeFileSync } = await import('fs');
-      const clientUrl = process.env.CLIENT_URL || 'https://typingpvp.com';
-      const envContent = `VITE_API_URL=${clientUrl}\n`;
+      const envContent = `VITE_API_URL=${apiUrl}\n`;
       writeFileSync(envProdPath, envContent, 'utf8');
-      console.log('✅ .env.production mis à jour avec la bonne URL');
+      console.log(`✅ .env.production mis à jour avec VITE_API_URL=${apiUrl}`);
     }
     
     // Builder
     console.log('Build du client en cours...');
-    await execAsync('npm run build', { cwd: clientDir });
-    
-    console.log('✅ Client buildé avec succès');
-    return true;
+    try {
+      const { stdout, stderr } = await execAsync('npm run build', { 
+        cwd: clientDir,
+        shell: true,
+        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+      });
+      if (stdout) console.log(stdout);
+      if (stderr) console.error('npm build stderr:', stderr);
+      
+      // Vérifier que le dossier dist a été créé
+      if (!existsSync(clientDistDir)) {
+        throw new Error('Le dossier client/dist n\'a pas été créé après le build');
+      }
+      
+      // Vérifier que index.html existe
+      const indexPath = join(clientDistDir, 'index.html');
+      if (!existsSync(indexPath)) {
+        throw new Error('index.html n\'existe pas dans client/dist après le build');
+      }
+      
+      console.log('✅ Client buildé avec succès');
+      return true;
+    } catch (buildError) {
+      console.error('❌ Erreur lors du build du client:', buildError.message);
+      if (buildError.stdout) {
+        console.error('Build stdout:', buildError.stdout);
+      }
+      if (buildError.stderr) {
+        console.error('Build stderr:', buildError.stderr);
+      }
+      throw buildError;
+    }
   } catch (error) {
     console.error('❌ Erreur lors du build du client:', error.message);
     console.error('⚠️ Le serveur va démarrer quand même, mais le client ne sera pas accessible');
+    console.error('⚠️ Vérifiez les logs ci-dessus pour plus de détails');
     return false;
   }
 }
@@ -138,12 +185,22 @@ async function checkServerDependencies() {
   if (!existsSync(nodeModulesPath)) {
     try {
       console.log('Installation des dépendances serveur...');
-      await execAsync('npm install', { cwd: SERVER_DIR });
+      const { stdout, stderr } = await execAsync('npm install', { 
+        cwd: SERVER_DIR,
+        shell: true,
+        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+      });
+      if (stdout) console.log(stdout);
+      if (stderr) console.error('npm install stderr:', stderr);
       console.log('✅ Dépendances serveur installées');
     } catch (error) {
-      console.error('❌ Erreur lors de l\'installation des dépendances:', error.message);
+      console.error('❌ Erreur lors de l\'installation des dépendances serveur:', error.message);
+      if (error.stdout) console.error('stdout:', error.stdout);
+      if (error.stderr) console.error('stderr:', error.stderr);
       throw error;
     }
+  } else {
+    console.log('✅ Dépendances serveur déjà installées');
   }
 }
 
