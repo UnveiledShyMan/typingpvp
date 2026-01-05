@@ -49,8 +49,9 @@ app.use(express.json());
 const rooms = new Map();
 const players = new Map();
 
-// Système de matchmaking (queue)
-const matchmakingQueue = new Map(); // Map<socketId, { userId, mmr, language, socketId }>
+// Système de matchmaking (queues séparées pour ranked et unrated)
+const rankedMatchmakingQueue = new Map(); // Map<socketId, { userId, username, mmr, language, socketId, joinedAt }>
+const unratedMatchmakingQueue = new Map(); // Map<socketId, { userId, username, mmr, language, socketId, joinedAt }>
 
 // Système de compétitions (mass multiplayer)
 const competitions = new Map(); // Map<competitionId, { id, text, players, status, startTime, results, language, maxPlayers }>
@@ -473,17 +474,23 @@ io.on('connection', (socket) => {
     if (allFinished) {
       room.status = 'finished';
       
-      // Mettre à jour les résultats du match (incluant les changements d'ELO)
+      // Mettre à jour les résultats du match (incluant les changements d'ELO uniquement pour ranked)
       let eloChanges = {};
-      if (room.matchmaking || room.players.some(p => p.userId)) {
+      // Seulement mettre à jour l'ELO pour les matchs ranked
+      if (room.ranked && room.matchmaking && room.players.some(p => p.userId)) {
         // updateMatchResults calcule et enregistre les changements d'ELO, et les retourne
         eloChanges = await updateMatchResults(room).catch(err => {
           console.error('Error updating match results:', err);
           return {};
         });
+      } else if (room.matchmaking && !room.ranked) {
+        // Pour unrated, enregistrer le match sans mettre à jour l'ELO
+        await recordUnratedMatch(room).catch(err => {
+          console.error('Error recording unrated match:', err);
+        });
       }
       
-      // Stocker les changements d'ELO dans la room pour les reconnexions
+      // Stocker les changements d'ELO dans la room pour les reconnexions (vide pour unrated)
       room.eloChanges = eloChanges;
       
       io.to(roomId).emit('game-finished', { results: room.results, players: room.players, eloChanges });
@@ -594,54 +601,123 @@ io.on('connection', (socket) => {
     return eloChanges;
   }
 
+  // Fonction pour enregistrer un match unrated (sans mettre à jour l'ELO)
+  async function recordUnratedMatch(room) {
+    if (room.players.length !== 2) return;
+    
+    const [player1, player2] = room.players;
+    const result1 = room.results[player1.id];
+    const result2 = room.results[player2.id];
+    
+    if (!result1 || !result2) return;
+    
+    // Déterminer le gagnant (meilleur WPM, en cas d'égalité meilleure accuracy)
+    let player1Won = false;
+    if (result1.wpm > result2.wpm) {
+      player1Won = true;
+    } else if (result1.wpm === result2.wpm) {
+      player1Won = result1.accuracy > result2.accuracy;
+    }
+    
+    const language = room.language || 'en';
+    
+    // Enregistrer le match sans changements d'ELO
+    await recordMatch({
+      type: 'battle',
+      language: language,
+      players: [{
+        userId: player1.userId || null,
+        username: player1.name,
+        wpm: result1.wpm,
+        accuracy: result1.accuracy,
+        won: player1Won,
+        eloBefore: null,
+        eloAfter: null,
+        eloChange: null
+      }, {
+        userId: player2.userId || null,
+        username: player2.name,
+        wpm: result2.wpm,
+        accuracy: result2.accuracy,
+        won: !player1Won,
+        eloBefore: null,
+        eloAfter: null,
+        eloChange: null
+      }]
+    });
+    
+    console.log(`Unrated match recorded: ${player1.name} vs ${player2.name}, Winner: ${player1Won ? player1.name : player2.name}`);
+  }
+
   // MATCHMAKING SYSTEM
   // Rejoindre la queue de matchmaking
   socket.on('join-matchmaking', async (data) => {
-    const { userId, username, language = 'en', mmr = 1000 } = data;
+    const { userId, username, language = 'en', mmr = 1000, ranked = true } = data;
     
-    // Vérifier si déjà dans la queue
-    if (matchmakingQueue.has(socket.id)) {
+    // Sélectionner la bonne queue
+    const queue = ranked ? rankedMatchmakingQueue : unratedMatchmakingQueue;
+    const queueName = ranked ? 'ranked' : 'unrated';
+    
+    // Vérifier si déjà dans une queue (ranked ou unrated)
+    if (rankedMatchmakingQueue.has(socket.id) || unratedMatchmakingQueue.has(socket.id)) {
       socket.emit('matchmaking-error', { message: 'Already in queue' });
       return;
     }
     
-    // Ajouter à la queue (userId peut être null pour les guests)
-    matchmakingQueue.set(socket.id, {
+    // Pour ranked, exiger un userId (pas de guests)
+    if (ranked && !userId) {
+      socket.emit('matchmaking-error', { message: 'Must be logged in for ranked matches' });
+      return;
+    }
+    
+    // Ajouter à la queue appropriée
+    queue.set(socket.id, {
       userId: userId || null,
-      username: username || null, // Pour les guests
+      username: username || null, // Pour les guests (unrated uniquement)
       mmr: parseInt(mmr) || 1000,
       language,
       socketId: socket.id,
-      joinedAt: Date.now()
+      joinedAt: Date.now(),
+      ranked
     });
     
-    socket.emit('matchmaking-joined', { language, mmr });
-    console.log(`Player ${userId || username || 'guest'} joined matchmaking queue (${language}, MMR: ${mmr})`);
+    socket.emit('matchmaking-joined', { language, mmr, ranked });
+    console.log(`Player ${userId || username || 'guest'} joined ${queueName} matchmaking queue (${language}, MMR: ${mmr})`);
     
     // Chercher un match
-    findMatch(socket.id, language, mmr);
+    findMatch(socket.id, language, mmr, ranked);
   });
 
   // Quitter la queue de matchmaking
   socket.on('leave-matchmaking', () => {
-    if (matchmakingQueue.has(socket.id)) {
-      matchmakingQueue.delete(socket.id);
+    let left = false;
+    if (rankedMatchmakingQueue.has(socket.id)) {
+      rankedMatchmakingQueue.delete(socket.id);
+      left = true;
+    }
+    if (unratedMatchmakingQueue.has(socket.id)) {
+      unratedMatchmakingQueue.delete(socket.id);
+      left = true;
+    }
+    if (left) {
       socket.emit('matchmaking-left');
       console.log(`Player left matchmaking queue: ${socket.id}`);
     }
   });
 
   // Fonction pour trouver un match
-  function findMatch(socketId, language, mmr) {
-    const player = matchmakingQueue.get(socketId);
+  function findMatch(socketId, language, mmr, ranked) {
+    const queue = ranked ? rankedMatchmakingQueue : unratedMatchmakingQueue;
+    const player = queue.get(socketId);
     if (!player) return;
     
-    // Chercher un adversaire avec un MMR similaire (±200)
-    const MMR_RANGE = 200;
+    // Pour ranked : chercher un adversaire avec un MMR similaire (±200)
+    // Pour unrated : chercher n'importe quel adversaire avec la même langue
+    const MMR_RANGE = ranked ? 200 : Infinity;
     let bestMatch = null;
     let bestMMRDiff = Infinity;
     
-    for (const [otherSocketId, otherPlayer] of matchmakingQueue.entries()) {
+    for (const [otherSocketId, otherPlayer] of queue.entries()) {
       if (otherSocketId === socketId) continue;
       if (otherPlayer.language !== language) continue;
       
@@ -654,19 +730,20 @@ io.on('connection', (socket) => {
     
     // Si un match est trouvé, créer une room
     if (bestMatch) {
-      createMatchmakingRoom(socketId, player, bestMatch.socketId, bestMatch.player, language);
+      createMatchmakingRoom(socketId, player, bestMatch.socketId, bestMatch.player, language, ranked);
     }
   }
 
   // Créer une room depuis le matchmaking
-  async function createMatchmakingRoom(socketId1, player1, socketId2, player2, language) {
-    // Retirer les joueurs de la queue
-    matchmakingQueue.delete(socketId1);
-    matchmakingQueue.delete(socketId2);
+  async function createMatchmakingRoom(socketId1, player1, socketId2, player2, language, ranked = true) {
+    // Retirer les joueurs de la queue appropriée
+    const queue = ranked ? rankedMatchmakingQueue : unratedMatchmakingQueue;
+    queue.delete(socketId1);
+    queue.delete(socketId2);
     
     // Récupérer les noms d'utilisateurs
-    const user1 = await getUserById(player1.userId);
-    const user2 = await getUserById(player2.userId);
+    const user1 = player1.userId ? await getUserById(player1.userId) : null;
+    const user2 = player2.userId ? await getUserById(player2.userId) : null;
     
     // Créer une nouvelle room
     const roomId = nanoid(8);
@@ -681,6 +758,7 @@ io.on('connection', (socket) => {
       results: {},
       language: language,
       matchmaking: true,
+      ranked: ranked, // Indicateur si c'est un match ranked ou unrated
       chatMessages: [] // Historique du chat pour la room
     };
     
@@ -719,13 +797,13 @@ io.on('connection', (socket) => {
     if (socket1) {
       socket1.join(roomId);
       players.set(socketId1, { roomId, player: player1Data });
-      socket1.emit('matchmaking-match-found', { roomId, text, players: room.players });
+      socket1.emit('matchmaking-match-found', { roomId, text, players: room.players, ranked: ranked });
     }
     
     if (socket2) {
       socket2.join(roomId);
       players.set(socketId2, { roomId, player: player2Data });
-      socket2.emit('matchmaking-match-found', { roomId, text, players: room.players });
+      socket2.emit('matchmaking-match-found', { roomId, text, players: room.players, ranked: ranked });
     }
     
     // Démarrer automatiquement après 3 secondes

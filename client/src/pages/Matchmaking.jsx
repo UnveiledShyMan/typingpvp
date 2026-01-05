@@ -8,6 +8,7 @@ import { authService } from '../services/apiService'
 
 export default function Matchmaking() {
   const [selectedLang, setSelectedLang] = useState('en');
+  const [matchType, setMatchType] = useState('ranked'); // 'ranked' ou 'unrated'
   const [isInQueue, setIsInQueue] = useState(false);
   const [queueTime, setQueueTime] = useState(0);
   const [user, setUser] = useState(null);
@@ -43,8 +44,14 @@ export default function Matchmaking() {
   };
 
   const handleJoinQueue = () => {
-    // Si pas d'utilisateur, demander un pseudo pour joueur invité
-    if (!user) {
+    // Pour ranked, exiger un utilisateur connecté
+    if (matchType === 'ranked' && !user) {
+      toast.error('You must be logged in to play ranked matches');
+      return;
+    }
+    
+    // Si pas d'utilisateur et unrated, demander un pseudo pour joueur invité
+    if (!user && matchType === 'unrated') {
       setShowGuestModal(true);
       return;
     }
@@ -61,13 +68,15 @@ export default function Matchmaking() {
     });
 
     const socket = socketRef.current;
-    const mmr = user.mmr[selectedLang] || 1000;
+    const mmr = user ? (user.mmr[selectedLang] || 1000) : 1000;
 
     socket.on('connect', () => {
       socket.emit('join-matchmaking', {
-        userId: user.id,
+        userId: user ? user.id : null,
+        username: user ? user.username : null,
         language: selectedLang,
-        mmr: mmr
+        mmr: mmr,
+        ranked: matchType === 'ranked'
       });
     });
 
@@ -100,6 +109,7 @@ export default function Matchmaking() {
           userId: user ? user.id : null,
           isCreator: false,
           matchmaking: true,
+          ranked: data.ranked !== undefined ? data.ranked : matchType === 'ranked',
           existingSocket: true, // Indicateur pour BattleRoom
           isGuest: !user // Indicateur pour joueur invité
         } 
@@ -168,7 +178,8 @@ export default function Matchmaking() {
         userId: null, // Pas d'userId pour les guests
         username: guestUsername.trim(),
         language: selectedLang,
-        mmr: 1000 // MMR par défaut pour les guests
+        mmr: 1000, // MMR par défaut pour les guests
+        ranked: false // Les guests ne peuvent jouer qu'en unrated
       });
     });
 
@@ -196,6 +207,7 @@ export default function Matchmaking() {
           userId: null,
           isCreator: false,
           matchmaking: true,
+          ranked: data.ranked !== undefined ? data.ranked : false,
           existingSocket: true,
           isGuest: true
         } 
@@ -223,6 +235,60 @@ export default function Matchmaking() {
         <p className="text-text-secondary text-sm">
           Find an opponent with similar skill level and compete in real-time
         </p>
+      </div>
+
+      {/* Sélection du type de match */}
+      <div className="mb-6 flex-shrink-0">
+        <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
+          <div className="text-text-secondary text-xs mb-3 font-medium">Match Type</div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                if (isInQueue) return;
+                setMatchType('ranked');
+              }}
+              disabled={isInQueue}
+              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-all ${
+                matchType === 'ranked'
+                  ? 'bg-accent-primary text-accent-text'
+                  : 'bg-bg-secondary text-text-secondary hover:bg-bg-secondary/80'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span>Ranked</span>
+                <span className="text-xs">🏆</span>
+              </div>
+              <div className="text-xs mt-1 opacity-80">
+                Affects ELO
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                if (isInQueue) return;
+                setMatchType('unrated');
+              }}
+              disabled={isInQueue}
+              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-all ${
+                matchType === 'unrated'
+                  ? 'bg-accent-primary text-accent-text'
+                  : 'bg-bg-secondary text-text-secondary hover:bg-bg-secondary/80'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span>Unrated</span>
+                <span className="text-xs">🎮</span>
+              </div>
+              <div className="text-xs mt-1 opacity-80">
+                No ELO change
+              </div>
+            </button>
+          </div>
+          {matchType === 'ranked' && !user && (
+            <div className="mt-3 text-xs text-text-error bg-text-error/10 rounded p-2">
+              ⚠️ You must be logged in to play ranked matches
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal pour demander le pseudo guest */}
@@ -259,7 +325,7 @@ export default function Matchmaking() {
             <button
               onClick={handleGuestJoin}
               disabled={!guestUsername.trim()}
-              className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue
             </button>
@@ -296,7 +362,7 @@ export default function Matchmaking() {
             </button>
             <button
               onClick={handleConfirmGuestJoin}
-              className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-lg transition-colors"
             >
               I Understand, Continue
             </button>
@@ -321,7 +387,7 @@ export default function Matchmaking() {
               </option>
             ))}
           </select>
-          {user && (
+          {user && matchType === 'ranked' && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-text-secondary">Your ELO:</span>
               <span className="text-text-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>
@@ -329,7 +395,7 @@ export default function Matchmaking() {
               </span>
             </div>
           )}
-          {!user && (
+          {!user && matchType === 'ranked' && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-text-secondary">Guest ELO:</span>
               <span className="text-text-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>
@@ -371,14 +437,21 @@ export default function Matchmaking() {
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent-primary/10 rounded-full mb-2">
                 <span className="text-accent-primary text-sm font-medium">Ready to battle?</span>
               </div>
-              <div className="space-y-2">
-                <p className="text-text-primary font-medium">
-                  Your ELO: <span className="text-accent-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{userMMR}</span>
-                </p>
+              {matchType === 'ranked' && (
+                <div className="space-y-2">
+                  <p className="text-text-primary font-medium">
+                    Your ELO: <span className="text-accent-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{userMMR}</span>
+                  </p>
+                  <p className="text-text-secondary text-sm">
+                    Matchmaking will find an opponent within ±200 MMR range
+                  </p>
+                </div>
+              )}
+              {matchType === 'unrated' && (
                 <p className="text-text-secondary text-sm">
-                  Matchmaking will find an opponent within ±200 MMR range
+                  Play for fun without affecting your ELO
                 </p>
-              </div>
+              )}
               {!user && (
                 <div className="bg-text-error/10 border border-text-error/20 rounded-lg p-3 mt-4">
                   <p className="text-text-error text-xs">
@@ -389,7 +462,7 @@ export default function Matchmaking() {
             </div>
             <button
               onClick={handleJoinQueue}
-              className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-4 px-12 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 text-lg"
+              className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-4 px-12 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 text-lg"
             >
               Find Match
             </button>

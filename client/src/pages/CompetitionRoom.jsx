@@ -365,7 +365,7 @@ export default function CompetitionRoom() {
               </div>
               <button
                 onClick={() => navigate('/competitions')}
-                className="mt-8 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-colors"
+                className="mt-8 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-colors"
               >
                 Back to Competitions
               </button>

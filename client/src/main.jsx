@@ -3,21 +3,23 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
-// Initialiser le thème et la police depuis localStorage
+// Initialiser les couleurs par défaut (thème dark fixe)
 const initTheme = () => {
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  const themes = {
-    dark: { bg: '#0a0e1a', text: '#e8ecf3', accent: '#8b5cf6' },
-    light: { bg: '#ffffff', text: '#1a1a1a', accent: '#8b5cf6' },
-    mono: { bg: '#1a1a1a', text: '#ffffff', accent: '#ffffff' },
-    blue: { bg: '#0a1628', text: '#e8f4f8', accent: '#3b82f6' },
-    green: { bg: '#0a1a0a', text: '#e8f8e8', accent: '#10b981' },
-    purple: { bg: '#1a0a1a', text: '#f8e8f8', accent: '#a855f7' },
-  };
-  const theme = themes[savedTheme] || themes.dark;
-  document.documentElement.style.setProperty('--bg-primary', theme.bg);
-  document.documentElement.style.setProperty('--text-primary', theme.text);
-  document.documentElement.style.setProperty('--accent-primary', theme.accent);
+  // Appliquer les variables CSS du thème dark par défaut
+  document.documentElement.style.setProperty('--bg-primary', '#0a0e1a');
+  document.documentElement.style.setProperty('--bg-secondary', '#131825');
+  document.documentElement.style.setProperty('--bg-tertiary', '#1a1f2e');
+  document.documentElement.style.setProperty('--bg-card', '#151a27');
+  document.documentElement.style.setProperty('--text-primary', '#e8ecf3');
+  document.documentElement.style.setProperty('--text-secondary', '#9ca3b8');
+  document.documentElement.style.setProperty('--text-muted', '#6b7280');
+  document.documentElement.style.setProperty('--accent-primary', '#8b5cf6');
+  document.documentElement.style.setProperty('--accent-hover', '#a78bfa');
+  document.documentElement.style.setProperty('--accent-text', '#ffffff');
+  document.documentElement.style.setProperty('--accent-secondary', '#06b6d4');
+  document.documentElement.style.setProperty('--accent-glow', '#8b5cf6');
+  document.documentElement.style.setProperty('--border-primary', 'rgba(139, 92, 246, 0.2)');
+  document.documentElement.style.setProperty('--border-secondary', 'rgba(156, 163, 184, 0.1)');
 };
 
 const initFont = () => {
@@ -54,19 +56,22 @@ const initCursorLag = () => {
 
 initCursorLag();
 
-// Fonction pour cacher l'overlay de chargement
+// Fonction pour cacher l'overlay de chargement avec fondu noir doux
 const hideLoadingOverlay = () => {
   const overlay = document.getElementById('loading-overlay');
   if (overlay) {
-    // Ajouter la classe fade-out pour le fondu
+    // Ajouter la classe fade-out pour le fondu doux
     overlay.classList.add('fade-out');
+    // Changer le fond du body en même temps pour une transition fluide
+    document.body.classList.add('content-ready');
     // Cacher complètement après la transition
     setTimeout(() => {
       overlay.classList.add('hidden');
-    }, 500); // Durée de la transition
+    }, 800); // Durée de la transition (synchronisée avec l'animation CSS)
+  } else {
+    // Si l'overlay n'existe pas, changer quand même le fond du body
+    document.body.classList.add('content-ready');
   }
-  // Changer le fond du body
-  document.body.classList.add('content-ready');
 };
 
 // Attendre que les polices soient chargées et que React soit monté
@@ -88,7 +93,7 @@ const initApp = async () => {
   // Attendre un peu pour que React soit monté
   await new Promise(resolve => setTimeout(resolve, 100));
   
-  // Cacher l'overlay
+  // Cacher l'overlay avec un fondu noir doux
   hideLoadingOverlay();
 };
 

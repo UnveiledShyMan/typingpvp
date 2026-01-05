@@ -111,7 +111,7 @@ export default function Register({ onSuccess, onSwitch }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

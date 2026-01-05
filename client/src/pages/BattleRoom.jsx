@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -15,7 +15,7 @@ export default function BattleRoom() {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { playerName: initialPlayerName, userId, isCreator, matchmaking } = location.state || {};
+  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = location.state || {};
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
@@ -252,20 +252,19 @@ export default function BattleRoom() {
         });
         
         // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
-        // Utiliser le startTime de la partie si disponible, sinon utiliser maintenant
-        if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTime) {
-          // Si la partie a déjà commencé, utiliser le startTime de la partie
-          // Sinon, utiliser le temps actuel
-          const gameStartTime = startTimeRef.current || Date.now();
-          setOpponentTypingStartTime(gameStartTime);
-          opponentTypingStartTimeRef.current = gameStartTime;
+        // Utiliser TOUJOURS le startTime de la partie pour synchroniser les deux joueurs
+        if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTime && startTimeRef.current) {
+          // Utiliser le startTime de la partie pour synchroniser les deux graphiques
+          setOpponentTypingStartTime(startTimeRef.current);
+          opponentTypingStartTimeRef.current = startTimeRef.current;
         }
         
         // Ajouter aux séries temporelles pour le graphique en temps réel
-        // Utiliser le temps depuis la première frappe de l'adversaire ou depuis le début de la partie
-        const typingStart = opponentTypingStartTimeRef.current || startTimeRef.current;
+        // Utiliser le startTime de la partie pour synchroniser avec le joueur local
+        const typingStart = startTimeRef.current;
         if (typingStart) {
           const currentSecond = Math.floor((Date.now() - typingStart) / 1000);
+          // Ne mettre à jour que si la seconde a changé pour éviter les re-renders inutiles
           setOpponentTimeSeries((prev) => {
             const existing = prev.findIndex((item) => item.second === currentSecond);
             const newData = { 
@@ -274,9 +273,14 @@ export default function BattleRoom() {
               accuracy: data.accuracy 
             };
             if (existing >= 0) {
-              const updated = [...prev];
-              updated[existing] = newData;
-              return updated;
+              // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
+              const existingData = prev[existing];
+              if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
+                const updated = [...prev];
+                updated[existing] = newData;
+                return updated;
+              }
+              return prev; // Pas de changement significatif, retourner la même référence
             }
             return [...prev, newData].sort((a, b) => a.second - b.second);
           });
@@ -291,9 +295,11 @@ export default function BattleRoom() {
         progress: 100
       });
       
-      // Ajouter les données finales de l'adversaire au graphique si elles n'ont pas été ajoutées
-      const typingStart = opponentTypingStartTimeRef.current;
-      if (typingStart && data.time) {
+      // Ajouter les données finales de l'adversaire au graphique
+      // Utiliser le startTime de la partie pour calculer la seconde finale
+      const gameStartTime = startTimeRef.current;
+      if (gameStartTime && data.time) {
+        // data.time est le temps écoulé depuis le début de la partie en millisecondes
         const finalSecond = Math.floor(data.time / 1000);
         setOpponentTimeSeries((prev) => {
           const existing = prev.findIndex((item) => item.second === finalSecond);
@@ -468,18 +474,26 @@ export default function BattleRoom() {
         setMyStats({ wpm, accuracy, progress });
         
         // Enregistrer dans les séries temporelles pour le graphique
-        // Utiliser le temps depuis le début de la frappe
-        const currentSecond = Math.floor((Date.now() - typingStartTime) / 1000);
-        setMyTimeSeries((prev) => {
-          const existing = prev.findIndex((item) => item.second === currentSecond);
-          const newData = { second: currentSecond, wpm, accuracy };
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = newData;
-            return updated;
-          }
-          return [...prev, newData].sort((a, b) => a.second - b.second);
-        });
+        // Utiliser le startTime de la partie pour synchroniser avec l'adversaire
+        const gameStartTime = startTimeRef.current;
+        if (gameStartTime) {
+          const currentSecond = Math.floor((Date.now() - gameStartTime) / 1000);
+          setMyTimeSeries((prev) => {
+            const existing = prev.findIndex((item) => item.second === currentSecond);
+            const newData = { second: currentSecond, wpm, accuracy };
+            if (existing >= 0) {
+              // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
+              const existingData = prev[existing];
+              if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
+                const updated = [...prev];
+                updated[existing] = newData;
+                return updated;
+              }
+              return prev; // Pas de changement significatif, retourner la même référence
+            }
+            return [...prev, newData].sort((a, b) => a.second - b.second);
+          });
+        }
         
         // Envoyer la mise à jour au serveur
         if (socketRef.current) {
@@ -512,9 +526,26 @@ export default function BattleRoom() {
 
       // Vérifier si terminé
       if (value === text && typingStartTime) {
+        // Utiliser typingStartTime pour le calcul du WPM final (temps réel de frappe)
         const finalTime = (Date.now() - typingStartTime) / 1000 / 60;
         const finalWpm = finalTime > 0 ? Math.round(text.trim().split(/\s+/).filter(w => w.length > 0).length / finalTime) : 0;
         const finalAccuracy = Math.round(((text.length - errorCount) / text.length) * 100);
+        
+        // Ajouter les données finales au graphique (utiliser startTime pour synchroniser)
+        const gameStartTime = startTimeRef.current;
+        if (gameStartTime) {
+          const finalSecond = Math.floor((Date.now() - gameStartTime) / 1000);
+          setMyTimeSeries((prev) => {
+            const existing = prev.findIndex((item) => item.second === finalSecond);
+            const newData = { second: finalSecond, wpm: finalWpm, accuracy: finalAccuracy };
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = newData;
+              return updated;
+            }
+            return [...prev, newData].sort((a, b) => a.second - b.second);
+          });
+        }
         
         if (socketRef.current) {
           socketRef.current.emit('finish-game', {
@@ -553,6 +584,28 @@ export default function BattleRoom() {
 
   const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));
   const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
+
+  // Mémoriser les données du graphique pour éviter les recalculs constants
+  const chartData = useMemo(() => {
+    if (myTimeSeries.length === 0 && opponentTimeSeries.length === 0) return [];
+    
+    const maxSecond = Math.max(
+      myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
+      opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
+    );
+    
+    const data = [];
+    for (let i = 0; i <= maxSecond; i++) {
+      const myData = myTimeSeries.find(d => d.second === i);
+      const oppData = opponentTimeSeries.find(d => d.second === i);
+      data.push({
+        time: i,
+        me: myData?.wpm ?? null,
+        opponent: oppData?.wpm ?? null
+      });
+    }
+    return data;
+  }, [myTimeSeries, opponentTimeSeries]);
 
   // Écran de chargement
   if (gameStatus === 'connecting' || !playerName) {
@@ -611,9 +664,20 @@ export default function BattleRoom() {
               {/* En-tête sobre */}
               <div className="mb-6 pb-4">
                 <div className="flex items-center justify-between">
-                  <h1 className="text-xl font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
-                    Battle #{roomId}
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
+                      Battle #{roomId}
+                    </h1>
+                    {matchmaking && (
+                      <div className={`px-2 py-1 rounded text-xs font-semibold ${
+                        ranked 
+                          ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30' 
+                          : 'bg-text-secondary/20 text-text-secondary border border-text-secondary/30'
+                      }`}>
+                        {ranked ? '🏆 Ranked' : '🎮 Unrated'}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 text-sm text-text-secondary">
                     {players.map((player, index) => (
                       <div key={index} className="flex items-center gap-2">
@@ -760,7 +824,7 @@ export default function BattleRoom() {
                         </div>
                         <button
                           onClick={handleStartGame}
-                          className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 w-full"
+                          className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 w-full"
                         >
                           Start Battle
                         </button>
@@ -823,28 +887,11 @@ export default function BattleRoom() {
               </div>
 
               {/* Graphique de progression en temps réel */}
-              {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
+              {chartData.length > 0 && (
                 <div className="mb-6 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress - Depuis la première frappe</div>
+                  <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress - Depuis le début de la partie</div>
                   <ResponsiveContainer width="100%" height={150}>
-                    <LineChart data={(() => {
-                      // Fusionner les deux séries en combinant par seconde depuis la première frappe
-                      const maxSecond = Math.max(
-                        myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
-                        opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
-                      );
-                      const chartData = [];
-                      for (let i = 0; i <= maxSecond; i++) {
-                        const myData = myTimeSeries.find(d => d.second === i);
-                        const oppData = opponentTimeSeries.find(d => d.second === i);
-                        chartData.push({
-                          time: i,
-                          me: myData?.wpm || null,
-                          opponent: oppData?.wpm || null
-                        });
-                      }
-                      return chartData;
-                    })()}>
+                    <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.3} />
                       <XAxis 
                         dataKey="time" 
@@ -985,7 +1032,7 @@ export default function BattleRoom() {
               </div>
 
               {/* Graphique de fin de partie */}
-              {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (() => {
+              {chartData.length > 0 && (() => {
                 // Trouver l'adversaire dans le contexte du graphique de fin de partie
                 const finishedOpponent = players.find(p => {
                   const isMe = p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id));
@@ -999,29 +1046,12 @@ export default function BattleRoom() {
                   <div className="mb-8 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6">
                     <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
                     <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={(() => {
-                        // Fusionner les deux séries en combinant par seconde depuis la première frappe de chacun
-                        const maxSecond = Math.max(
-                          myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
-                          opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
-                        );
-                        const chartData = [];
-                        for (let i = 0; i <= maxSecond; i++) {
-                          const myData = myTimeSeries.find(d => d.second === i);
-                          const oppData = opponentTimeSeries.find(d => d.second === i);
-                          chartData.push({
-                            time: i,
-                            me: myData?.wpm || null, // null pour ne pas afficher de point si pas de données
-                            opponent: oppData?.wpm || null
-                          });
-                        }
-                        return chartData;
-                      })()}>
+                      <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.2} />
                         <XAxis 
                           dataKey="time" 
                           stroke="#646669"
-                          label={{ value: 'Temps depuis première frappe (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
+                          label={{ value: 'Temps depuis le début de la partie (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
                           domain={['dataMin', 'dataMax']}
                         />
                         <YAxis 
@@ -1074,7 +1104,7 @@ export default function BattleRoom() {
               <div className="text-center">
                 <button
                   onClick={() => navigate('/')}
-                  className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-colors"
+                  className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-colors"
                 >
                   New Battle
                 </button>
@@ -1133,7 +1163,7 @@ export default function BattleRoom() {
                     <button
                       type="submit"
                       disabled={!chatInput.trim() || gameStatus === 'playing'}
-                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       Send
                     </button>

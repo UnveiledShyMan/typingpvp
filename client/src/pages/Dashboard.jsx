@@ -182,7 +182,7 @@ export default function Dashboard({ user, onSectionChange }) {
           <div className="flex gap-2 sm:gap-3 w-full md:w-auto mt-4 md:mt-0">
             <button
               onClick={() => onSectionChange('solo')}
-              className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 sm:py-2.5 px-4 sm:px-5 rounded-lg transition-colors text-xs sm:text-sm shadow-lg flex-1 md:flex-initial"
+              className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 sm:py-2.5 px-4 sm:px-5 rounded-lg transition-colors text-xs sm:text-sm shadow-lg flex-1 md:flex-initial"
             >
               Start Typing
             </button>

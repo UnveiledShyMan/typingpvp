@@ -52,10 +52,19 @@ export default function Rankings() {
           <select
             value={selectedLang}
             onChange={(e) => setSelectedLang(e.target.value)}
-            className="bg-bg-secondary/40 backdrop-blur-sm border-none text-text-primary px-4 py-3 rounded-lg focus:outline-none focus:bg-bg-secondary/60 transition-all duration-200 font-medium"
+            className="rounded-lg px-4 py-3 font-medium focus:outline-none focus:ring-2 focus:ring-accent-primary/20 transition-all appearance-none cursor-pointer"
+            style={{
+              backgroundColor: 'rgba(10, 14, 26, 0.3)',
+              color: 'var(--text-primary, #e8ecf3)',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3b8' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 1rem center',
+              paddingRight: '2.5rem',
+              border: 'none'
+            }}
           >
             {Object.entries(languages).map(([code, lang]) => (
-              <option key={code} value={code} className="bg-bg-secondary">
+              <option key={code} value={code} style={{ backgroundColor: 'var(--bg-secondary, #131825)', color: 'var(--text-primary, #e8ecf3)' }}>
                 {lang.name}
               </option>
             ))}

@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import ThemeSelector from '../components/ThemeSelector'
 import FontSelector from '../components/FontSelector'
-import SmoothnessSelector from '../components/SmoothnessSelector'
 
 const colorPresets = [
   { name: 'Default', text: '#9ca3b8', correct: '#e8ecf3', incorrect: '#f472b6', current: '#fbbf24', pending: '#9ca3b8' },
@@ -39,17 +37,24 @@ export default function Sandbox() {
   const textContainerRef = useRef(null);
   const previousCursorPosition = useRef(0); // Pour suivre la position précédente du curseur
 
+  // Ref pour savoir si l'utilisateur est en train de taper dans le textarea
+  const isTypingInTextareaRef = useRef(false);
+
   useEffect(() => {
     if (customText.trim()) {
       setText(customText);
     } else {
       setText('Start typing your custom text here...');
     }
-    setInput('');
+    // Ne réinitialiser l'input que si on n'est pas en train de taper dans le textarea
+    if (!isTypingInTextareaRef.current) {
+      setInput('');
+    }
   }, [customText]);
 
   useEffect(() => {
-    if (inputRef.current) {
+    // Ne voler le focus que si on n'est pas en train de taper dans le textarea
+    if (inputRef.current && !isTypingInTextareaRef.current) {
       inputRef.current.focus();
     }
   }, [text]);
@@ -224,11 +229,9 @@ export default function Sandbox() {
     <div className="w-full h-full max-w-6xl mx-auto flex flex-col items-center justify-center overflow-hidden py-4 sm:py-8 animate-fade-in">
       {/* Controls bar - Style Monkeytype minimaliste et élégant */}
       <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-3 mb-4 sm:mb-6 w-full">
-        {/* Sélecteurs de thème, police et smoothness */}
+        {/* Sélecteur de police */}
         <div className="flex items-center gap-1">
-          <ThemeSelector />
           <FontSelector />
-          <SmoothnessSelector />
         </div>
         
         {/* Bouton Settings avec indicateur visuel */}
@@ -286,62 +289,141 @@ export default function Sandbox() {
           {/* Contenu des onglets */}
           <div className="p-4 sm:p-6">
             {activeTab === 'colors' && (
-              <div className="space-y-4">
-                {/* Presets de couleurs */}
+              <div className="space-y-6">
+                {/* Presets de couleurs - Design amélioré */}
                 <div>
-                  <label className="block text-text-secondary/70 text-xs mb-3 font-medium">Color Presets</label>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {colorPresets.map((preset) => (
-                      <button
-                        key={preset.name}
-                        onClick={() => applyPreset(preset)}
-                        className="p-2 rounded-lg bg-bg-primary/30 hover:bg-bg-primary/50 transition-all duration-200 text-xs font-medium text-text-secondary/70 hover:text-text-primary"
-                        title={preset.name}
-                      >
-                        <div className="flex gap-1 justify-center mb-1">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: preset.text }} />
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: preset.correct }} />
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: preset.current }} />
-                        </div>
-                        <div className="text-[10px]">{preset.name}</div>
-                      </button>
-                    ))}
+                  <label className="block text-text-primary text-sm mb-4 font-semibold">Color Presets</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {colorPresets.map((preset) => {
+                      const isActive = 
+                        settings.textColor === preset.text &&
+                        settings.correctColor === preset.correct &&
+                        settings.incorrectColor === preset.incorrect &&
+                        settings.currentColor === preset.current &&
+                        settings.pendingColor === preset.pending;
+                      
+                      return (
+                        <button
+                          key={preset.name}
+                          onClick={() => applyPreset(preset)}
+                          className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                            isActive
+                              ? 'border-accent-primary bg-accent-primary/10'
+                              : 'border-border-secondary/30 bg-bg-primary/30 hover:border-accent-primary/50 hover:bg-bg-primary/50'
+                          }`}
+                          title={preset.name}
+                        >
+                          <div className="text-xs font-medium text-text-primary mb-2">{preset.name}</div>
+                          <div className="flex items-center gap-2">
+                            {/* Aperçu de la palette */}
+                            <div className="flex-1 grid grid-cols-4 gap-1">
+                              <div 
+                                className="h-6 rounded" 
+                                style={{ backgroundColor: preset.text }}
+                                title="Text"
+                              />
+                              <div 
+                                className="h-6 rounded" 
+                                style={{ backgroundColor: preset.correct }}
+                                title="Correct"
+                              />
+                              <div 
+                                className="h-6 rounded" 
+                                style={{ backgroundColor: preset.incorrect }}
+                                title="Incorrect"
+                              />
+                              <div 
+                                className="h-6 rounded" 
+                                style={{ backgroundColor: preset.current }}
+                                title="Current"
+                              />
+                            </div>
+                            {isActive && (
+                              <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Sélecteurs de couleurs individuels */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-2">
-                  {[
-                    { key: 'textColor', label: 'Text' },
-                    { key: 'correctColor', label: 'Correct' },
-                    { key: 'incorrectColor', label: 'Incorrect' },
-                    { key: 'currentColor', label: 'Current' },
-                    { key: 'pendingColor', label: 'Pending' },
-                  ].map(({ key, label }) => (
-                    <div key={key}>
-                      <label className="block text-text-secondary/70 text-xs mb-2 font-medium">{label}</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={settings[key]}
-                          onChange={(e) => handleSettingChange(key, e.target.value)}
-                          className="w-10 h-10 rounded-lg cursor-pointer border-none"
-                          style={{ 
-                            backgroundColor: settings[key],
-                            WebkitAppearance: 'none',
-                            appearance: 'none'
-                          }}
-                        />
-                        <input
-                          type="text"
-                          value={settings[key]}
-                          onChange={(e) => handleSettingChange(key, e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-bg-primary/30 rounded text-text-primary text-xs font-mono focus:outline-none focus:bg-bg-primary/50 transition-all"
-                          placeholder="#000000"
-                        />
-                      </div>
+                {/* Aperçu de la palette actuelle */}
+                <div className="pt-2 border-t border-border-secondary/20">
+                  <label className="block text-text-primary text-sm mb-3 font-semibold">Current Palette</label>
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-bg-primary/20 border border-border-secondary/20">
+                    <div className="flex-1 grid grid-cols-5 gap-2">
+                      {[
+                        { key: 'textColor', label: 'Text', color: settings.textColor },
+                        { key: 'correctColor', label: 'Correct', color: settings.correctColor },
+                        { key: 'incorrectColor', label: 'Incorrect', color: settings.incorrectColor },
+                        { key: 'currentColor', label: 'Current', color: settings.currentColor },
+                        { key: 'pendingColor', label: 'Pending', color: settings.pendingColor },
+                      ].map(({ key, label, color }) => (
+                        <div key={key} className="text-center">
+                          <div 
+                            className="w-full h-8 rounded mb-1 border border-border-secondary/30"
+                            style={{ backgroundColor: color }}
+                          />
+                          <div className="text-[10px] text-text-secondary/70">{label}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                </div>
+
+                {/* Sélecteurs de couleurs individuels - Design amélioré */}
+                <div className="pt-2 border-t border-border-secondary/20">
+                  <label className="block text-text-primary text-sm mb-4 font-semibold">Customize Colors</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { key: 'textColor', label: 'Text', description: 'Untyped text' },
+                      { key: 'correctColor', label: 'Correct', description: 'Correctly typed' },
+                      { key: 'incorrectColor', label: 'Incorrect', description: 'Mistakes' },
+                      { key: 'currentColor', label: 'Current', description: 'Current character' },
+                      { key: 'pendingColor', label: 'Pending', description: 'Upcoming text' },
+                    ].map(({ key, label, description }) => (
+                      <div key={key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-text-primary text-xs font-medium">{label}</label>
+                          <span className="text-[10px] text-text-secondary/60">{description}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={settings[key]}
+                            onChange={(e) => handleSettingChange(key, e.target.value)}
+                            className="w-12 h-12 rounded-lg cursor-pointer flex-shrink-0"
+                            title={`Select ${label} color`}
+                          />
+                          <div className="flex-1 flex flex-col gap-1">
+                            <input
+                              type="text"
+                              value={settings[key]}
+                              onChange={(e) => handleSettingChange(key, e.target.value)}
+                              className="w-full px-2 py-1.5 border border-border-secondary/30 rounded text-text-primary text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary/50 transition-all"
+                              placeholder="#000000"
+                              style={{
+                                backgroundColor: 'rgba(10, 14, 26, 0.4)'
+                              }}
+                              onFocus={(e) => {
+                                e.target.style.backgroundColor = 'rgba(10, 14, 26, 0.6)';
+                              }}
+                              onBlur={(e) => {
+                                e.target.style.backgroundColor = 'rgba(10, 14, 26, 0.4)';
+                              }}
+                            />
+                            <div 
+                              className="w-full h-2 rounded border border-border-secondary/20"
+                              style={{ backgroundColor: settings[key] }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -505,15 +587,30 @@ export default function Sandbox() {
 
       {/* Zone de texte personnalisée (en bas) - Style amélioré */}
       <div className="w-full max-w-3xl mt-6">
-        <label className="block text-text-secondary/70 text-xs mb-2 font-medium">Custom Text</label>
+        <label className="block text-text-primary text-xs mb-2 font-medium">Custom Text</label>
         <textarea
           value={customText}
-          onChange={(e) => setCustomText(e.target.value)}
+          onChange={(e) => {
+            isTypingInTextareaRef.current = true;
+            setCustomText(e.target.value);
+          }}
+          onFocus={(e) => {
+            isTypingInTextareaRef.current = true;
+            e.target.style.backgroundColor = 'rgba(10, 14, 26, 0.6)';
+          }}
+          onBlur={(e) => {
+            // Attendre un peu avant de réinitialiser pour éviter les conflits
+            setTimeout(() => {
+              isTypingInTextareaRef.current = false;
+            }, 100);
+            e.target.style.backgroundColor = 'rgba(10, 14, 26, 0.4)';
+          }}
           placeholder="Enter your custom text here or type directly above..."
-          className="w-full p-4 bg-bg-secondary/20 backdrop-blur-sm border-none rounded-lg text-text-primary text-sm focus:outline-none focus:bg-bg-secondary/40 focus:ring-2 focus:ring-accent-primary/20 transition-all resize-none custom-scrollbar"
+          className="w-full p-4 backdrop-blur-sm border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary/50 transition-all resize-none custom-scrollbar"
           rows={4}
           style={{
-            fontFamily: 'var(--typing-font, "JetBrains Mono", monospace)'
+            fontFamily: 'var(--typing-font, "JetBrains Mono", monospace)',
+            backgroundColor: 'rgba(10, 14, 26, 0.4)'
           }}
         />
       </div>

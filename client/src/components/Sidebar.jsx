@@ -11,7 +11,7 @@ export default function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-bg-secondary/60 backdrop-blur-sm p-6 flex flex-col">
+    <aside className="fixed left-0 top-0 h-full w-64 bg-bg-secondary/80 backdrop-blur-md border-r border-border-secondary/50 p-6 flex flex-col z-30">
       <Link to="/" className="mb-8 group">
         <h1 className="text-2xl font-bold text-text-primary group-hover:text-accent-primary transition-colors" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
           typingpvp.com
@@ -30,8 +30,8 @@ export default function Sidebar() {
                   to={item.path}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                     isActive
-                      ? 'bg-accent-primary/20 text-accent-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-primary/30'
+                      ? 'bg-accent-primary/20 text-accent-primary border-l-2 border-accent-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50'
                   }`}
                 >
                   <span className="text-xl">{item.icon}</span>

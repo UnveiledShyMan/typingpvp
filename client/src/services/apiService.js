@@ -220,6 +220,9 @@ export const friendsService = {
  * Service de profil
  */
 export const profileService = {
+  async getProfileByUsername(username) {
+    return request(`/api/users/username/${encodeURIComponent(username)}`);
+  },
   async getProfile(userId) {
     return get(`/api/users/${userId}`);
   },

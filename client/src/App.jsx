@@ -13,6 +13,8 @@ const OAuthCallback = lazy(() => import('./pages/OAuthCallback'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const LegalNotice = lazy(() => import('./pages/LegalNotice'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const Profile = lazy(() => import('./pages/Profile'))
+const UserProfile = lazy(() => import('./pages/UserProfile'))
 
 // Composant de chargement
 const LoadingSpinner = () => (
@@ -36,6 +38,8 @@ function App() {
                 <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/legal" element={<LegalNotice />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/profile/:id" element={<Profile />} />
+                <Route path="/user/:username" element={<UserProfile />} />
               </Routes>
             </Suspense>
           </Router>

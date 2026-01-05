@@ -3,7 +3,7 @@ import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import { getUserById, getAllUsers, updateUser } from '../db.js';
+import { getUserById, getAllUsers, updateUser, getUserByUsername } from '../db.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -51,8 +51,48 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
+// Obtenir un utilisateur par username (route spéciale avant /:id)
+router.get('/username/:username', optionalAuth, async (req, res) => {
+  try {
+    const user = await getUserByUsername(req.params.username);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Ne pas envoyer le hash du mot de passe
+    res.json({
+      id: user.id,
+      username: user.username,
+      avatar: user.avatar,
+      bio: user.bio,
+      gear: user.gear || '',
+      socialMedia: user.socialMedia || {
+        twitter: '',
+        github: '',
+        discord: '',
+        website: ''
+      },
+      mmr: user.mmr,
+      stats: user.stats,
+      preferences: user.preferences || {
+        defaultMode: 'solo'
+      },
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    console.error('Error fetching user by username:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Obtenir un utilisateur par ID
 router.get('/:id', optionalAuth, async (req, res) => {
+  // Vérifier si c'est "username" pour éviter les conflits
+  if (req.params.id === 'username') {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
+
   const user = await getUserById(req.params.id);
 
   if (!user) {

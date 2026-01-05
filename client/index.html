@@ -52,9 +52,41 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Chargement optimisé des fonts avec font-display: swap pour éviter le FOUC -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fira+Code:wght@400;500;600&family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
-      /* Overlay noir qui couvre tout l'écran pendant le chargement */
+      /* Variables CSS définies immédiatement pour éviter le FOUC (Flash of Unstyled Content) */
+      :root {
+        --bg-primary: #0a0e1a;
+        --bg-secondary: #131825;
+        --bg-tertiary: #1a1f2e;
+        --bg-card: #151a27;
+        --text-primary: #e8ecf3;
+        --text-secondary: #9ca3b8;
+        --text-muted: #6b7280;
+        --accent-primary: #8b5cf6;
+        --accent-hover: #a78bfa;
+        --accent-text: #ffffff;
+        --accent-secondary: #06b6d4;
+        --accent-glow: #8b5cf6;
+        --correct-char: #10b981;
+        --incorrect-char: #f472b6;
+        --text-error: #f472b6;
+        --current-char-bg: #fbbf24;
+        --current-char-text: #0a0e1a;
+        --border-primary: rgba(139, 92, 246, 0.2);
+        --border-secondary: rgba(156, 163, 184, 0.1);
+        --typing-font: 'JetBrains Mono', monospace;
+        --typing-transition-duration: 200ms;
+        --cursor-lag-duration: 0ms;
+      }
+      
+      /* S'assurer que le body et html ont les bonnes couleurs dès le début */
+      html, body {
+        color: var(--text-primary, #e8ecf3);
+        background-color: var(--bg-primary, #0a0e1a);
+      }
+      
+      /* Overlay avec fondu noir doux */
       #loading-overlay {
         position: fixed;
         top: 0;
@@ -64,7 +96,7 @@
         background-color: #000000;
         z-index: 9999;
         opacity: 1;
-        transition: opacity 0.5s ease-out;
+        transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         pointer-events: none;
       }
       #loading-overlay.fade-out {
@@ -73,16 +105,22 @@
       #loading-overlay.hidden {
         display: none;
       }
-      /* Masquer le contenu jusqu'à ce que tout soit chargé */
+      /* Transition douce du fond du body */
       body {
-        background-color: #000000;
+        background-color: var(--bg-primary, #0a0e1a);
+        transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       }
       body.content-ready {
         background-color: var(--bg-primary, #0a0e1a);
       }
-      /* Forcer JetBrains Mono pour les stats dès le début */
+      /* Forcer JetBrains Mono pour les stats dès le début - prévenir le changement */
       .stats-number {
         font-family: 'JetBrains Mono', monospace !important;
+        font-display: swap;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
     </style>
   </head>

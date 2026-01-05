@@ -269,7 +269,7 @@ export default function Friends() {
         >
           Requests
           {friendRequests.received.length > 0 && (
-            <span className="ml-2 bg-accent-primary text-bg-primary text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="ml-2 bg-accent-primary text-accent-text text-xs font-bold px-2 py-0.5 rounded-full">
               {friendRequests.received.length}
             </span>
           )}
@@ -316,7 +316,7 @@ export default function Friends() {
               <p className="text-text-secondary text-lg mb-4">No friends yet</p>
               <button
                 onClick={() => setActiveTab('search')}
-                className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-6 rounded-lg transition-colors"
+                className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-6 rounded-lg transition-colors"
               >
                 Add Friends
               </button>
@@ -351,7 +351,7 @@ export default function Friends() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleInviteToBattle(friend.id, friend.username)}
-                      className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                      className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                     >
                       Challenge
                     </button>
@@ -400,7 +400,7 @@ export default function Friends() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleAcceptRequest(request.id)}
-                        className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                        className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                       >
                         Accept
                       </button>
@@ -524,7 +524,7 @@ export default function Friends() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleAcceptRequest(user.id)}
-                          className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                          className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                         >
                           Accept
                         </button>
@@ -538,7 +538,7 @@ export default function Friends() {
                     ) : (
                       <button
                         onClick={() => handleSendRequest(user.id)}
-                        className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                        className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                       >
                         Add Friend
                       </button>

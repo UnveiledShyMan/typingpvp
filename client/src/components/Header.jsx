@@ -39,7 +39,13 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 right-0 left-64 h-16 bg-bg-secondary/60 backdrop-blur-sm px-6 flex items-center justify-end z-40">
+    <header 
+      className="fixed top-0 right-0 left-64 h-16 bg-bg-secondary/80 backdrop-blur-md border-b border-border-secondary/50 px-6 flex items-center justify-end z-40"
+      style={{
+        color: 'var(--text-primary, #e8ecf3)',
+        backgroundColor: 'rgba(19, 24, 37, 0.8)'
+      }}
+    >
       {user ? (
         <div className="relative">
           <button
@@ -50,10 +56,10 @@ export default function Header() {
               <img
                 src={user.avatar}
                 alt={user.username}
-                className="w-10 h-10 rounded-full object-cover"
+                className="w-10 h-10 rounded-full object-cover border-2 border-border-secondary/30"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold">
+              <div className="w-10 h-10 rounded-full bg-accent-primary/20 border-2 border-border-secondary/30 flex items-center justify-center text-accent-primary font-bold">
                 {user.username[0].toUpperCase()}
               </div>
             )}
@@ -66,17 +72,17 @@ export default function Header() {
                 className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/80 backdrop-blur-sm rounded-lg shadow-xl z-50 py-2">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2">
                 <Link
                   to={`/profile/${user.id}`}
-                  className="block px-4 py-2 text-text-primary hover:bg-bg-primary transition-colors"
+                  className="block px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
                   onClick={() => setShowMenu(false)}
                 >
                   Profile
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary transition-colors"
+                  className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
                 >
                   Logout
                 </button>
@@ -94,7 +100,7 @@ export default function Header() {
           </Link>
           <Link
             to="/register"
-            className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors"
+            className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-accent-primary/20"
           >
             Register
           </Link>

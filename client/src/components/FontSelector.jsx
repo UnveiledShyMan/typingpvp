@@ -60,10 +60,28 @@ export default function FontSelector() {
     localStorage.setItem('typingFont', fontId);
     const font = fonts.find(f => f.id === fontId);
     if (font) {
+      // Mettre à jour la variable CSS globale - cela mettra à jour automatiquement tous les éléments qui l'utilisent
       document.documentElement.style.setProperty('--typing-font', font.family);
+      
+      // Forcer la mise à jour des éléments avec la classe .typing-text pour une application immédiate
       const typingTextElements = document.querySelectorAll('.typing-text');
       typingTextElements.forEach(el => {
         el.style.fontFamily = font.family;
+      });
+      
+      // Mettre à jour les éléments avec des styles inline qui utilisent var(--typing-font)
+      // En remplaçant directement la valeur dans le style
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(el => {
+        const style = el.getAttribute('style');
+        if (style && style.includes('--typing-font')) {
+          // Remplacer var(--typing-font) par la valeur réelle de la police
+          const newStyle = style.replace(
+            /var\(--typing-font[^)]*\)/g,
+            font.family
+          );
+          el.setAttribute('style', newStyle);
+        }
       });
     }
     setIsOpen(false);

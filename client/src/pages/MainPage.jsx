@@ -297,7 +297,7 @@ export default function MainPage() {
                   </button>
                   <button
                     onClick={() => setShowAuth('register')}
-                    className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                   >
                     Register
                   </button>

@@ -141,7 +141,7 @@ export default function Battle() {
                     />
                     <button
                       onClick={copyRoomId}
-                      className="bg-accent-primary hover:bg-accent-hover text-bg-primary px-4 rounded text-sm font-semibold transition-colors"
+                      className="bg-accent-primary hover:bg-accent-hover text-accent-text px-4 rounded text-sm font-semibold transition-colors"
                     >
                       copy
                     </button>

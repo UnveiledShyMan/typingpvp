@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom'
 import { generateText, languages } from '../data/languages'
 import { generateNumbers } from '../data/numbers'
 import LanguageSelector from '../components/LanguageSelector'
-import ThemeSelector from '../components/ThemeSelector'
 import FontSelector from '../components/FontSelector'
-import SmoothnessSelector from '../components/SmoothnessSelector'
 import WordsIcon from '../components/icons/WordsIcon'
 import NumbersIcon from '../components/icons/NumbersIcon'
 import { getDefaultLanguage } from '../utils/languageDetection'
@@ -384,11 +382,9 @@ export default function Solo() {
         {mode === 'words' && (
           <LanguageSelector selectedLang={selectedLang} onLanguageChange={handleLanguageChange} />
         )}
-        {/* Sélecteurs de thème, police et smoothness */}
+        {/* Sélecteur de police */}
         <div className="flex items-center gap-1">
-          <ThemeSelector />
           <FontSelector />
-          <SmoothnessSelector />
         </div>
       </div>
 
@@ -584,7 +580,7 @@ export default function Solo() {
             <div className="text-center pt-2">
               <button
                 onClick={reset}
-                className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded transition-colors text-sm sm:text-base"
+                className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded transition-colors text-sm sm:text-base"
               >
                 test again
               </button>

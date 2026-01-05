@@ -44,6 +44,7 @@ lahaine/
 ### Prérequis
 - Node.js 18+
 - npm ou yarn
+- MariaDB (ou MySQL)
 
 ### Installation
 
@@ -61,6 +62,19 @@ npm install
 ```
 
 ### Développement
+
+#### Mode Local (Recommandé pour le développement)
+
+```bash
+# Démarrer le serveur et le client en parallèle (un seul terminal)
+npm run dev:local
+```
+
+Cette commande lance automatiquement :
+- Le serveur sur http://localhost:3001 (avec nodemon pour le rechargement automatique)
+- Le client sur http://localhost:5173 (avec Vite pour le hot-reload)
+
+#### Mode Manuel (Deux terminaux)
 
 ```bash
 # Terminal 1 : Démarrer le serveur

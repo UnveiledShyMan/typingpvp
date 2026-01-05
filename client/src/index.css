@@ -5,13 +5,34 @@
 @tailwind utilities;
 
 * {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Variables CSS redéfinies ici pour s'assurer qu'elles sont disponibles même si index.html n'a pas chargé */
 :root {
   --bg-primary: #0a0e1a;
+  --bg-secondary: #131825;
+  --bg-tertiary: #1a1f2e;
+  --bg-card: #151a27;
   --text-primary: #e8ecf3;
+  --text-secondary: #9ca3b8;
+  --text-muted: #6b7280;
   --accent-primary: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --accent-text: #ffffff;
+  --accent-secondary: #06b6d4;
+  --accent-glow: #8b5cf6;
+  --correct-char: #10b981;
+  --incorrect-char: #f472b6;
+  --text-error: #f472b6;
+  --current-char-bg: #fbbf24;
+  --current-char-text: #0a0e1a;
+  --border-primary: rgba(139, 92, 246, 0.2);
+  --border-secondary: rgba(156, 163, 184, 0.1);
   --typing-font: 'JetBrains Mono', monospace;
   --typing-transition-duration: 200ms; /* Smoothness par défaut */
   --cursor-lag-duration: 0ms; /* Délai du curseur - contrôlé par smoothness */
@@ -22,31 +43,32 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  /* S'assurer que les couleurs sont appliquées immédiatement pour éviter le FOUC */
+  color: var(--text-primary, #e8ecf3);
+  background-color: var(--bg-primary, #0a0e1a);
 }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg-primary);
+  background: var(--bg-primary, #0a0e1a);
   background-image: 
     radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
-  color: var(--text-primary);
+  color: var(--text-primary, #e8ecf3);
   height: 100vh;
   font-weight: 400;
-  /* Animation de fondu noir et léger au chargement */
-  animation: fadeInBodyDark 0.5s ease-in;
+  /* Animation de fondu doux au chargement - transition fluide */
+  animation: fadeInBodyDark 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes fadeInBodyDark {
   from {
-    opacity: 0;
-    background-color: #000000;
+    opacity: 0.95;
   }
   to {
     opacity: 1;
-    background-color: var(--bg-primary);
   }
 }
 
@@ -146,10 +168,15 @@ code {
   /* Pas de transition nécessaire sans effet visuel */
 }
 
-/* Classe pour les stats - Utilise toujours JetBrains Mono */
+/* Classe pour les stats - Utilise toujours JetBrains Mono avec préchargement */
 .stats-number {
   font-family: 'JetBrains Mono', monospace !important;
-  font-display: block;
+  font-display: swap;
+  /* Prévenir le changement de police en forçant le rendu immédiat */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @media (max-width: 768px) {
@@ -570,11 +597,11 @@ code {
 
 /* Styles pour les inputs améliorés - Style Monkeytype épuré */
 .input-modern {
-  background: rgba(19, 24, 37, 0.3);
+  background: var(--bg-primary, rgba(19, 24, 37, 0.3));
   border: none;
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
-  color: #e8ecf3;
+  color: var(--text-primary, #e8ecf3);
   font-size: 1rem;
   transition: all 0.3s ease;
   width: 100%;
@@ -609,7 +636,8 @@ button:focus-visible {
 }
 
 .input-modern::placeholder {
-  color: rgba(156, 163, 184, 0.4);
+  color: var(--text-secondary, rgba(156, 163, 184, 0.4));
+  opacity: 0.6;
 }
 
 /* Styles pour les range inputs - Style moderne */
@@ -672,25 +700,36 @@ input[type="range"]::-moz-range-thumb:hover {
 input[type="color"] {
   -webkit-appearance: none;
   appearance: none;
-  border: 2px solid rgba(139, 92, 246, 0.3);
+  border: 1px solid var(--border-secondary, rgba(156, 163, 184, 0.3));
   border-radius: 0.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  background: transparent;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
   padding: 0;
   border-radius: 0.375rem;
   overflow: hidden;
+  background: transparent;
+  border: none;
 }
 
 input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: 0.375rem;
+  padding: 0;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 0.375rem;
 }
 
 input[type="color"]:hover {
-  border-color: rgba(139, 92, 246, 0.6);
+  border-color: var(--accent-primary, rgba(139, 92, 246, 0.6));
   box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
   transform: scale(1.05);
 }

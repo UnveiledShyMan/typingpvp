@@ -297,7 +297,7 @@ export default function Profile({ userId: currentUserId }) {
                   <button
                     onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                     disabled={saving}
-                    className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2.5 px-6 rounded-lg transition-colors text-sm disabled:opacity-50 shadow-lg"
+                    className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2.5 px-6 rounded-lg transition-colors text-sm disabled:opacity-50 shadow-lg"
                   >
                     {isEditing ? (saving ? 'Saving...' : 'Save') : 'Edit Profile'}
                   </button>
@@ -371,7 +371,7 @@ export default function Profile({ userId: currentUserId }) {
                     <div className="space-y-2">
                       {/* Input file pour uploader une image */}
                       <div className="flex items-center gap-3">
-                        <label className="cursor-pointer bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 shadow-lg inline-block">
+                        <label className="cursor-pointer bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 shadow-lg inline-block">
                           {uploadingAvatar ? 'Upload en cours...' : 'Choisir une image'}
                           <input
                             type="file"
