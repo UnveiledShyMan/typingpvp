@@ -18,10 +18,15 @@ export default function SEOHead({
   title = 'TypingPVP - Competitive Typing Battles',
   description = 'Compete in real-time typing battles, improve your speed and accuracy, and climb the global leaderboard.',
   keywords = 'typing, typing test, typing speed, wpm, typing battle, competitive typing',
-  image = '/logo.svg',
-  url = window.location.href
+  image = '/logo.png',
+  url = typeof window !== 'undefined' ? window.location.href : 'https://typingpvp.com/'
 }) {
   useEffect(() => {
+    // Construire l'URL absolue de l'image
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://typingpvp.com';
+    const absoluteImageUrl = image.startsWith('http') ? image : `${baseUrl}${image}`;
+    const absoluteUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+
     // Mettre à jour le titre
     document.title = title;
 
@@ -40,18 +45,34 @@ export default function SEOHead({
     setMetaTag('description', description);
     setMetaTag('keywords', keywords);
 
-    // Open Graph tags
+    // Open Graph tags (Facebook, WhatsApp, etc.)
     setMetaTag('og:title', title, 'property');
     setMetaTag('og:description', description, 'property');
-    setMetaTag('og:image', image, 'property');
-    setMetaTag('og:url', url, 'property');
+    setMetaTag('og:image', absoluteImageUrl, 'property');
+    setMetaTag('og:image:secure_url', absoluteImageUrl, 'property');
+    setMetaTag('og:image:type', 'image/png', 'property');
+    setMetaTag('og:image:width', '1200', 'property');
+    setMetaTag('og:image:height', '630', 'property');
+    setMetaTag('og:image:alt', title, 'property');
+    setMetaTag('og:url', absoluteUrl, 'property');
     setMetaTag('og:type', 'website', 'property');
+    setMetaTag('og:site_name', 'typingpvp.com', 'property');
 
     // Twitter Card tags
     setMetaTag('twitter:card', 'summary_large_image');
     setMetaTag('twitter:title', title);
     setMetaTag('twitter:description', description);
-    setMetaTag('twitter:image', image);
+    setMetaTag('twitter:image', absoluteImageUrl);
+    setMetaTag('twitter:image:alt', title);
+
+    // Canonical URL
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', absoluteUrl);
 
     // Cleanup function (optionnel, mais bon pour la propreté)
     return () => {

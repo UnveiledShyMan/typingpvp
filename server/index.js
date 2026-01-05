@@ -214,19 +214,148 @@ io.on('connection', (socket) => {
         existingPlayer.id = socket.id;
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
-        socket.emit('room-joined', { roomId, text: room.text, players: room.players });
+        
+        // Si la partie est terminée, envoyer aussi les résultats
+        if (room.status === 'finished') {
+          socket.emit('room-joined', { 
+            roomId, 
+            text: room.text, 
+            players: room.players,
+            chatMessages: room.chatMessages || []
+          });
+          // Envoyer les résultats si disponibles
+          if (room.results && Object.keys(room.results).length > 0) {
+            socket.emit('game-finished', { 
+              results: room.results, 
+              players: room.players,
+              eloChanges: room.eloChanges || {}
+            });
+          }
+        } else {
+          socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        }
         console.log(`Player ${playerName} reconnected to matchmaking room ${roomId}`);
         return;
       }
     }
     
-    // Vérification normale pour les rooms non-matchmaking
-    if (!room.matchmaking && room.players.length >= 2) {
+    // Si la room est terminée, permettre de rejoindre pour voir les résultats
+    if (room.status === 'finished') {
+      // Vérifier si le joueur était déjà dans la room (reconnexion)
+      // Chercher par userId d'abord, puis par nom si pas de userId
+      const existingPlayer = room.players.find(p => {
+        if (userId && p.userId) {
+          return p.userId === userId;
+        }
+        if (!userId && !p.userId) {
+          return p.name === playerName;
+        }
+        return false;
+      });
+      
+      if (existingPlayer) {
+        // Reconnexion : mettre à jour le socket.id
+        existingPlayer.id = socket.id;
+        if (existingPlayer.disconnected !== undefined) {
+          existingPlayer.disconnected = false; // Marquer comme reconnecté
+        }
+        players.set(socket.id, { roomId, player: existingPlayer });
+        socket.join(roomId);
+        socket.emit('room-joined', { 
+          roomId, 
+          text: room.text, 
+          players: room.players,
+          chatMessages: room.chatMessages || []
+        });
+        // Envoyer les résultats
+        if (room.results && Object.keys(room.results).length > 0) {
+          socket.emit('game-finished', { 
+            results: room.results, 
+            players: room.players,
+            eloChanges: room.eloChanges || {}
+          });
+        }
+        console.log(`Player ${playerName} (${userId || 'guest'}) reconnected to finished room ${roomId}`);
+        return;
+      }
+      
+      // Nouveau joueur qui veut voir les résultats (permission de lecture seule)
+      // Permettre à n'importe qui de voir les résultats d'une room finished
+      socket.join(roomId);
+      socket.emit('room-joined', { 
+        roomId, 
+        text: room.text, 
+        players: room.players,
+        chatMessages: room.chatMessages || []
+      });
+      // Envoyer les résultats
+      if (room.results && Object.keys(room.results).length > 0) {
+        socket.emit('game-finished', { 
+          results: room.results, 
+          players: room.players,
+          eloChanges: room.eloChanges || {}
+        });
+      }
+      console.log(`Player ${playerName} (${userId || 'guest'}) joined finished room ${roomId} to view results`);
+      return;
+    }
+    
+    // Vérification normale pour les rooms non-matchmaking en attente
+    if (!room.matchmaking && room.status === 'waiting' && room.players.length >= 2) {
       socket.emit('error', { message: 'Room is full' });
       return;
     }
     
+    // Ne pas permettre de rejoindre une room en cours de jeu (sauf si c'est une reconnexion)
+    if (room.status === 'playing') {
+      // Vérifier si c'est une reconnexion du même joueur
+      // Chercher par userId d'abord, puis par nom si pas de userId
+      const existingPlayer = room.players.find(p => {
+        if (userId && p.userId) {
+          return p.userId === userId;
+        }
+        if (!userId && !p.userId) {
+          return p.name === playerName;
+        }
+        return false;
+      });
+      
+      if (existingPlayer) {
+        // Reconnexion : mettre à jour le socket.id
+        existingPlayer.id = socket.id;
+        if (existingPlayer.disconnected !== undefined) {
+          existingPlayer.disconnected = false; // Marquer comme reconnecté
+        }
+        players.set(socket.id, { roomId, player: existingPlayer });
+        socket.join(roomId);
+        socket.emit('room-joined', { 
+          roomId, 
+          text: room.text, 
+          players: room.players,
+          chatMessages: room.chatMessages || []
+        });
+        // Si la partie est en cours, renvoyer l'état actuel
+        if (room.status === 'playing') {
+          socket.emit('game-started', { 
+            startTime: room.startTime, 
+            text: room.text,
+            mode: room.mode,
+            timerDuration: room.timerDuration,
+            difficulty: room.difficulty
+          });
+        }
+        console.log(`Player ${playerName} (${userId || 'guest'}) reconnected to playing room ${roomId}`);
+        return;
+      } else {
+        socket.emit('error', { message: 'Game is already in progress' });
+        return;
+      }
+    }
+    
+    // Si on arrive ici, la room doit être en 'waiting'
+    // Si ce n'est pas le cas, c'est un état inattendu
     if (room.status !== 'waiting') {
+      console.error(`Unexpected room status: ${room.status} for room ${roomId}`);
       socket.emit('error', { message: 'Room is not available' });
       return;
     }
@@ -354,7 +483,13 @@ io.on('connection', (socket) => {
         });
       }
       
+      // Stocker les changements d'ELO dans la room pour les reconnexions
+      room.eloChanges = eloChanges;
+      
       io.to(roomId).emit('game-finished', { results: room.results, players: room.players, eloChanges });
+      
+      // La room sera supprimée automatiquement quand les deux joueurs se déconnecteront
+      // (géré dans le handler disconnect)
     } else {
       socket.to(roomId).emit('opponent-finished', {
         playerId: socket.id,
@@ -901,26 +1036,55 @@ io.on('connection', (socket) => {
       if (playerData.roomId) {
         const room = rooms.get(playerData.roomId);
         if (room) {
-          room.players = room.players.filter(p => p.id !== socket.id);
+          // Ne pas retirer le joueur de la liste si la partie est terminée
+          // Cela permet de garder les résultats visibles
+          if (room.status !== 'finished') {
+            room.players = room.players.filter(p => p.id !== socket.id);
+          } else {
+            // Pour les rooms finished, marquer le joueur comme déconnecté mais le garder dans la liste
+            const player = room.players.find(p => p.id === socket.id);
+            if (player) {
+              player.disconnected = true;
+            }
+            
+            // Vérifier si tous les joueurs sont déconnectés
+            // Compter les joueurs encore connectés
+            const connectedPlayers = room.players.filter(p => {
+              const playerSocket = io.sockets.sockets.get(p.id);
+              return playerSocket && playerSocket.connected;
+            });
+            
+            // Si aucun joueur n'est connecté, supprimer la room
+            if (connectedPlayers.length === 0) {
+              rooms.delete(playerData.roomId);
+              console.log(`Finished room ${playerData.roomId} deleted - all players disconnected`);
+              return; // Sortir tôt car la room n'existe plus
+            } else {
+              console.log(`Player disconnected from finished room ${playerData.roomId}, ${connectedPlayers.length} player(s) still connected`);
+            }
+          }
           
-          // Pour les rooms matchmaking, ne pas supprimer immédiatement
-          // Attendre 30 secondes avant de supprimer pour permettre la reconnexion
-          if (room.players.length === 0) {
+          // Pour les rooms non-finished, vérifier si on doit supprimer
+          if (room.status !== 'finished' && room.players.length === 0) {
             if (room.matchmaking) {
               // Délai de grâce pour les rooms matchmaking (reconnexion possible)
               setTimeout(() => {
                 const checkRoom = rooms.get(playerData.roomId);
-                if (checkRoom && checkRoom.players.length === 0) {
+                if (checkRoom && checkRoom.players.length === 0 && checkRoom.status !== 'finished') {
                   rooms.delete(playerData.roomId);
                   console.log(`Matchmaking room ${playerData.roomId} deleted after grace period`);
                 }
               }, 30000); // 30 secondes
             } else {
-              // Suppression immédiate pour les rooms normales
+              // Suppression immédiate pour les rooms normales (pas finished)
               rooms.delete(playerData.roomId);
+              console.log(`Normal room ${playerData.roomId} deleted (empty and not finished)`);
             }
           } else {
-            io.to(playerData.roomId).emit('player-left', { players: room.players });
+            // Notifier les autres joueurs seulement si la partie n'est pas terminée
+            if (room.status !== 'finished') {
+              io.to(playerData.roomId).emit('player-left', { players: room.players });
+            }
           }
         }
       }

@@ -36,6 +36,7 @@ export default function BattleRoom() {
   const [players, setPlayers] = useState([]);
   const [gameStatus, setGameStatus] = useState('connecting'); // connecting, waiting, playing, finished
   const [startTime, setStartTime] = useState(null); // Temps de début de la partie (pour le timer)
+  const startTimeRef = useRef(null); // Ref pour accéder à startTime dans les callbacks
   const [typingStartTime, setTypingStartTime] = useState(null); // Temps de début de la frappe (pour le WPM)
   const typingStartTimeRef = useRef(null); // Ref pour accéder à typingStartTime dans les callbacks
   const [opponentTypingStartTime, setOpponentTypingStartTime] = useState(null); // Temps de début de frappe de l'adversaire
@@ -146,7 +147,10 @@ export default function BattleRoom() {
     socket.on('room-joined', (data) => {
       setText(data.text);
       setPlayers(data.players);
-      setGameStatus('waiting'); // Passer à 'waiting' une fois la room jointe
+      // Ne pas changer le statut si on rejoint une room finished (le statut sera mis à jour par game-finished)
+      if (gameStatus !== 'finished') {
+        setGameStatus('waiting'); // Passer à 'waiting' une fois la room jointe
+      }
       if (data.chatMessages) {
         setChatMessages(data.chatMessages);
       }
@@ -163,6 +167,7 @@ export default function BattleRoom() {
     socket.on('game-started', (data) => {
       setGameStatus('playing');
       setStartTime(data.startTime);
+      startTimeRef.current = data.startTime; // Stocker aussi dans la ref
       setTypingStartTime(null); // Réinitialiser le temps de début de frappe
       typingStartTimeRef.current = null; // Réinitialiser aussi la ref
       setOpponentTypingStartTime(null); // Réinitialiser le temps de début de frappe de l'adversaire
@@ -247,15 +252,18 @@ export default function BattleRoom() {
         });
         
         // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
+        // Utiliser le startTime de la partie si disponible, sinon utiliser maintenant
         if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTime) {
-          const now = Date.now();
-          setOpponentTypingStartTime(now);
-          opponentTypingStartTimeRef.current = now;
+          // Si la partie a déjà commencé, utiliser le startTime de la partie
+          // Sinon, utiliser le temps actuel
+          const gameStartTime = startTimeRef.current || Date.now();
+          setOpponentTypingStartTime(gameStartTime);
+          opponentTypingStartTimeRef.current = gameStartTime;
         }
         
         // Ajouter aux séries temporelles pour le graphique en temps réel
-        // Utiliser le temps depuis la première frappe de l'adversaire
-        const typingStart = opponentTypingStartTimeRef.current;
+        // Utiliser le temps depuis la première frappe de l'adversaire ou depuis le début de la partie
+        const typingStart = opponentTypingStartTimeRef.current || startTimeRef.current;
         if (typingStart) {
           const currentSecond = Math.floor((Date.now() - typingStart) / 1000);
           setOpponentTimeSeries((prev) => {
@@ -282,6 +290,26 @@ export default function BattleRoom() {
         accuracy: data.accuracy,
         progress: 100
       });
+      
+      // Ajouter les données finales de l'adversaire au graphique si elles n'ont pas été ajoutées
+      const typingStart = opponentTypingStartTimeRef.current;
+      if (typingStart && data.time) {
+        const finalSecond = Math.floor(data.time / 1000);
+        setOpponentTimeSeries((prev) => {
+          const existing = prev.findIndex((item) => item.second === finalSecond);
+          const newData = { 
+            second: finalSecond, 
+            wpm: data.wpm, 
+            accuracy: data.accuracy 
+          };
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = newData;
+            return updated;
+          }
+          return [...prev, newData].sort((a, b) => a.second - b.second);
+        });
+      }
     });
 
     socket.on('game-finished', (data) => {
@@ -889,33 +917,48 @@ export default function BattleRoom() {
 
           {gameStatus === 'finished' && results && (
             <div className="py-8">
+              {/* Titre des résultats */}
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-text-primary mb-2">Match Finished!</h2>
+                <p className="text-text-secondary text-sm">Results</p>
+              </div>
+              
               {/* Résultats finaux - design sobre */}
               <div className="grid md:grid-cols-2 gap-6 mb-8">
                 {players.map((player) => {
                   const result = results[player.id];
                   const isMe = player.name === playerName || (player.userId && player.userId === (userId || currentUser?.id));
-                  const isWinner = result && players.length === 2 && (
-                    !results[players.find(p => p.id !== player.id)?.id] || 
-                    result.wpm > results[players.find(p => p.id !== player.id)?.id]?.wpm ||
-                    (result.wpm === results[players.find(p => p.id !== player.id)?.id]?.wpm && result.accuracy > results[players.find(p => p.id !== player.id)?.id]?.accuracy)
+                  
+                  // Déterminer le gagnant : meilleur WPM, en cas d'égalité meilleure accuracy
+                  const otherPlayer = players.find(p => p.id !== player.id);
+                  const otherResult = otherPlayer ? results[otherPlayer.id] : null;
+                  const isWinner = result && otherResult && (
+                    result.wpm > otherResult.wpm ||
+                    (result.wpm === otherResult.wpm && result.accuracy > otherResult.accuracy)
                   );
+                  
                   const eloChange = eloChanges[player.id];
                   
                   return (
                     <div
                       key={player.id}
-                      className={`bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 ${
-                        isWinner ? 'ring-2 ring-accent-primary/30' : ''
+                      className={`bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 border-2 transition-all ${
+                        isWinner 
+                          ? 'border-accent-primary/50 shadow-lg shadow-accent-primary/20' 
+                          : result 
+                            ? 'border-border-secondary/30' 
+                            : 'border-border-secondary/10 opacity-60'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="text-lg font-semibold text-text-primary">
                           {isMe ? 'You' : player.name}
                         </div>
-                        {isWinner && <span className="text-xl">🏆</span>}
+                        {isWinner && <span className="text-2xl">🏆</span>}
+                        {!result && <span className="text-text-secondary text-sm">Did not finish</span>}
                       </div>
                       
-                      {result && (
+                      {result ? (
                         <div className="space-y-3">
                           <div className="flex items-baseline gap-3">
                             <span className="text-4xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{result.wpm}</span>
@@ -931,6 +974,10 @@ export default function BattleRoom() {
                             </div>
                           )}
                         </div>
+                      ) : (
+                        <div className="text-text-secondary text-sm py-4">
+                          This player did not complete the match.
+                        </div>
                       )}
                     </div>
                   );
@@ -938,80 +985,91 @@ export default function BattleRoom() {
               </div>
 
               {/* Graphique de fin de partie */}
-              {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
-                <div className="mb-8 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6">
-                  <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={(() => {
-                      // Fusionner les deux séries en combinant par seconde depuis la première frappe de chacun
-                      const maxSecond = Math.max(
-                        myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
-                        opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
-                      );
-                      const chartData = [];
-                      for (let i = 0; i <= maxSecond; i++) {
-                        const myData = myTimeSeries.find(d => d.second === i);
-                        const oppData = opponentTimeSeries.find(d => d.second === i);
-                        chartData.push({
-                          time: i,
-                          me: myData?.wpm || null, // null pour ne pas afficher de point si pas de données
-                          opponent: oppData?.wpm || null
-                        });
-                      }
-                      return chartData;
-                    })()}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.2} />
-                      <XAxis 
-                        dataKey="time" 
-                        stroke="#646669"
-                        label={{ value: 'Temps depuis première frappe (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
-                        domain={['dataMin', 'dataMax']}
-                      />
-                      <YAxis 
-                        stroke="#646669"
-                        label={{ value: 'WPM', angle: -90, position: 'insideLeft', style: { fill: '#646669', fontSize: '12px' } }}
-                        domain={[0, 'auto']}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#1e1e1e', 
-                          border: '1px solid #646669',
-                          borderRadius: '8px',
-                          color: '#e8e8e8'
-                        }}
-                        formatter={(value, name) => {
-                          if (value === null || value === undefined) return ['-', name];
-                          return [value + ' WPM', name];
-                        }}
-                      />
-                      <Legend 
-                        wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-                        iconType="line"
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="me" 
-                        stroke="#00ff9f" 
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 5, fill: '#00ff9f' }}
-                        name={myPlayer?.name || 'You'}
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="opponent" 
-                        stroke="#ff6b6b" 
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 5, fill: '#ff6b6b' }}
-                        name={opponent?.name || 'Opponent'}
-                        connectNulls={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+              {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (() => {
+                // Trouver l'adversaire dans le contexte du graphique de fin de partie
+                const finishedOpponent = players.find(p => {
+                  const isMe = p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id));
+                  return !isMe;
+                });
+                const finishedMyPlayer = players.find(p => {
+                  return p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id));
+                });
+                
+                return (
+                  <div className="mb-8 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6">
+                    <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={(() => {
+                        // Fusionner les deux séries en combinant par seconde depuis la première frappe de chacun
+                        const maxSecond = Math.max(
+                          myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
+                          opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
+                        );
+                        const chartData = [];
+                        for (let i = 0; i <= maxSecond; i++) {
+                          const myData = myTimeSeries.find(d => d.second === i);
+                          const oppData = opponentTimeSeries.find(d => d.second === i);
+                          chartData.push({
+                            time: i,
+                            me: myData?.wpm || null, // null pour ne pas afficher de point si pas de données
+                            opponent: oppData?.wpm || null
+                          });
+                        }
+                        return chartData;
+                      })()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.2} />
+                        <XAxis 
+                          dataKey="time" 
+                          stroke="#646669"
+                          label={{ value: 'Temps depuis première frappe (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
+                          domain={['dataMin', 'dataMax']}
+                        />
+                        <YAxis 
+                          stroke="#646669"
+                          label={{ value: 'WPM', angle: -90, position: 'insideLeft', style: { fill: '#646669', fontSize: '12px' } }}
+                          domain={[0, 'auto']}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1e1e1e', 
+                            border: '1px solid #646669',
+                            borderRadius: '8px',
+                            color: '#e8e8e8'
+                          }}
+                          formatter={(value, name) => {
+                            if (value === null || value === undefined) return ['-', name === 'me' ? (finishedMyPlayer?.name || 'You') : (finishedOpponent?.name || 'Opponent')];
+                            return [value + ' WPM', name === 'me' ? (finishedMyPlayer?.name || 'You') : (finishedOpponent?.name || 'Opponent')];
+                          }}
+                        />
+                        <Legend 
+                          wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                          iconType="line"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="me" 
+                          stroke="#00ff9f" 
+                          strokeWidth={3}
+                          dot={false}
+                          activeDot={{ r: 5, fill: '#00ff9f' }}
+                          name={finishedMyPlayer?.name || 'You'}
+                          connectNulls={false}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="opponent" 
+                          stroke="#ff6b6b" 
+                          strokeWidth={3}
+                          dot={false}
+                          activeDot={{ r: 5, fill: '#ff6b6b' }}
+                          name={finishedOpponent?.name || 'Opponent'}
+                          connectNulls={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
 
               <div className="text-center">
                 <button
