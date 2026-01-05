@@ -131,6 +131,19 @@ npm start
    - Vérifiez que le message `✅ Serveur démarré avec succès` apparaît dans les logs
    - En cas d'erreur 502, vérifiez les logs pour identifier le problème
 
+5. **Diagnostic des erreurs 502** :
+   - **Test de santé** : Accédez à `https://typingpvp.com/api/health` - devrait retourner `{"status":"ok"}`
+   - **Test serveur** : Accédez à `https://typingpvp.com/api/test` - devrait retourner les infos du serveur
+   - **Vérifier les logs** : Dans Plesk, allez dans "Logs" → "Node.js Application Logs"
+   - **Vérifier le port** : Assurez-vous que le port dans Plesk correspond à celui dans les variables d'environnement
+   - **Redémarrer** : Redémarrez l'application Node.js dans Plesk après chaque modification
+
+6. **Configuration Socket.io pour Plesk** :
+   - Socket.io est configuré pour utiliser uniquement le transport `polling` (compatible avec les reverse proxy)
+   - Le path est `/socket.io/` (par défaut)
+   - Les timeouts sont augmentés pour éviter les déconnexions
+   - Si vous avez des erreurs 400 avec Socket.io, vérifiez que le reverse proxy n'interfère pas avec les requêtes long polling
+
 ## 📚 Documentation
 
 - [STRUCTURE.md](./STRUCTURE.md) - Structure détaillée du projet

@@ -25,25 +25,70 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+
+// Configuration Socket.io optimisée pour Plesk/nginx reverse proxy
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
   },
   // Forcer polling pour compatibilité avec Plesk/nginx
   transports: ['polling'],
-  allowUpgrades: false // Empêcher l'upgrade vers WebSocket
+  allowUpgrades: false, // Empêcher l'upgrade vers WebSocket
+  // Configuration pour reverse proxy
+  path: '/socket.io/',
+  // Timeouts augmentés pour polling
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Configuration pour éviter les problèmes de connexion
+  connectTimeout: 45000,
+  // Permettre les connexions depuis le reverse proxy
+  allowEIO3: true
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
+const corsOptions = {
+  origin: function (origin, callback) {
+    // En production, accepter les requêtes depuis le domaine configuré
+    const allowedOrigins = [
+      process.env.CLIENT_URL,
+      'https://typingpvp.com',
+      'http://localhost:5173',
+      'http://localhost:3000'
+    ].filter(Boolean);
+    
+    // En développement, permettre toutes les origines
+    if (process.env.NODE_ENV === 'development' || !origin) {
+      return callback(null, true);
+    }
+    
+    // Vérifier si l'origine est autorisée
+    if (allowedOrigins.some(allowed => origin.includes(allowed.replace(/^https?:\/\//, '')))) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Permettre temporairement pour debug
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Middleware pour logger les requêtes (utile pour debug)
+if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`, {
+      origin: req.headers.origin,
+      'user-agent': req.headers['user-agent']?.substring(0, 50)
+    });
+    next();
+  });
+}
 
 // Stockage des rooms en mémoire
 const rooms = new Map();
@@ -99,7 +144,22 @@ function generateTextForLanguage(langCode = 'en', wordCount = 50) {
 
 // Routes API
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Route de test pour vérifier que le serveur répond
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Server is running',
+    port: process.env.PORT || 3001,
+    host: process.env.HOST || '0.0.0.0',
+    socketIoPath: '/socket.io/'
+  });
 });
 
 app.use('/api/auth', authRoutes);
