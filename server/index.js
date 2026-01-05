@@ -361,6 +361,12 @@ io.on('connection', (socket) => {
     const eloChange1 = newMMR1 - mmr1;
     const eloChange2 = newMMR2 - mmr2;
     
+    // Retourner les changements d'ELO indexés par socket.id
+    const eloChanges = {
+      [player1.id]: eloChange1,
+      [player2.id]: eloChange2
+    };
+    
     // Enregistrer le match avec les changements d'ELO
     await recordMatch({
       type: 'battle',
@@ -387,6 +393,8 @@ io.on('connection', (socket) => {
     });
     
     console.log(`Match results updated: ${user1.username} (${mmr1} → ${newMMR1}) vs ${user2.username} (${mmr2} → ${newMMR2}), Winner: ${player1Won ? user1.username : user2.username}`);
+    
+    return eloChanges;
   }
 
   // MATCHMAKING SYSTEM
