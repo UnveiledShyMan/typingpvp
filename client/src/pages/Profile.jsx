@@ -194,8 +194,8 @@ export default function Profile({ userId: currentUserId }) {
             
             <div className="relative bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            {/* Avatar large */}
-            <div className="relative">
+                {/* Avatar large */}
+                <div className="relative">
               {isEditing ? (
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-bg-primary border-4 flex items-center justify-center overflow-hidden shadow-xl"
                   style={{ borderColor: getRankColor(rankInfo) }}>
@@ -233,10 +233,10 @@ export default function Profile({ userId: currentUserId }) {
               >
                 {rankInfo.tier[0]}
               </div>
-            </div>
+                </div>
 
-            {/* Infos principales */}
-            <div className="flex-1">
+                {/* Infos principales */}
+                <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h1 className="text-4xl md:text-5xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
@@ -433,6 +433,7 @@ export default function Profile({ userId: currentUserId }) {
                   </button>
                 </div>
               )}
+                </div>
               </div>
             </div>
           </div>
