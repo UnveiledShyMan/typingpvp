@@ -5,12 +5,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /**
  * Crée une nouvelle instance de socket
- * Utilise polling pour compatibilité avec Plesk/nginx reverse proxy
+ * Configuration par défaut (comme avant)
  */
 export function createSocket() {
   return io(API_URL, {
-    transports: ['polling'], // Utiliser polling au lieu de websocket pour Plesk
-    upgrade: false, // Empêcher l'upgrade vers WebSocket
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 5,
