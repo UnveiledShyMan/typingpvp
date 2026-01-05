@@ -1,5 +1,5 @@
 // Base de données MariaDB
-import pool from './db/connection.js';
+import pool, { getConnection } from './db/connection.js';
 import { User } from './models/User.js';
 import { nanoid } from 'nanoid';
 import bcrypt from 'bcryptjs';
@@ -51,17 +51,24 @@ export async function createUser(username, email, password = null, provider = 'l
     const result = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
     return rowToUser(result.rows[0]);
   } catch (error) {
-    if (error.code === '23505') { // Unique violation
-      if (error.constraint === 'users_username_key') {
+    // MariaDB utilise 1062 pour ER_DUP_ENTRY, PostgreSQL utilise 23505
+    // Le wrapper dans connection.js convertit déjà 1062 en 23505, mais on vérifie les deux pour sécurité
+    if (error.code === '23505' || error.code === 1062 || error.code === 'ER_DUP_ENTRY') {
+      // Extraire le nom de la contrainte depuis le message d'erreur MariaDB
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('username') || error.constraint === 'users_username_key' || errorMessage.includes('PRIMARY')) {
         throw new Error('Username already taken');
       }
-      if (error.constraint === 'users_email_key') {
+      if (errorMessage.includes('email') || error.constraint === 'users_email_key') {
         throw new Error('Email already taken');
       }
-      if (error.constraint === 'idx_users_provider_provider_id') {
+      if (errorMessage.includes('provider') || error.constraint === 'idx_users_provider_provider_id' || error.constraint === 'unique_provider_provider_id') {
         throw new Error('Account already exists with this provider');
       }
+      // Erreur générique de duplication
+      throw new Error('A user with this information already exists');
     }
+    console.error('Error creating user:', error);
     throw error;
   }
 }
@@ -278,13 +285,13 @@ export async function updateUser(user) {
  */
 export async function recordMatch(matchData) {
   const matchId = nanoid();
-  const client = await pool.connect();
+  const connection = await getConnection();
   
   try {
-    await client.query('BEGIN');
+    await connection.beginTransaction();
     
     // Insérer le match
-    await client.query(
+    await connection.execute(
       `INSERT INTO matches (id, type, language, date, data)
        VALUES (?, ?, ?, ?, ?)`,
       [
@@ -300,7 +307,7 @@ export async function recordMatch(matchData) {
     // MariaDB : utiliser INSERT IGNORE au lieu de ON CONFLICT
     for (const player of matchData.players) {
       if (player.userId) {
-        await client.query(
+        await connection.execute(
           `INSERT IGNORE INTO user_matches (user_id, match_id, wpm, accuracy, won, position)
            VALUES (?, ?, ?, ?, ?, ?)`,
           [
@@ -315,14 +322,14 @@ export async function recordMatch(matchData) {
       }
     }
     
-    await client.query('COMMIT');
+    await connection.commit();
     return matchId;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await connection.rollback();
     console.error('Error recording match:', error);
     throw error;
   } finally {
-    client.release();
+    connection.release();
   }
 }
 

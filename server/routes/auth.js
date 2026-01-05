@@ -1,5 +1,5 @@
 import express from 'express';
-import { createUser, getUserByUsername, getUserByEmail, getUserByProviderId, verifyPassword } from '../db.js';
+import { createUser, getUserByUsername, getUserByEmail, getUserByProviderId, verifyPassword, updateUser } from '../db.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
