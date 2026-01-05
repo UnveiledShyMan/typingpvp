@@ -320,10 +320,10 @@ io.on('connection', (socket) => {
     
     socket.emit('room-created', { roomId, text });
     console.log(`Room created: ${roomId}`);
-  });
+  }));
 
   // Rejoindre une room
-  socket.on('join-room', (data) => {
+  socket.on('join-room', safeHandler((data) => {
     const { roomId, playerName, userId } = data;
     const room = rooms.get(roomId);
     
@@ -543,7 +543,9 @@ io.on('connection', (socket) => {
       timerDuration: room.timerDuration,
       difficulty: room.difficulty
     });
-  });
+    
+    console.log(`Game started in room ${roomId}`);
+  }));
 
   // Mettre à jour la progression
   socket.on('update-progress', (data) => {
