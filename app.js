@@ -85,6 +85,33 @@ async function buildClient() {
     const clientDir = join(__dirname, 'client');
     const clientDistDir = join(__dirname, 'client', 'dist');
     
+    console.log(`Répertoire client: ${clientDir}`);
+    console.log(`Répertoire dist cible: ${clientDistDir}`);
+    
+    // Vérifier que le dossier client existe
+    if (!existsSync(clientDir)) {
+      throw new Error(`Le dossier client n'existe pas: ${clientDir}`);
+    }
+    
+    // Vérifier que package.json existe
+    const packageJsonPath = join(clientDir, 'package.json');
+    if (!existsSync(packageJsonPath)) {
+      throw new Error(`package.json n'existe pas dans ${clientDir}`);
+    }
+    console.log('✅ package.json trouvé');
+    
+    // Vérifier que npm est disponible
+    try {
+      const { stdout: npmVersion } = await execAsync('npm --version', { 
+        shell: true,
+        maxBuffer: 1024 * 1024
+      });
+      console.log(`✅ npm disponible: ${npmVersion.trim()}`);
+    } catch (npmError) {
+      console.error('❌ npm n\'est pas disponible ou n\'est pas dans le PATH');
+      throw new Error('npm n\'est pas disponible. Vérifiez que Node.js et npm sont installés.');
+    }
+    
     // Supprimer client/dist/ s'il existe pour forcer un rebuild propre
     if (existsSync(clientDistDir)) {
       console.log('Suppression de client/dist/ pour forcer un rebuild propre...');
@@ -94,7 +121,8 @@ async function buildClient() {
     }
     
     // Vérifier si node_modules existe
-    if (!existsSync(join(clientDir, 'node_modules'))) {
+    const nodeModulesPath = join(clientDir, 'node_modules');
+    if (!existsSync(nodeModulesPath)) {
       console.log('Installation des dépendances client...');
       try {
         const { stdout, stderr } = await execAsync('npm install', { 
@@ -136,35 +164,95 @@ async function buildClient() {
     
     // Builder
     console.log('Build du client en cours...');
+    console.log(`Exécution de: npm run build dans ${clientDir}`);
+    
+    // Vérifier que package.json existe et contient le script build
+    const { readFileSync } = await import('fs');
+    const { resolve: pathResolve } = await import('path');
     try {
+      const packageJsonContent = readFileSync(packageJsonPath, 'utf8');
+      const packageJson = JSON.parse(packageJsonContent);
+      if (!packageJson.scripts || !packageJson.scripts.build) {
+        throw new Error('Le script "build" n\'existe pas dans package.json');
+      }
+      console.log(`✅ Script build trouvé: ${packageJson.scripts.build}`);
+    } catch (packageError) {
+      console.error('❌ Erreur lors de la lecture de package.json:', packageError.message);
+      throw packageError;
+    }
+    
+    try {
+      // Utiliser le chemin absolu pour être sûr
+      const absoluteClientDir = pathResolve(clientDir);
+      console.log(`Chemin absolu client: ${absoluteClientDir}`);
+      console.log(`Répertoire de travail actuel: ${process.cwd()}`);
+      
       const { stdout, stderr } = await execAsync('npm run build', { 
-        cwd: clientDir,
+        cwd: absoluteClientDir,
         shell: true,
-        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        env: { ...process.env, PWD: absoluteClientDir } // Forcer le PWD
       });
-      if (stdout) console.log(stdout);
-      if (stderr) console.error('npm build stderr:', stderr);
+      if (stdout) {
+        console.log('=== Build stdout ===');
+        console.log(stdout);
+        console.log('=== Fin stdout ===');
+      }
+      if (stderr) {
+        console.error('=== Build stderr ===');
+        console.error(stderr);
+        console.error('=== Fin stderr ===');
+      }
+      
+      // Attendre un peu pour s'assurer que les fichiers sont écrits
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Vérifier que le dossier dist a été créé
+      console.log(`Vérification de l'existence de: ${clientDistDir}`);
       if (!existsSync(clientDistDir)) {
-        throw new Error('Le dossier client/dist n\'a pas été créé après le build');
+        // Lister le contenu du dossier client pour voir ce qui existe
+        const { readdirSync } = await import('fs');
+        console.error('Contenu du dossier client:');
+        try {
+          const files = readdirSync(clientDir);
+          console.error('Fichiers/dossiers:', files.join(', '));
+        } catch (readError) {
+          console.error('Impossible de lire le dossier client:', readError.message);
+        }
+        throw new Error(`Le dossier client/dist n'a pas été créé après le build. Chemin attendu: ${clientDistDir}`);
       }
+      console.log('✅ Dossier client/dist créé');
       
       // Vérifier que index.html existe
       const indexPath = join(clientDistDir, 'index.html');
+      console.log(`Vérification de l'existence de: ${indexPath}`);
       if (!existsSync(indexPath)) {
-        throw new Error('index.html n\'existe pas dans client/dist après le build');
+        // Lister le contenu de dist pour voir ce qui existe
+        const { readdirSync } = await import('fs');
+        console.error('Contenu du dossier client/dist:');
+        try {
+          const files = readdirSync(clientDistDir);
+          console.error('Fichiers/dossiers:', files.join(', '));
+        } catch (readError) {
+          console.error('Impossible de lire le dossier dist:', readError.message);
+        }
+        throw new Error(`index.html n'existe pas dans client/dist après le build. Chemin attendu: ${indexPath}`);
       }
+      console.log('✅ index.html trouvé');
       
       console.log('✅ Client buildé avec succès');
       return true;
     } catch (buildError) {
       console.error('❌ Erreur lors du build du client:', buildError.message);
       if (buildError.stdout) {
-        console.error('Build stdout:', buildError.stdout);
+        console.error('=== Build stdout (erreur) ===');
+        console.error(buildError.stdout);
+        console.error('=== Fin stdout ===');
       }
       if (buildError.stderr) {
-        console.error('Build stderr:', buildError.stderr);
+        console.error('=== Build stderr (erreur) ===');
+        console.error(buildError.stderr);
+        console.error('=== Fin stderr ===');
       }
       throw buildError;
     }
