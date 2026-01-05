@@ -1366,26 +1366,48 @@ try {
   });
   
   // Monitoring de la santé du serveur
-  let requestCount = 0;
-  let errorCount = 0;
-  
-  app.use((req, res, next) => {
-    requestCount++;
-    // Logger toutes les 100 requêtes pour monitoring
-    if (requestCount % 100 === 0) {
-      console.log(`📊 Statistiques serveur: ${requestCount} requêtes, ${errorCount} erreurs`);
-    }
-    next();
-  });
-  
-  // Logger les erreurs de requête
-  app.use((err, req, res, next) => {
-    errorCount++;
-    console.error('❌ Erreur dans une requête:', err.message);
-    console.error('URL:', req.url);
+let requestCount = 0;
+let errorCount = 0;
+let socketConnectionCount = 0;
+let socketDisconnectionCount = 0;
+
+app.use((req, res, next) => {
+  requestCount++;
+  // Logger toutes les 100 requêtes pour monitoring
+  if (requestCount % 100 === 0) {
+    console.log(`📊 Statistiques serveur: ${requestCount} requêtes, ${errorCount} erreurs`);
+    console.log(`📡 Socket.io: ${socketConnectionCount} connexions, ${socketDisconnectionCount} déconnexions`);
+  }
+  next();
+});
+
+// Logger les erreurs de requête
+app.use((err, req, res, next) => {
+  errorCount++;
+  console.error('❌ Erreur dans une requête:', err.message);
+  console.error('URL:', req.url);
+  if (err.stack && process.env.NODE_ENV !== 'production') {
     console.error('Stack:', err.stack);
-    res.status(500).json({ error: 'Internal server error' });
+  }
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// Monitoring Socket.io
+io.engine.on('connection_error', (err) => {
+  console.error('❌ Erreur de connexion Socket.io:', err.message);
+  console.error('Code:', err.code);
+  console.error('Context:', err.context);
+});
+
+io.on('connection', (socket) => {
+  socketConnectionCount++;
+  console.log(`✅ Nouvelle connexion Socket.io: ${socket.id} (Total: ${socketConnectionCount})`);
+  
+  socket.on('disconnect', () => {
+    socketDisconnectionCount++;
+    console.log(`❌ Déconnexion Socket.io: ${socket.id} (Total: ${socketDisconnectionCount})`);
   });
+});
   
 } catch (error) {
   console.error('❌ Erreur fatale lors de la configuration du serveur:', error);
