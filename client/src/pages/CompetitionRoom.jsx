@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
+import { useToastContext } from '../contexts/ToastContext'
 
 export default function CompetitionRoom() {
   const { competitionId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { username, userId, isCreator } = location.state || {};
+  const { toast } = useToastContext();
   
   const [text, setText] = useState('');
   const [input, setInput] = useState('');
@@ -76,8 +78,10 @@ export default function CompetitionRoom() {
     });
 
     socket.on('competition-error', (error) => {
-      alert(error.message);
-      navigate('/competitions');
+      toast.error(error.message);
+      setTimeout(() => {
+        navigate('/competitions');
+      }, 2000);
     });
 
     return () => {

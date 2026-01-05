@@ -1,20 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useToastContext } from '../contexts/ToastContext'
+import { useUser } from '../contexts/UserContext'
 
 export default function Battle() {
   const [roomId, setRoomId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState('');
-  const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const socketRef = useRef(null);
+  const { toast } = useToastContext();
+  const { user } = useUser(); // Utiliser UserContext au lieu de fetch manuel
+
+  // Initialiser le nom du joueur avec le username de l'utilisateur connecté
+  useEffect(() => {
+    if (user) {
+      setPlayerName(user.username);
+    }
+  }, [user]);
 
   useEffect(() => {
-    fetchCurrentUser();
-    
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     socketRef.current = io(apiUrl, {
       transports: ['polling'], // Utiliser polling pour Plesk
@@ -28,7 +34,7 @@ export default function Battle() {
     });
 
     socket.on('error', (error) => {
-      alert(error.message);
+      toast.error(error.message);
     });
 
     return () => {
@@ -38,28 +44,10 @@ export default function Battle() {
     };
   }, []);
 
-  const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-        setPlayerName(userData.username);
-      }
-    } catch (error) {
-      console.error('Error fetching user:', error);
-    }
-  };
-
   const handleCreateRoom = () => {
     const name = user ? user.username : playerName;
     if (!name.trim()) {
-      alert('Enter a name');
+      toast.warning('Please enter a name');
       return;
     }
     if (socketRef.current) {
@@ -70,11 +58,11 @@ export default function Battle() {
   const handleJoinRoom = () => {
     const name = user ? user.username : playerName;
     if (!name.trim()) {
-      alert('Enter a name');
+      toast.warning('Please enter a name');
       return;
     }
     if (!roomId.trim()) {
-      alert('Enter a room ID');
+      toast.warning('Please enter a room ID');
       return;
     }
     navigate(`/battle/${roomId}`, {
@@ -100,7 +88,7 @@ export default function Battle() {
   const copyRoomId = () => {
     if (createdRoomId) {
       navigator.clipboard.writeText(createdRoomId);
-      alert('Room ID copied!');
+      toast.success('Room ID copied to clipboard!');
     }
   };
 

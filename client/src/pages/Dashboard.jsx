@@ -9,7 +9,7 @@ import TrophyIcon from '../components/icons/TrophyIcon'
 import CompetitionIcon from '../components/icons/CompetitionIcon'
 import MatchmakingIcon from '../components/icons/MatchmakingIcon'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { matchesService } from '../services/apiService';
 
 export default function Dashboard({ user, onSectionChange }) {
   const [selectedLang, setSelectedLang] = useState('en');
@@ -29,16 +29,11 @@ export default function Dashboard({ user, onSectionChange }) {
     if (!user) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/matches?limit=5`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setRecentMatches(data.matches || []);
-      }
+      const data = await matchesService.getMatches(5);
+      setRecentMatches(data.matches || []);
     } catch (error) {
-      console.error('Error fetching matches:', error);
+      // Erreur gérée par apiService
+      setRecentMatches([]);
     } finally {
       setLoading(false);
     }

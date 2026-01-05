@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, useEffect, Suspense, lazy, useRef } from 'react'
 import Footer from '../components/Footer'
 import LogoIcon from '../components/icons/LogoIcon'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
@@ -9,6 +9,10 @@ import CompetitionIcon from '../components/icons/CompetitionIcon'
 import MatchmakingIcon from '../components/icons/MatchmakingIcon'
 import FriendsIcon from '../components/icons/FriendsIcon'
 import SoloDropdown from '../components/SoloDropdown'
+import { profileService } from '../services/apiService'
+import { useUser } from '../contexts/UserContext'
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
+import SEOHead from '../components/SEOHead'
 
 // Lazy loading des composants de pages pour améliorer les performances et réduire le bundle initial
 const Solo = lazy(() => import('./Solo'))
@@ -32,19 +36,17 @@ const LoadingSpinner = () => (
 export default function MainPage() {
   const [activeSection, setActiveSection] = useState('solo');
   const [showAuth, setShowAuth] = useState(null); // 'login' | 'register' | null
-  const [user, setUser] = useState(null);
+  const { user, updateUser } = useUser();
   const [showSandbox, setShowSandbox] = useState(false);
 
   useEffect(() => {
-    fetchCurrentUser();
-    
     // Charger la préférence depuis localStorage si pas d'utilisateur connecté
     const savedMode = localStorage.getItem('defaultMode');
     if (!user && savedMode === 'sandbox') {
       setShowSandbox(true);
       setActiveSection('sandbox');
     }
-  }, []);
+  }, [user]);
 
   // Charger la préférence de mode par défaut quand l'utilisateur est chargé
   useEffect(() => {
@@ -60,23 +62,8 @@ export default function MainPage() {
     }
   }, [user]);
 
-  const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    try {
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      }
-    } catch (error) {
-      console.error('Error fetching user:', error);
-    }
-  };
+  // L'utilisateur est maintenant géré par UserContext
+  // Plus besoin de fetchCurrentUser
 
   // Sauvegarder la préférence de mode
   const saveModePreference = async (mode) => {
@@ -86,38 +73,22 @@ export default function MainPage() {
       return;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     try {
-      const response = await fetch(`${API_URL}/api/me/preferences`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          preferences: {
-            defaultMode: mode
-          }
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUser(prev => ({
-          ...prev,
+      const data = await profileService.updatePreferences({ defaultMode: mode });
+      if (user) {
+        updateUser({
+          ...user,
           preferences: data.preferences
-        }));
+        });
       }
     } catch (error) {
-      console.error('Error saving preferences:', error);
+      // Erreur gérée par apiService
     }
   };
 
   const handleAuthSuccess = () => {
     setShowAuth(null);
-    fetchCurrentUser();
+    // L'utilisateur sera automatiquement chargé par UserContext après la connexion
   };
 
   // Sections de navigation
@@ -150,7 +121,13 @@ export default function MainPage() {
   }
 
   return (
-    <div className="h-screen bg-bg-primary flex flex-col overflow-hidden">
+    <>
+      <SEOHead 
+        title="TypingPVP - Competitive Typing Battles"
+        description="Compete in real-time typing battles, improve your speed and accuracy, and climb the global leaderboard."
+        keywords="typing, typing test, typing speed, wpm, typing battle, competitive typing"
+      />
+      <div className="h-screen bg-bg-primary flex flex-col overflow-hidden">
       {/* Header avec navigation horizontale */}
       <header 
         className="w-full bg-bg-primary/60 backdrop-blur-md z-30"
@@ -428,7 +405,8 @@ export default function MainPage() {
 
       {/* Footer */}
       <Footer />
-    </div>
+      </div>
+    </>
   )
 }
 

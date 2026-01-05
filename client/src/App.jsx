@@ -1,11 +1,15 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
+import { ToastProvider } from './contexts/ToastContext'
+import { UserProvider } from './contexts/UserContext'
+import { QueryProvider } from './providers/QueryProvider'
 import './App.css'
 
 // Lazy loading des routes pour améliorer les performances
 const MainPage = lazy(() => import('./pages/MainPage'))
 const BattleRoom = lazy(() => import('./pages/BattleRoom'))
 const CompetitionRoom = lazy(() => import('./pages/CompetitionRoom'))
+const OAuthCallback = lazy(() => import('./pages/OAuthCallback'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const LegalNotice = lazy(() => import('./pages/LegalNotice'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
@@ -19,18 +23,25 @@ const LoadingSpinner = () => (
 
 function App() {
   return (
-    <Router>
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          <Route path="/" element={<MainPage />} />
-          <Route path="/battle/:roomId" element={<BattleRoom />} />
-          <Route path="/competition/:competitionId" element={<CompetitionRoom />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/legal" element={<LegalNotice />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-        </Routes>
-      </Suspense>
-    </Router>
+    <QueryProvider>
+      <ToastProvider>
+        <UserProvider>
+          <Router>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/" element={<MainPage />} />
+                <Route path="/battle/:roomId" element={<BattleRoom />} />
+                <Route path="/competition/:competitionId" element={<CompetitionRoom />} />
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/legal" element={<LegalNotice />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+              </Routes>
+            </Suspense>
+          </Router>
+        </UserProvider>
+      </ToastProvider>
+    </QueryProvider>
   )
 }
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import FontIcon from './icons/FontIcon'
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 
 const fonts = [
   { id: 'jetbrains', name: 'JetBrains Mono', family: "'JetBrains Mono', monospace" },
@@ -42,6 +43,17 @@ export default function FontSelector() {
     }
   }, [isOpen]);
 
+  // Navigation clavier : fermer avec Escape
+  useKeyboardNavigation({
+    onEscape: () => {
+      if (isOpen) {
+        setIsOpen(false);
+        buttonRef.current?.focus();
+      }
+    },
+    enabled: isOpen
+  });
+
   const currentFont = fonts.find(f => f.id === (localStorage.getItem('typingFont') || 'jetbrains')) || fonts[0];
 
   const handleFontChange = (fontId) => {
@@ -78,8 +90,10 @@ export default function FontSelector() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-text-secondary/60 hover:text-text-primary transition-colors opacity-60 hover:opacity-100"
         aria-label="Select font"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        className="p-2 text-text-secondary/60 hover:text-text-primary transition-colors opacity-60 hover:opacity-100"
       >
         <FontIcon className="w-4 h-4" stroke="currentColor" />
       </button>

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { languages } from '../data/languages'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useToastContext } from '../contexts/ToastContext'
+import { authService } from '../services/apiService'
 
 export default function Competitions() {
   const [competitions, setCompetitions] = useState([]);
@@ -11,6 +11,7 @@ export default function Competitions() {
   const [user, setUser] = useState(null);
   const socketRef = useRef(null);
   const navigate = useNavigate();
+  const { toast } = useToastContext();
 
   useEffect(() => {
     fetchCurrentUser();
@@ -23,19 +24,12 @@ export default function Competitions() {
   }, []);
 
   const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     try {
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      }
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
     } catch (error) {
-      console.error('Error fetching user:', error);
+      // Erreur gérée par apiService
+      setUser(null);
     }
   };
 
@@ -65,7 +59,7 @@ export default function Competitions() {
 
   const handleCreateCompetition = () => {
     if (!user) {
-      alert('Please login to create a competition');
+      toast.warning('Please login to create a competition');
       return;
     }
 
@@ -91,7 +85,7 @@ export default function Competitions() {
 
   const handleJoinCompetition = (competitionId) => {
     if (!user) {
-      alert('Please login to join a competition');
+      toast.warning('Please login to join a competition');
       return;
     }
 

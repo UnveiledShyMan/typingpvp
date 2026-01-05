@@ -1,30 +1,31 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { languages } from '../data/languages'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useRankings } from '../hooks/useRankings'
+import { TableSkeleton } from '../components/SkeletonLoader'
+import SEOHead from '../components/SEOHead'
 
 export default function Rankings() {
   const [selectedLang, setSelectedLang] = useState('en');
-  const [rankings, setRankings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Utiliser React Query pour le cache automatique
+  const { data: rankings = [], isLoading: loading, refetch } = useRankings(selectedLang);
 
   useEffect(() => {
-    fetchRankings();
-  }, [selectedLang]);
-
-  const fetchRankings = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/rankings/${selectedLang}`);
-      const data = await response.json();
-      setRankings(data.rankings || []);
-    } catch (error) {
-      console.error('Error fetching rankings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Écouter les événements de mise à jour ELO après une battle
+    const handleEloUpdate = () => {
+      // Rafraîchir le leaderboard après un court délai
+      setTimeout(() => {
+        refetch();
+      }, 1000);
+    };
+    
+    window.addEventListener('elo-updated', handleEloUpdate);
+    
+    return () => {
+      window.removeEventListener('elo-updated', handleEloUpdate);
+    };
+  }, [selectedLang, refetch]);
 
   // Les couleurs sont maintenant dans rankInfo.color
   const getRankColor = (rankInfo) => {
@@ -32,7 +33,13 @@ export default function Rankings() {
   };
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
+    <>
+      <SEOHead 
+        title="Rankings - TypingPVP"
+        description={`Global leaderboard for ${languages[selectedLang]?.name || 'typing'} - Compete with the best typists`}
+        keywords={`typing rankings, leaderboard, ${languages[selectedLang]?.name || ''} typing, competitive typing`}
+      />
+      <div className="h-full w-full flex flex-col overflow-hidden">
       <div className="mb-4 sm:mb-6 flex-shrink-0">
         <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-1 animate-slide-up" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
           Rankings
@@ -55,9 +62,8 @@ export default function Rankings() {
         </div>
 
         {loading ? (
-          <div className="text-center py-16 text-text-secondary">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent-primary"></div>
-            <p className="mt-4">Loading rankings...</p>
+          <div className="p-6">
+            <TableSkeleton rows={10} columns={4} />
           </div>
         ) : (
           <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg overflow-hidden animate-slide-up flex-1 min-h-0 flex flex-col">
@@ -143,7 +149,8 @@ export default function Rankings() {
             </div>
           </div>
         )}
-    </div>
+      </div>
+    </>
   )
 }
 

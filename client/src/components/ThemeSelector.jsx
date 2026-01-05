@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import BrushIcon from './icons/BrushIcon'
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 
 const themes = [
   { id: 'dark', name: 'Dark', bg: '#0a0e1a', text: '#e8ecf3', accent: '#8b5cf6' },
@@ -42,6 +43,17 @@ export default function ThemeSelector() {
     }
   }, [isOpen]);
 
+  // Navigation clavier : fermer avec Escape
+  useKeyboardNavigation({
+    onEscape: () => {
+      if (isOpen) {
+        setIsOpen(false);
+        buttonRef.current?.focus(); // Retourner le focus au bouton
+      }
+    },
+    enabled: isOpen
+  });
+
   const currentTheme = themes.find(t => t.id === (localStorage.getItem('theme') || 'dark')) || themes[0];
 
   const handleThemeChange = (themeId) => {
@@ -76,8 +88,10 @@ export default function ThemeSelector() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-text-secondary/60 hover:text-text-primary transition-colors opacity-60 hover:opacity-100"
         aria-label="Select theme"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        className="p-2 text-text-secondary/60 hover:text-text-primary transition-colors opacity-60 hover:opacity-100"
       >
         <BrushIcon className="w-4 h-4" stroke="currentColor" />
       </button>

@@ -1,4 +1,18 @@
-// Noms de rangs drôles et amusants (client-side)
+/**
+ * Détermine le rang (tier) d'un joueur basé sur son MMR
+ * Utilise un système de rangs inspiré des jeux compétitifs
+ * 
+ * @param {number} mmr - MMR (Match Making Rating) du joueur
+ * @returns {Object} - Objet contenant tier, rank, mmr et color
+ * @returns {string} returns.tier - Nom du tier (ex: "Keyboard Destroyer")
+ * @returns {string} returns.rank - Rang dans le tier (ex: "I", "II", "III", "IV")
+ * @returns {number} returns.mmr - MMR du joueur
+ * @returns {string} returns.color - Couleur hexadécimale du tier
+ * 
+ * @example
+ * const rankInfo = getRankFromMMR(1500);
+ * // { tier: 'Key Crusher', rank: 'III', mmr: 1500, color: '#FFD700' }
+ */
 export function getRankFromMMR(mmr) {
   if (mmr >= 2800) return { tier: 'Keyboard Destroyer', rank: '', mmr, color: '#FFD700' };
   if (mmr >= 2600) return { tier: 'Speed Demon', rank: '', mmr, color: '#FF1493' };

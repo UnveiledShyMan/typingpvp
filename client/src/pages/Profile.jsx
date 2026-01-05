@@ -1,16 +1,25 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getRankFromMMR } from '../utils/ranks.js'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useToastContext } from '../contexts/ToastContext'
+import { profileService, authService, matchesService } from '../services/apiService'
+import { ProfileSkeleton } from '../components/SkeletonLoader'
+import { useProfile, useUpdateProfile } from '../hooks/useProfile'
+import { useUser } from '../contexts/UserContext'
+import SEOHead from '../components/SEOHead'
+import logger from '../utils/logger'
 
 export default function Profile({ userId: currentUserId }) {
   const { id } = useParams();
   const userId = id || currentUserId;
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToastContext();
+  const { user: currentUserFromContext } = useUser();
+  
+  // Utiliser React Query pour le cache du profil
+  const { data: user, isLoading: loading, refetch: refetchProfile } = useProfile(userId);
+  const updateProfileMutation = useUpdateProfile();
+  
   const [selectedLang, setSelectedLang] = useState('en');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -29,42 +38,14 @@ export default function Profile({ userId: currentUserId }) {
   const [soloMatches, setSoloMatches] = useState([]);
   const [multiplayerMatches, setMultiplayerMatches] = useState([]);
 
+  // Initialiser le formulaire d'édition quand les données sont chargées
   useEffect(() => {
-    fetchProfile();
-    fetchCurrentUser();
-  }, [userId]);
-
-  const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setCurrentUser(userData);
-      }
-    } catch (error) {
-      console.error('Error fetching current user:', error);
-    }
-  };
-
-  const fetchProfile = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      
-      const response = await fetch(`${API_URL}/api/users/${userId}`, { headers });
-      const data = await response.json();
-      setUser(data);
+    if (user) {
       setEditForm({
-        bio: data.bio || '',
-        avatar: data.avatar || '',
-        gear: data.gear || '',
-        socialMedia: data.socialMedia || {
+        bio: user.bio || '',
+        avatar: user.avatar || '',
+        gear: user.gear || '',
+        socialMedia: user.socialMedia || {
           twitter: '',
           github: '',
           discord: '',
@@ -74,48 +55,39 @@ export default function Profile({ userId: currentUserId }) {
       
       // Récupérer l'historique des matchs réels
       fetchUserMatches(userId);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [user, userId]);
+
+  useEffect(() => {
+    // Écouter les événements de mise à jour ELO après une battle
+    const handleEloUpdate = () => {
+      // Rafraîchir le profil si c'est le profil de l'utilisateur courant
+      if (currentUserFromContext && currentUserFromContext.id === userId) {
+        refetchProfile();
+      }
+    };
+    
+    window.addEventListener('elo-updated', handleEloUpdate);
+    
+    return () => {
+      window.removeEventListener('elo-updated', handleEloUpdate);
+    };
+  }, [userId, currentUserFromContext, refetchProfile]);
 
   const fetchUserMatches = async (targetUserId) => {
     try {
-      const token = localStorage.getItem('token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      
       // Récupérer les matchs solo et multijoueurs séparément
-      const [soloResponse, multiplayerResponse] = await Promise.all([
-        fetch(`${API_URL}/api/matches/${targetUserId}?limit=10&type=solo`, { headers }),
-        fetch(`${API_URL}/api/matches/${targetUserId}?limit=10&type=multiplayer`, { headers })
+      const [soloData, multiplayerData, allData] = await Promise.all([
+        matchesService.getUserMatches(targetUserId, 10, 'solo').catch(() => ({ matches: [] })),
+        matchesService.getUserMatches(targetUserId, 10, 'multiplayer').catch(() => ({ matches: [] })),
+        matchesService.getUserMatches(targetUserId, 10).catch(() => ({ matches: [] }))
       ]);
       
-      if (soloResponse.ok) {
-        const soloData = await soloResponse.json();
-        setSoloMatches(soloData.matches || []);
-      } else {
-        setSoloMatches([]);
-      }
-      
-      if (multiplayerResponse.ok) {
-        const multiplayerData = await multiplayerResponse.json();
-        setMultiplayerMatches(multiplayerData.matches || []);
-      } else {
-        setMultiplayerMatches([]);
-      }
-      
-      // Garder recentMatches pour compatibilité (tous les matchs)
-      const allResponse = await fetch(`${API_URL}/api/matches/${targetUserId}?limit=10`, { headers });
-      if (allResponse.ok) {
-        const allData = await allResponse.json();
-        setRecentMatches(allData.matches || []);
-      } else {
-        setRecentMatches([]);
-      }
+      setSoloMatches(soloData.matches || []);
+      setMultiplayerMatches(multiplayerData.matches || []);
+      setRecentMatches(allData.matches || []);
     } catch (error) {
-      console.error('Error fetching user matches:', error);
+      // Erreur gérée par apiService
       setSoloMatches([]);
       setMultiplayerMatches([]);
       setRecentMatches([]);
@@ -123,38 +95,22 @@ export default function Profile({ userId: currentUserId }) {
   };
 
   const handleSave = async () => {
+    if (!currentUserFromContext) {
+      toast.warning('Please login to edit profile');
+      return;
+    }
+
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Please login to edit profile');
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/api/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(editForm)
+      await updateProfileMutation.mutateAsync({
+        userId,
+        profileData: editForm
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        alert(error.error || 'Failed to update profile');
-        return;
-      }
-
-      const updatedUser = await response.json();
-      setUser(updatedUser);
       setIsEditing(false);
-      if (currentUser && currentUser.id === userId) {
-        setCurrentUser(updatedUser);
-      }
+      toast.success('Profil mis à jour avec succès !');
+      // Le cache sera automatiquement invalidé par useUpdateProfile
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('Failed to update profile');
+      // Erreur gérée par apiService
     } finally {
       setSaving(false);
     }
@@ -185,12 +141,14 @@ export default function Profile({ userId: currentUserId }) {
     }
   };
 
-  const isOwnProfile = currentUser && currentUser.id === userId;
+  const isOwnProfile = currentUserFromContext && currentUserFromContext.id === userId;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-        <div className="text-text-secondary">Loading...</div>
+      <div className="h-full w-full overflow-hidden">
+        <div className="w-full h-full max-w-5xl mx-auto overflow-y-auto p-6">
+          <ProfileSkeleton />
+        </div>
       </div>
     );
   }
@@ -216,8 +174,14 @@ export default function Profile({ userId: currentUserId }) {
   };
 
   return (
-    <div className="h-full w-full overflow-hidden">
-      <div className="w-full h-full max-w-5xl mx-auto overflow-y-auto">
+    <>
+      <SEOHead 
+        title={`${user.username} - Profile - TypingPVP`}
+        description={user.bio || `View ${user.username}'s typing stats, ELO, and match history`}
+        keywords={`${user.username}, typing profile, typing stats, ${user.gear || ''}`}
+      />
+      <div className="h-full w-full overflow-hidden">
+        <div className="w-full h-full max-w-5xl mx-auto overflow-y-auto">
       {/* Header avec avatar et infos principales - Style osu! */}
       <div className="relative mb-8">
         {/* Bannière de fond avec gradient */}
@@ -651,7 +615,8 @@ export default function Profile({ userId: currentUserId }) {
           )}
         </>
       )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

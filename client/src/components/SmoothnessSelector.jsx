@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import SettingsIcon from './icons/SettingsIcon'
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 
 const smoothnessOptions = [
   { id: 'instant', name: 'Instant', value: 0, cursorLag: 0 },
@@ -93,8 +94,10 @@ export default function SmoothnessSelector() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-text-secondary/60 hover:text-text-primary transition-all duration-200 opacity-60 hover:opacity-100"
         aria-label="Adjust smoothness"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        className="p-2 text-text-secondary/60 hover:text-text-primary transition-all duration-200 opacity-60 hover:opacity-100"
       >
         <SettingsIcon className="w-4 h-4" stroke="currentColor" />
       </button>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useReducer, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { generateText, languages } from '../data/languages'
 import { generateNumbers } from '../data/numbers'
@@ -11,43 +11,43 @@ import NumbersIcon from '../components/icons/NumbersIcon'
 import { getDefaultLanguage } from '../utils/languageDetection'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts'
 
-const TIME_LIMIT = 60; // 60 secondes
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { post } from '../services/apiService';
+import { TIME_LIMIT, CHARS_PER_WORD, MIN_TEXT_LENGTH, ADDITIONAL_TEXT_LENGTH, TEXT_GENERATION_THRESHOLD } from '../config/constants';
+import { soloReducer, SOLO_ACTIONS, initialState } from '../reducers/soloReducer';
 
 export default function Solo() {
-  // Détecter automatiquement la langue au chargement
-  const [selectedLang, setSelectedLang] = useState(() => getDefaultLanguage());
-  const [mode, setMode] = useState('words'); // 'words' or 'numbers'
-  const [text, setText] = useState('');
-  const [input, setInput] = useState('');
-  const [startTime, setStartTime] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
-  const [stats, setStats] = useState({ wpm: 0, accuracy: 100, time: 0, chars: 0 });
-  const [finished, setFinished] = useState(false);
-  const [errors, setErrors] = useState(0);
-  const [timeSeries, setTimeSeries] = useState([]); // Pour les graphiques
-  const [totalWords, setTotalWords] = useState(0);
-  const [isFocused, setIsFocused] = useState(false);
+  // Utiliser useReducer pour regrouper tous les états liés et réduire les re-renders
+  const [state, dispatch] = useReducer(soloReducer, {
+    ...initialState,
+    selectedLang: getDefaultLanguage()
+  });
+  
+  // Extraire les valeurs de l'état pour faciliter l'utilisation
+  const { selectedLang, mode, text, input, startTime, timeLeft, stats, finished, errors, timeSeries, totalWords, isFocused } = state;
+  
   const inputRef = useRef(null);
   const intervalRef = useRef(null);
   const textContainerRef = useRef(null);
   const matchRecordedRef = useRef(false); // Pour éviter d'enregistrer plusieurs fois
 
   useEffect(() => {
-    if (mode === 'numbers') {
-      setText(generateNumbers(300));
-    } else {
-      setText(generateText(selectedLang, 300)); // Plus de texte pour 60 secondes
-    }
-    setInput('');
-    setStartTime(null);
-    setStats({ wpm: 0, accuracy: 100, time: 0, chars: 0 });
-    setFinished(false);
-    setErrors(0);
-    setTimeLeft(TIME_LIMIT);
-    setTimeSeries([]);
-    setTotalWords(0);
+    // Générer le texte initial
+    const initialText = mode === 'numbers' 
+      ? generateNumbers(MIN_TEXT_LENGTH)
+      : generateText(selectedLang, MIN_TEXT_LENGTH);
+    
+    // Réinitialiser l'état avec le reducer
+    dispatch({ type: SOLO_ACTIONS.SET_TEXT, payload: initialText });
+    dispatch({ type: SOLO_ACTIONS.SET_INPUT, payload: '' });
+    dispatch({ type: SOLO_ACTIONS.SET_START_TIME, payload: null });
+    dispatch({ type: SOLO_ACTIONS.SET_STATS, payload: { wpm: 0, accuracy: 100, time: 0, chars: 0 } });
+    dispatch({ type: SOLO_ACTIONS.SET_FINISHED, payload: false });
+    dispatch({ type: SOLO_ACTIONS.SET_ERRORS, payload: 0 });
+    dispatch({ type: SOLO_ACTIONS.SET_TIME_LEFT, payload: TIME_LIMIT });
+    dispatch({ type: SOLO_ACTIONS.ADD_TIME_SERIES, payload: { second: 0, wpm: 0, accuracy: 100 } }); // Reset timeSeries
+    dispatch({ type: SOLO_ACTIONS.SET_TOTAL_WORDS, payload: 0 });
+    matchRecordedRef.current = false;
+    
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -62,11 +62,11 @@ export default function Solo() {
 
   // Gérer le focus/blur pour l'indicateur visuel - optimisé avec useCallback
   const handleFocus = useCallback(() => {
-    setIsFocused(true);
+    dispatch({ type: SOLO_ACTIONS.SET_FOCUSED, payload: true });
   }, []);
 
   const handleBlur = useCallback(() => {
-    setIsFocused(false);
+    dispatch({ type: SOLO_ACTIONS.SET_FOCUSED, payload: false });
   }, []);
 
   // Empêcher le menu contextuel (clic droit) et la sélection du texte - style Monkeytype
@@ -76,26 +76,39 @@ export default function Solo() {
   }, []);
 
   // Empêcher la sélection du texte avec un clic long ou un glisser-déposer
-  const handleSelectStart = useCallback((e) => {
-    e.preventDefault();
-    return false;
+  // Utiliser useEffect pour ajouter l'événement natif onselectstart
+  useEffect(() => {
+    if (textContainerRef.current) {
+      const element = textContainerRef.current;
+      const handleSelectStart = (e) => {
+        e.preventDefault();
+        return false;
+      };
+      
+      // Utiliser l'événement natif HTML
+      element.addEventListener('selectstart', handleSelectStart);
+      
+      return () => {
+        element.removeEventListener('selectstart', handleSelectStart);
+      };
+    }
   }, []);
 
   // Timer pour les 60 secondes
   useEffect(() => {
     if (startTime && !finished && timeLeft > 0) {
       intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setFinished(true);
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
-            return 0;
+        const newTimeLeft = timeLeft - 1;
+        if (newTimeLeft <= 0) {
+          dispatch({ type: SOLO_ACTIONS.SET_FINISHED, payload: true });
+          dispatch({ type: SOLO_ACTIONS.SET_TIME_LEFT, payload: 0 });
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
           }
-          return prev - 1;
-        });
+        } else {
+          dispatch({ type: SOLO_ACTIONS.SET_TIME_LEFT, payload: newTimeLeft });
+        }
       }, 1000);
     } else {
       if (intervalRef.current) {
@@ -119,19 +132,12 @@ export default function Solo() {
       if (token) {
         // Enregistrer le match solo (seulement en mode words pour avoir une langue)
         if (mode === 'words') {
-          fetch(`${API_URL}/api/matches/solo`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              wpm: stats.wpm,
-              accuracy: stats.accuracy,
-              language: selectedLang
-            })
-          }).catch(error => {
-            console.error('Error recording solo match:', error);
+          post('/api/matches/solo', {
+            wpm: stats.wpm,
+            accuracy: stats.accuracy,
+            language: selectedLang
+          }).catch(() => {
+            // Erreur silencieuse - le match n'est pas critique pour le solo
           });
         }
       }
@@ -140,7 +146,7 @@ export default function Solo() {
 
   // Sauvegarder la langue quand elle change - optimisé avec useCallback
   const handleLanguageChange = useCallback((langCode) => {
-    setSelectedLang(langCode);
+    dispatch({ type: SOLO_ACTIONS.SET_LANG, payload: langCode });
     localStorage.setItem('typingLanguage', langCode);
   }, []);
 
@@ -156,19 +162,19 @@ export default function Solo() {
     
     // Mise à jour immédiate de l'input pour réduire l'input lag
     if (value.length <= text.length) {
-      setInput(value);
+      dispatch({ type: SOLO_ACTIONS.SET_INPUT, payload: value });
     }
     
     if (!startTime && value.length > 0) {
-      setStartTime(Date.now());
+      dispatch({ type: SOLO_ACTIONS.SET_START_TIME, payload: Date.now() });
     }
 
     // Générer plus de texte si nécessaire (déféré pour ne pas bloquer)
-    if (value.length >= text.length - 50) {
+    if (value.length >= text.length - TEXT_GENERATION_THRESHOLD) {
       requestAnimationFrame(() => {
-        const additionalText = mode === 'numbers' ? generateNumbers(100) : generateText(selectedLang, 100);
+        const additionalText = mode === 'numbers' ? generateNumbers(ADDITIONAL_TEXT_LENGTH) : generateText(selectedLang, ADDITIONAL_TEXT_LENGTH);
         // Les espaces sont déjà inclus dans le texte généré (avant les mots)
-        setText(prev => prev + additionalText);
+        dispatch({ type: SOLO_ACTIONS.APPEND_TEXT, payload: additionalText });
       });
     }
 
@@ -176,27 +182,30 @@ export default function Solo() {
       // Calculer les erreurs de manière optimisée (seulement les nouveaux caractères)
       let errorCount = lastErrorCountRef.current;
       if (value.length > input.length) {
-        // Nouveau caractère ajouté - vérifier seulement le dernier
+        // Nouveau caractère ajouté - vérifier seulement les nouveaux
         for (let i = input.length; i < value.length; i++) {
           if (value[i] !== text[i]) {
             errorCount++;
-          } else if (i < input.length && input[i] !== text[i]) {
-            // Correction d'une erreur précédente
+          }
+        }
+        // Vérifier les corrections dans la partie déjà tapée (si l'utilisateur corrige)
+        for (let i = 0; i < input.length; i++) {
+          if (input[i] !== text[i] && value[i] === text[i]) {
+            // Une erreur a été corrigée
             errorCount = Math.max(0, errorCount - 1);
           }
         }
       } else if (value.length < input.length) {
-        // Caractère supprimé - recalculer depuis le début (rare)
+        // Caractère supprimé - recalculer depuis le début (rare mais nécessaire)
         errorCount = 0;
         for (let i = 0; i < value.length; i++) {
           if (value[i] !== text[i]) {
             errorCount++;
           }
         }
-        // Réinitialiser les refs lors de la suppression si nécessaire
       }
       lastErrorCountRef.current = errorCount;
-      setErrors(errorCount);
+      dispatch({ type: SOLO_ACTIONS.SET_ERRORS, payload: errorCount });
 
       // Calculer les stats de manière throttlée (pas à chaque frappe)
       if (startTime) {
@@ -209,43 +218,36 @@ export default function Solo() {
         statsUpdateRef.current = requestAnimationFrame(() => {
           const timeElapsed = (TIME_LIMIT - timeLeft) / 60;
           
-          // Calcul optimisé des caractères corrects (seulement les nouveaux)
-          let correctChars = 0;
-          const minLen = Math.min(value.length, text.length);
-          for (let i = 0; i < minLen; i++) {
-            if (value[i] === text[i]) {
-              correctChars++;
-            }
-          }
+          // Calcul optimisé des caractères corrects : utiliser errorCount déjà calculé
+          // correctChars = total - erreurs (plus efficace qu'une boucle)
+          const correctChars = value.length - errorCount;
           
           // WPM basé uniquement sur les caractères corrects - empêche le spam du clavier
           // Un mot = 5 caractères, donc on divise les caractères corrects par 5
-          const wordsTyped = correctChars / 5;
+          const wordsTyped = correctChars / CHARS_PER_WORD;
           const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
           
+          // Accuracy : (caractères corrects / total) * 100
           const accuracy = value.length > 0 
-            ? Math.round(((value.length - errorCount) / value.length) * 100)
+            ? Math.round((correctChars / value.length) * 100)
             : 100;
           
-          setStats({ 
-            wpm, 
-            accuracy, 
-            time: TIME_LIMIT - timeLeft, 
-            chars: value.length 
+          dispatch({ 
+            type: SOLO_ACTIONS.SET_STATS, 
+            payload: { 
+              wpm, 
+              accuracy, 
+              time: TIME_LIMIT - timeLeft, 
+              chars: value.length 
+            }
           });
-          setTotalWords(Math.floor(wordsTyped));
+          dispatch({ type: SOLO_ACTIONS.SET_TOTAL_WORDS, payload: Math.floor(wordsTyped) });
 
           // Enregistrer les stats chaque seconde pour le graphique (throttlé)
           const currentSecond = TIME_LIMIT - timeLeft;
-          setTimeSeries((prev) => {
-            const existing = prev.findIndex((item) => item.second === currentSecond);
-            const newData = { second: currentSecond, wpm, accuracy };
-            if (existing >= 0) {
-              const updated = [...prev];
-              updated[existing] = newData;
-              return updated;
-            }
-            return [...prev, newData].sort((a, b) => a.second - b.second);
+          dispatch({ 
+            type: SOLO_ACTIONS.ADD_TIME_SERIES, 
+            payload: { second: currentSecond, wpm, accuracy } 
           });
         });
 
@@ -271,24 +273,21 @@ export default function Solo() {
         });
       }
     }
-  }, [finished, text, startTime, timeLeft, mode, selectedLang, input.length]);
+  }, [finished, text, startTime, timeLeft, mode, selectedLang, input]);
 
   const reset = () => {
-    setInput('');
-    setStartTime(null);
-    setStats({ wpm: 0, accuracy: 100, time: 0, chars: 0 });
-    setFinished(false);
-    setErrors(0);
-    setTimeLeft(TIME_LIMIT);
-    setTimeSeries([]);
-    setTotalWords(0);
+    // Utiliser le reducer pour réinitialiser
+    dispatch({ type: SOLO_ACTIONS.RESET });
+    
+    // Générer le nouveau texte
+    const newText = mode === 'numbers' 
+      ? generateNumbers(MIN_TEXT_LENGTH)
+      : generateText(selectedLang, MIN_TEXT_LENGTH);
+    dispatch({ type: SOLO_ACTIONS.SET_TEXT, payload: newText });
+    
     matchRecordedRef.current = false; // Réinitialiser pour le prochain match
     lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
-    if (mode === 'numbers') {
-      setText(generateNumbers(300));
-    } else {
-      setText(generateText(selectedLang, 300));
-    }
+    
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -358,7 +357,7 @@ export default function Solo() {
         {/* Boutons mode avec icônes */}
         <div className="flex gap-1">
           <button
-            onClick={() => setMode('words')}
+            onClick={() => dispatch({ type: SOLO_ACTIONS.SET_MODE, payload: 'words' })}
             className={`p-2 rounded-md transition-all duration-200 ${
               mode === 'words'
                 ? 'bg-accent-primary/20 text-accent-primary opacity-100'
@@ -369,13 +368,14 @@ export default function Solo() {
             <WordsIcon className="w-4 h-4" stroke="currentColor" />
           </button>
           <button
-            onClick={() => setMode('numbers')}
+            onClick={() => dispatch({ type: SOLO_ACTIONS.SET_MODE, payload: 'numbers' })}
             className={`p-2 rounded-md transition-all duration-200 ${
               mode === 'numbers'
                 ? 'bg-accent-primary/20 text-accent-primary opacity-100'
                 : 'bg-bg-secondary/20 text-text-secondary/60 hover:text-text-primary hover:bg-bg-secondary/40 opacity-60 hover:opacity-100'
             }`}
             aria-label="Numbers mode"
+            title="Numbers mode"
           >
             <NumbersIcon className="w-4 h-4" stroke="currentColor" />
           </button>
@@ -421,7 +421,6 @@ export default function Solo() {
               ref={textContainerRef}
               onClick={() => inputRef.current?.focus()}
               onContextMenu={handleContextMenu}
-              onSelectStart={handleSelectStart}
               onDragStart={(e) => e.preventDefault()}
               className={`typing-text bg-transparent rounded-lg w-full overflow-y-auto cursor-text relative transition-all duration-300 ${
                 isFocused ? 'typing-area-focused' : 'typing-area-unfocused'

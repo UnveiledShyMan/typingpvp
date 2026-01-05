@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useToastContext } from '../contexts/ToastContext'
+import { friendsService, authService } from '../services/apiService'
+import { useDebounce } from '../hooks/useDebounce'
+import { FriendsListSkeleton } from '../components/SkeletonLoader'
+import logger from '../utils/logger'
 
 export default function Friends() {
   const [friends, setFriends] = useState([]);
@@ -10,10 +13,15 @@ export default function Friends() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('friends'); // 'friends' | 'requests' | 'search'
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const socketRef = useRef(null);
+  const { toast } = useToastContext();
+  
+  // Debounce la recherche pour éviter trop d'appels API
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -35,19 +43,10 @@ export default function Friends() {
 
   const fetchCurrentUser = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const userData = await response.json();
-        setCurrentUser(userData);
-      }
+      const userData = await authService.getCurrentUser();
+      setCurrentUser(userData);
     } catch (error) {
-      console.error('Error fetching current user:', error);
+      // Erreur gérée par apiService
     }
   };
 
@@ -84,19 +83,10 @@ export default function Friends() {
 
   const fetchFriends = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await fetch(`${API_URL}/api/friends`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setFriends(data.friends || []);
-      }
+      const data = await friendsService.getFriends();
+      setFriends(data.friends || []);
     } catch (error) {
-      console.error('Error fetching friends:', error);
+      // Erreur gérée par apiService
     } finally {
       setLoading(false);
     }
@@ -104,88 +94,59 @@ export default function Friends() {
 
   const fetchFriendRequests = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await fetch(`${API_URL}/api/friends/requests`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setFriendRequests({ sent: data.sent || [], received: data.received || [] });
-      }
+      const data = await friendsService.getFriendRequests();
+      setFriendRequests({ sent: data.sent || [], received: data.received || [] });
     } catch (error) {
-      console.error('Error fetching friend requests:', error);
+      // Erreur gérée par apiService
     }
   };
 
-  const searchUsers = async (query) => {
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await fetch(`${API_URL}/api/friends/search?q=${encodeURIComponent(query)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.users || []);
+  // Recherche avec debounce - déclenchée automatiquement quand debouncedSearchQuery change
+  useEffect(() => {
+    const performSearch = async () => {
+      if (debouncedSearchQuery.length < 2) {
+        setSearchResults([]);
+        return;
       }
-    } catch (error) {
-      console.error('Error searching users:', error);
-    }
-  };
+      
+      setSearchLoading(true);
+      try {
+        const data = await friendsService.searchUsers(debouncedSearchQuery);
+        setSearchResults(data.users || []);
+      } catch (error) {
+        // Erreur gérée par apiService
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+
+    performSearch();
+  }, [debouncedSearchQuery]);
 
   const handleSendRequest = async (userId) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await fetch(`${API_URL}/api/friends/request/${userId}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        fetchFriendRequests();
-        searchUsers(searchQuery);
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Failed to send friend request');
+      await friendsService.sendFriendRequest(userId);
+      fetchFriendRequests();
+      // Refaire la recherche pour mettre à jour les résultats
+      if (debouncedSearchQuery.length >= 2) {
+        const data = await friendsService.searchUsers(debouncedSearchQuery);
+        setSearchResults(data.users || []);
       }
+      toast.success('Demande d\'ami envoyée !');
     } catch (error) {
-      console.error('Error sending friend request:', error);
-      alert('Failed to send friend request');
+      // Erreur gérée par apiService
     }
   };
 
   const handleAcceptRequest = async (userId) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await fetch(`${API_URL}/api/friends/accept/${userId}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        fetchFriends();
-        fetchFriendRequests();
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Failed to accept friend request');
-      }
+      await friendsService.acceptFriendRequest(userId);
+      fetchFriends();
+      fetchFriendRequests();
+      toast.success('Demande d\'ami acceptée !');
     } catch (error) {
-      console.error('Error accepting friend request:', error);
-      alert('Failed to accept friend request');
+      // Erreur gérée par apiService
     }
   };
 
@@ -204,7 +165,7 @@ export default function Friends() {
         searchUsers(searchQuery);
       }
     } catch (error) {
-      console.error('Error removing friend request:', error);
+      logger.error('Error removing friend request:', error);
     }
   };
 
@@ -224,14 +185,14 @@ export default function Friends() {
         fetchFriends();
       }
     } catch (error) {
-      console.error('Error removing friend:', error);
+      logger.error('Error removing friend:', error);
     }
   };
 
   const handleInviteToBattle = (friendId, friendUsername) => {
     const token = localStorage.getItem('token');
     if (!token) {
-      alert('Please login to invite friends');
+      toast.warning('Please login to invite friends');
       return;
     }
 
@@ -327,14 +288,19 @@ export default function Friends() {
 
       {/* Search */}
       {activeTab === 'search' && (
-        <div className="mb-4 sm:mb-6 flex-shrink-0">
+        <div className="mb-4 sm:mb-6 flex-shrink-0 relative">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by username..."
-            className="input-modern text-lg"
+            className="input-modern text-lg pr-10"
           />
+          {searchLoading && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-5 h-5 border-2 border-text-secondary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
         </div>
       )}
 
@@ -343,7 +309,9 @@ export default function Friends() {
       {/* Friends List */}
       {activeTab === 'friends' && (
         <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
-          {friends.length === 0 ? (
+          {loading ? (
+            <FriendsListSkeleton count={5} />
+          ) : friends.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-text-secondary text-lg mb-4">No friends yet</p>
               <button

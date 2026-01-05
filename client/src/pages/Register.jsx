@@ -1,6 +1,8 @@
 import { useState } from 'react'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import OAuthButton from '../components/OAuthButton'
+import { useToastContext } from '../contexts/ToastContext'
+import { authService } from '../services/apiService'
+import FormField from '../components/FormField'
 
 export default function Register({ onSuccess, onSwitch }) {
   const [username, setUsername] = useState('');
@@ -8,41 +10,34 @@ export default function Register({ onSuccess, onSwitch }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToastContext();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('Les mots de passe ne correspondent pas');
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Le mot de passe doit contenir au moins 6 caractères');
       return;
     }
 
+    setLoading(true);
+
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Registration failed');
-        return;
-      }
-
-      localStorage.setItem('token', data.token);
+      const data = await authService.register(username, email, password);
       if (onSuccess) onSuccess();
+      toast.success('Inscription réussie !');
     } catch (error) {
-      console.error('Register error:', error);
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      setError(`Network error: ${error.message}. Please make sure the server is running on ${API_URL}`);
+      // L'erreur est déjà gérée par apiService (toast automatique)
+      setError(error.message || 'Erreur lors de l\'inscription');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,57 +55,87 @@ export default function Register({ onSuccess, onSwitch }) {
             </div>
           )}
           
-          <div>
-            <label className="block text-text-primary mb-2 text-sm font-medium">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="input-modern"
-              required
-            />
-          </div>
+          <FormField
+            label="Username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            placeholder="Choose a username"
+            autoComplete="username"
+            validation={(value) => {
+              if (value.length < 3) return 'Username must be at least 3 characters';
+              if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Username can only contain letters, numbers, and underscores';
+              return true;
+            }}
+          />
 
-          <div>
-            <label className="block text-text-primary mb-2 text-sm font-medium">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-modern"
-              required
-            />
-          </div>
+          <FormField
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="Enter your email"
+            autoComplete="email"
+          />
 
-          <div>
-            <label className="block text-text-primary mb-2 text-sm font-medium">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-modern"
-              required
-            />
-          </div>
+          <FormField
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="Create a password (min 6 characters)"
+            autoComplete="new-password"
+            validation={(value) => {
+              if (value.length < 6) return 'Password must be at least 6 characters';
+              return true;
+            }}
+          />
 
-          <div>
-            <label className="block text-text-primary mb-2 text-sm font-medium">Confirm Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="input-modern"
-              required
-            />
-          </div>
+          <FormField
+            label="Confirm Password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            placeholder="Confirm your password"
+            autoComplete="new-password"
+            validation={(value) => {
+              if (value !== password) return 'Passwords do not match';
+              return true;
+            }}
+          />
 
           <button
             type="submit"
-            className="w-full bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-6 rounded-lg transition-colors"
+            disabled={loading}
+            className="w-full bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Register
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                <span>Inscription...</span>
+              </>
+            ) : (
+              'Register'
+            )}
           </button>
         </form>
+
+        {/* Séparateur */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-text-secondary/20"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-bg-secondary/40 text-text-secondary">Or sign up with</span>
+          </div>
+        </div>
+
+        {/* Bouton OAuth Google */}
+        <OAuthButton onSuccess={onSuccess} />
 
         <div className="mt-6 text-center text-text-secondary text-sm">
           Already have an account?{' '}

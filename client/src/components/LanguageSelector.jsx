@@ -1,5 +1,6 @@
 import { memo, useState, useRef, useEffect } from 'react'
 import { languages } from '../data/languages'
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 
 // Codes de langue à afficher
 const languageCodes = {
@@ -63,6 +64,17 @@ const LanguageSelector = memo(function LanguageSelector({ selectedLang, onLangua
     }
   }, [isOpen]);
 
+  // Navigation clavier : fermer avec Escape
+  useKeyboardNavigation({
+    onEscape: () => {
+      if (isOpen) {
+        setIsOpen(false);
+        buttonRef.current?.focus();
+      }
+    },
+    enabled: isOpen
+  });
+
   const handleMouseEnter = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -93,8 +105,10 @@ const LanguageSelector = memo(function LanguageSelector({ selectedLang, onLangua
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="px-3 py-1.5 bg-bg-secondary/20 hover:bg-bg-secondary/40 text-text-secondary/70 hover:text-text-primary rounded text-xs font-medium transition-all duration-200 opacity-60 hover:opacity-100"
         aria-label="Select language"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        className="px-3 py-1.5 bg-bg-secondary/20 hover:bg-bg-secondary/40 text-text-secondary/70 hover:text-text-primary rounded text-xs font-medium transition-all duration-200 opacity-60 hover:opacity-100"
       >
         <span className="font-mono">{selectedCode}</span>
       </button>

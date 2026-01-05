@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { languages } from '../data/languages'
 import Modal from '../components/Modal'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useToastContext } from '../contexts/ToastContext'
+import { authService } from '../services/apiService'
 
 export default function Matchmaking() {
   const [selectedLang, setSelectedLang] = useState('en');
@@ -18,6 +18,7 @@ export default function Matchmaking() {
   const intervalRef = useRef(null);
   const queueStartTimeRef = useRef(null);
   const navigate = useNavigate();
+  const { toast } = useToastContext();
 
   useEffect(() => {
     fetchCurrentUser();
@@ -32,19 +33,12 @@ export default function Matchmaking() {
   }, []);
 
   const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     try {
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      }
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
     } catch (error) {
-      console.error('Error fetching user:', error);
+      // Erreur gérée par apiService
+      setUser(null);
     }
   };
 
@@ -113,7 +107,7 @@ export default function Matchmaking() {
     });
 
     socket.on('matchmaking-error', (error) => {
-      alert(error.message);
+      toast.error(error.message);
       setIsInQueue(false);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -145,7 +139,7 @@ export default function Matchmaking() {
   // Gérer le join en tant que guest
   const handleGuestJoin = () => {
     if (!guestUsername.trim()) {
-      alert('Please enter a username');
+      toast.warning('Please enter a username');
       return;
     }
 
@@ -209,7 +203,7 @@ export default function Matchmaking() {
     });
 
     socket.on('matchmaking-error', (error) => {
-      alert(error.message);
+      toast.error(error.message);
       setIsInQueue(false);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -222,9 +216,14 @@ export default function Matchmaking() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
-      <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4 sm:mb-6 flex-shrink-0" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
-        Matchmaking
-      </h1>
+      <div className="mb-6 flex-shrink-0">
+        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+          Matchmaking
+        </h1>
+        <p className="text-text-secondary text-sm">
+          Find an opponent with similar skill level and compete in real-time
+        </p>
+      </div>
 
       {/* Modal pour demander le pseudo guest */}
       <Modal 
@@ -342,42 +341,55 @@ export default function Matchmaking() {
 
         {/* Queue Status */}
         {isInQueue ? (
-          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center battle-glow">
-            <div className="mb-6">
-              <div className="inline-flex items-center gap-3 px-4 py-2 bg-bg-primary/40 backdrop-blur-sm rounded-full mb-4">
-                <div className="w-3 h-3 rounded-full bg-accent-primary animate-pulse"></div>
-                <span className="text-text-primary font-medium">Searching for opponent...</span>
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center">
+            <div className="mb-6 space-y-4">
+              <div className="relative w-20 h-20 mx-auto">
+                <div className="absolute inset-0 border-4 border-accent-primary/20 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
               </div>
-              <div className="text-3xl font-bold text-text-primary mb-2" style={{ fontFamily: 'JetBrains Mono' }}>
-                {formatTime(queueTime)}
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-3 px-4 py-2 bg-bg-primary/40 backdrop-blur-sm rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></div>
+                  <span className="text-text-primary font-medium text-sm">Searching for opponent...</span>
+                </div>
+                <div className="text-4xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                  {formatTime(queueTime)}
+                </div>
+                <div className="text-text-secondary text-sm">Time in queue</div>
               </div>
-              <div className="text-text-secondary text-sm">Time in queue</div>
             </div>
             <button
               onClick={handleLeaveQueue}
-              className="bg-text-error hover:bg-text-error/80 text-bg-primary font-semibold py-3 px-8 rounded-lg transition-colors"
+              className="bg-text-error/20 hover:bg-text-error/30 text-text-error font-semibold py-3 px-8 rounded-lg transition-all duration-200 border border-text-error/30"
             >
               Cancel Search
             </button>
           </div>
         ) : (
-          <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-8 text-center shadow-lg">
-            <div className="mb-6">
-              <p className="text-text-secondary mb-4">
-                Find an opponent with similar skill level {user ? `(MMR: ${userMMR})` : '(MMR: 1000)'}
-              </p>
-              <p className="text-text-secondary/70 text-sm">
-                Matchmaking will find you an opponent within ±200 MMR range
-              </p>
-              {!user && (
-                <p className="text-text-error/80 text-xs mt-2">
-                  ⚠️ Guest mode: Your progress will not be saved
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center space-y-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent-primary/10 rounded-full mb-2">
+                <span className="text-accent-primary text-sm font-medium">Ready to battle?</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-text-primary font-medium">
+                  Your ELO: <span className="text-accent-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{userMMR}</span>
                 </p>
+                <p className="text-text-secondary text-sm">
+                  Matchmaking will find an opponent within ±200 MMR range
+                </p>
+              </div>
+              {!user && (
+                <div className="bg-text-error/10 border border-text-error/20 rounded-lg p-3 mt-4">
+                  <p className="text-text-error text-xs">
+                    ⚠️ Guest mode: Your progress will not be saved
+                  </p>
+                </div>
               )}
             </div>
             <button
               onClick={handleJoinQueue}
-              className="bg-gradient-to-r from-accent-primary to-accent-hover hover:from-accent-hover hover:to-accent-primary text-bg-primary font-semibold py-4 px-12 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl battle-glow text-lg"
+              className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-4 px-12 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 text-lg"
             >
               Find Match
             </button>

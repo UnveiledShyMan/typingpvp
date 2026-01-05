@@ -3,12 +3,15 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
+import { useToastContext } from '../contexts/ToastContext'
+import { authService } from '../services/apiService'
 
 export default function BattleRoom() {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { playerName, userId, isCreator, matchmaking } = location.state || {};
+  const { toast } = useToastContext();
   
   const [text, setText] = useState('');
   const [input, setInput] = useState('');
@@ -36,20 +39,12 @@ export default function BattleRoom() {
   useEffect(() => {
     if (userId || matchmaking) {
       const fetchUser = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        
         try {
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-          const response = await fetch(`${API_URL}/api/me`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (response.ok) {
-            const userData = await response.json();
-            setCurrentUser(userData);
-          }
+          const userData = await authService.getCurrentUser();
+          setCurrentUser(userData);
         } catch (error) {
-          console.error('Error fetching user:', error);
+          // Erreur gérée par apiService
+          setCurrentUser(null);
         }
       };
       fetchUser();
@@ -181,6 +176,26 @@ export default function BattleRoom() {
       setResults(data.results);
       if (data.eloChanges) {
         setEloChanges(data.eloChanges);
+        
+        // Rafraîchir les données utilisateur si connecté pour mettre à jour les ELO
+        if (userId || currentUser?.id) {
+          const refreshUserData = async () => {
+            try {
+              const userData = await authService.getCurrentUser();
+              setCurrentUser(userData);
+              
+              // Émettre un événement pour rafraîchir le profil et le leaderboard
+              window.dispatchEvent(new CustomEvent('elo-updated', { 
+                detail: { userId: userData.id } 
+              }));
+            } catch (error) {
+              // Erreur gérée par apiService
+            }
+          };
+          
+          // Rafraîchir après un court délai pour laisser le temps au serveur de sauvegarder
+          setTimeout(refreshUserData, 500);
+        }
       }
       // Arrêter l'interval d'enregistrement
       if (progressIntervalRef.current) {
@@ -200,8 +215,10 @@ export default function BattleRoom() {
     });
 
     socket.on('error', (error) => {
-      alert(error.message);
-      window.location.href = '/';
+      toast.error(error.message);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
     });
 
     return () => {
@@ -379,8 +396,8 @@ export default function BattleRoom() {
   const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
 
   return (
-    <div className="page-container p-4 lg:p-8">
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 lg:p-8">
+    <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 lg:p-8 flex-1 min-h-0 flex flex-col">
           {/* Layout en deux colonnes : jeu à gauche, chat à droite */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
             {/* Colonne principale : jeu */}
@@ -403,21 +420,79 @@ export default function BattleRoom() {
               </div>
 
           {gameStatus === 'waiting' && (
-            <div className="text-center py-12">
-              <p className="text-text-primary text-lg mb-4">
-                {players.length === 1 ? 'Waiting for opponent...' : 'Both players ready!'}
-              </p>
-              {players.length === 2 && isCreator && (
-                <button
-                  onClick={handleStartGame}
-                  className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded transition-colors"
-                >
-                  start
-                </button>
-              )}
-              {players.length === 2 && !isCreator && (
-                <p className="text-text-secondary">Waiting for room creator...</p>
-              )}
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-6 max-w-md">
+                {/* Liste des joueurs */}
+                <div className="space-y-3">
+                  <h3 className="text-text-secondary text-sm font-medium uppercase tracking-wider mb-4">
+                    Players
+                  </h3>
+                  <div className="space-y-2">
+                    {players.map((player, index) => (
+                      <div 
+                        key={index}
+                        className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${
+                            player.name === playerName ? 'bg-accent-primary' : 'bg-text-secondary/50'
+                          }`}></div>
+                          <span className="text-text-primary font-medium">{player.name}</span>
+                          {player.name === playerName && (
+                            <span className="text-xs text-text-secondary">(You)</span>
+                          )}
+                        </div>
+                        {player.name === playerName && (
+                          <span className="text-xs px-2 py-1 bg-accent-primary/20 text-accent-primary rounded">
+                            Ready
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Message d'attente ou bouton start */}
+                {players.length === 1 ? (
+                  <div className="space-y-3">
+                    <div className="relative w-12 h-12 mx-auto">
+                      <div className="absolute inset-0 border-3 border-accent-primary/20 rounded-full"></div>
+                      <div className="absolute inset-0 border-3 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
+                    </div>
+                    <p className="text-text-primary text-lg font-medium">
+                      Waiting for opponent...
+                    </p>
+                    <p className="text-text-secondary text-sm">
+                      Share the room ID: <span className="font-mono text-accent-primary">{roomId}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-text-primary text-lg font-medium">
+                        Both players ready!
+                      </p>
+                      {isCreator ? (
+                        <p className="text-text-secondary text-sm">
+                          Click start when you're ready to begin
+                        </p>
+                      ) : (
+                        <p className="text-text-secondary text-sm">
+                          Waiting for room creator to start...
+                        </p>
+                      )}
+                    </div>
+                    {players.length === 2 && isCreator && (
+                      <button
+                        onClick={handleStartGame}
+                        className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20"
+                      >
+                        Start Battle
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

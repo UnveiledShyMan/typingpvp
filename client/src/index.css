@@ -50,6 +50,18 @@ body {
   }
 }
 
+/* Animation pour les toasts */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 code {
   font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, monospace;
 }
@@ -548,7 +560,29 @@ code {
   width: 100%;
 }
 
-.input-modern:focus {
+/* Focus visible pour accessibilité - style moderne et visible */
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Focus pour les inputs */
+.input-modern:focus,
+.input-modern:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-color: var(--accent-primary);
+}
+
+/* Focus pour les boutons */
+button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Désactiver outline par défaut mais garder focus-visible */
+*:focus:not(:focus-visible) {
   outline: none;
   background: rgba(19, 24, 37, 0.5);
   box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
