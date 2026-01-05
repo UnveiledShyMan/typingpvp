@@ -254,7 +254,7 @@ io.on('connection', (socket) => {
   });
 
   // Finir la partie
-  socket.on('finish-game', (data) => {
+  socket.on('finish-game', async (data) => {
     const playerData = players.get(socket.id);
     if (!playerData) return;
     
@@ -282,24 +282,14 @@ io.on('connection', (socket) => {
     if (allFinished) {
       room.status = 'finished';
       
-      // Calculer les changements d'ELO pour les résultats
+      // Mettre à jour les résultats du match (incluant les changements d'ELO)
       let eloChanges = {};
       if (room.matchmaking || room.players.some(p => p.userId)) {
-        const user1 = await getUserById(room.players[0].userId);
-        const user2 = await getUserById(room.players[1].userId);
-        
-        if (user1 && user2) {
-          const language = room.language || 'en';
-          const mmr1 = user1.getMMR(language);
-          const mmr2 = user2.getMMR(language);
-          const player1Won = result1.wpm > result2.wpm || (result1.wpm === result2.wpm && result1.accuracy > result2.accuracy);
-          const newMMR1 = calculateNewMMR(mmr1, mmr2, player1Won);
-          const newMMR2 = calculateNewMMR(mmr2, mmr1, !player1Won);
-          eloChanges[room.players[0].id] = newMMR1 - mmr1;
-          eloChanges[room.players[1].id] = newMMR2 - mmr2;
-        }
-        
-        updateMatchResults(room).catch(err => console.error('Error updating match results:', err));
+        // updateMatchResults calcule et enregistre les changements d'ELO, et les retourne
+        eloChanges = await updateMatchResults(room).catch(err => {
+          console.error('Error updating match results:', err);
+          return {};
+        });
       }
       
       io.to(roomId).emit('game-finished', { results: room.results, players: room.players, eloChanges });
