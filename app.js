@@ -171,10 +171,18 @@ async function main() {
     // 2. Builder le client (supprime client/dist/ et rebuild)
     // ATTENDRE que le build soit terminé avant de démarrer le serveur
     console.log('Build du client en cours...');
-    const clientBuilt = await buildClient();
-    if (!clientBuilt) {
-      console.error('❌ Le build du client a échoué. Le serveur ne peut pas démarrer sans le client.');
-      process.exit(1);
+    try {
+      const clientBuilt = await buildClient();
+      if (!clientBuilt) {
+        console.error('❌ Le build du client a échoué.');
+        console.error('⚠️ Le serveur va démarrer quand même, mais le client ne sera pas accessible.');
+        console.error('⚠️ Vérifiez les logs ci-dessus pour voir l\'erreur de build.');
+        // Ne pas arrêter le serveur - permettre de démarrer même sans client pour diagnostiquer
+      }
+    } catch (buildError) {
+      console.error('❌ Erreur lors du build du client:', buildError);
+      console.error('⚠️ Le serveur va démarrer quand même pour permettre le diagnostic.');
+      // Ne pas arrêter le serveur - permettre de démarrer même sans client pour diagnostiquer
     }
     
     // 3. Vérifier et initialiser la base de données
