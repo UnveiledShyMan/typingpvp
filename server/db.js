@@ -28,13 +28,12 @@ export async function createUser(username, email, password = null, provider = 'l
   try {
     // MariaDB n'a pas RETURNING, on fait INSERT puis SELECT
     // Inclure tous les champs nécessaires pour éviter les problèmes avec les valeurs par défaut
+    // IMPORTANT: L'ordre des colonnes doit correspondre exactement au schéma MariaDB
     const insertParams = [
       id,
       username,
       email ? email.toLowerCase() : null,
       passwordHash,
-      provider || 'local',
-      providerId || null,
       avatar || null,
       null, // bio
       null, // gear
@@ -51,13 +50,16 @@ export async function createUser(username, email, password = null, provider = 'l
         bestWPM: 0,
         averageAccuracy: 0
       }),
-      JSON.stringify({ defaultMode: 'solo' }) // preferences
+      JSON.stringify({ defaultMode: 'solo' }), // preferences
+      provider || 'local', // provider (après preferences dans le schéma)
+      providerId || null // provider_id (après provider dans le schéma)
     ];
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:28',message:'before INSERT',data:{id,username,email:email?.toLowerCase(),hasPasswordHash:!!passwordHash,paramsCount:insertParams.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
+    // L'ordre des colonnes doit correspondre exactement au schéma MariaDB
     await pool.query(
-      `INSERT INTO users (id, username, email, password_hash, provider, provider_id, avatar, bio, gear, social_media, friends, friend_requests_sent, friend_requests_received, mmr, stats, preferences)
+      `INSERT INTO users (id, username, email, password_hash, avatar, bio, gear, social_media, friends, friend_requests_sent, friend_requests_received, mmr, stats, preferences, provider, provider_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       insertParams
     );

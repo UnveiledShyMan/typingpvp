@@ -21,15 +21,16 @@ const CLIENT_DIST_DIR = join(__dirname, 'client', 'dist');
 async function checkDatabase() {
   try {
     const pool = (await import('./server/db/connection.js')).default;
+    const dbName = process.env.DB_NAME || 'typingpvp';
+    // MariaDB : utiliser DATABASE() au lieu de 'public' et COUNT(*) au lieu de EXISTS
     const result = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'users'
-      );
-    `);
+      SELECT COUNT(*) as count
+      FROM information_schema.tables 
+      WHERE table_schema = ?
+      AND table_name = 'users'
+    `, [dbName]);
     
-    const tablesExist = result.rows[0].exists;
+    const tablesExist = result.rows[0].count > 0;
     // NE PAS fermer le pool, il est partagé avec l'application
     // Le pool sera fermé automatiquement à la fin du processus
     
@@ -46,19 +47,20 @@ async function checkDatabase() {
  */
 async function initDatabase() {
   try {
-    console.log('Initialisation de la base de données...');
+    console.log('Initialisation de la base de données MariaDB...');
     const { readFileSync } = await import('fs');
     const pool = (await import('./server/db/connection.js')).default;
     const { join } = await import('path');
     
-    const schemaPath = join(__dirname, 'server', 'db', 'schema.sql');
+    // Utiliser schema-mariadb.sql au lieu de schema.sql
+    const schemaPath = join(__dirname, 'server', 'db', 'schema-mariadb.sql');
     const schema = readFileSync(schemaPath, 'utf8');
     
     await pool.query(schema);
     // NE PAS fermer le pool, il est partagé avec l'application
     // Le pool sera fermé automatiquement à la fin du processus
     
-    console.log('✅ Base de données initialisée avec succès');
+    console.log('✅ Base de données MariaDB initialisée avec succès');
     return true;
   } catch (error) {
     console.error('❌ Erreur lors de l\'initialisation de la base de données:', error.message);

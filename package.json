@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "dev": "node start.js",
+    "dev": "node app.js",
     "dev:server": "cd server && nodemon index.js",
     "dev:client": "cd client && npm run dev",
-    "start": "node start.js",
+    "start": "node app.js",
     "start:server": "cd server && node index.js",
     "start:client": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",

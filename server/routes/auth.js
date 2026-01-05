@@ -62,7 +62,11 @@ router.post('/register', async (req, res) => {
     fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:48',message:'register catch',data:{errorMessage:error?.message,errorCode:error?.code,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
     // #endregion
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    // En développement, retourner le message d'erreur complet pour faciliter le debug
+    const errorMessage = process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : error.message || 'Internal server error';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
