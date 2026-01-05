@@ -79,16 +79,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Middleware pour logger les requêtes (utile pour debug)
-if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
-  app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`, {
+// Middleware pour logger les requêtes API (toujours actif pour diagnostic)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    console.log(`📡 ${req.method} ${req.path}`, {
       origin: req.headers.origin,
-      'user-agent': req.headers['user-agent']?.substring(0, 50)
+      query: Object.keys(req.query).length > 0 ? req.query : undefined
     });
-    next();
-  });
-}
+  }
+  next();
+});
 
 // Stockage des rooms en mémoire
 const rooms = new Map();
@@ -204,10 +204,15 @@ if (process.env.SERVE_CLIENT === 'true') {
   
   // Route catch-all : servir index.html pour toutes les routes non-API
   // IMPORTANT: Cette route doit être APRÈS toutes les routes API
-  app.get('*', (req, res, next) => {
+  // Utiliser app.all('*') pour capturer toutes les méthodes HTTP, mais seulement si ce n'est pas une route API
+  app.all('*', (req, res, next) => {
     // Ne pas intercepter les routes API - elles devraient déjà être traitées par les routes définies avant
+    // Si c'est une route API, laisser Express gérer la 404 (elle devrait déjà être traitée)
     if (req.path.startsWith('/api')) {
-      return res.status(404).json({ error: 'API route not found' });
+      // Si on arrive ici, c'est qu'aucune route API n'a matché
+      // Logger pour debug
+      console.warn(`⚠️ Route API non trouvée: ${req.method} ${req.path}`);
+      return res.status(404).json({ error: 'API route not found', path: req.path, method: req.method });
     }
     // Servir index.html pour toutes les autres routes (SPA routing)
     const indexPath = join(clientDistPath, 'index.html');
@@ -224,10 +229,12 @@ if (process.env.SERVE_CLIENT === 'true') {
   });
 } else {
   // Si le client n'est pas servi par le serveur, retourner 404 pour les routes non-API
-  app.get('*', (req, res) => {
+  app.all('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'Not found. Client is served separately.' });
     }
+    // Pour les routes API non trouvées, laisser Express gérer la 404
+    res.status(404).json({ error: 'API route not found', path: req.path, method: req.method });
   });
 }
 
