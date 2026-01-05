@@ -45,9 +45,11 @@ const serverProcess = spawn('node', ['index.js'], {
 
 // Démarrer le client
 console.log('🌐 Démarrage du client...');
+// Sur Windows, utiliser shell: true pour exécuter npm
 const clientProcess = spawn('npm', ['run', 'dev'], {
   cwd: CLIENT_DIR,
   stdio: 'inherit',
+  shell: process.platform === 'win32', // Nécessaire sur Windows pour npm
   env: {
     ...process.env,
     PORT: CLIENT_PORT,

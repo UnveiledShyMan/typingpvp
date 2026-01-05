@@ -11,7 +11,7 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  password: process.env.DB_PASSWORD || '', // S'assurer que c'est toujours une chaîne
   // SSL peut être nécessaire selon la configuration Plesk
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   // Configuration du pool

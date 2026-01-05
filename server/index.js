@@ -77,7 +77,6 @@ app.use('/api/rankings', rankingsRoutes);
 app.use('/api/me', meRoutes);
 
 // Configurer onlineUsers dans friendsRoutes
-import { setOnlineUsers } from './routes/friends.js';
 setOnlineUsers(onlineUsers);
 
 app.use('/api/friends', friendsRoutes);
