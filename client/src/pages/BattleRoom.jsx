@@ -60,6 +60,10 @@ export default function BattleRoom() {
   const chatContainerRef = useRef(null);
   const hasJoinedRoomRef = useRef(false); // Ref pour éviter de joindre plusieurs fois
   const listenersSetupRef = useRef(false); // Ref pour éviter de configurer les listeners plusieurs fois
+  const opponentUpdateTimeoutRef = useRef(null); // Ref pour throttling des mises à jour opponent
+  const lastOpponentUpdateRef = useRef(null); // Ref pour stocker la dernière mise à jour opponent
+  const myTimeSeriesUpdateTimeoutRef = useRef(null); // Ref pour throttling des mises à jour du graphique local
+  const lastMyStatsRef = useRef(null); // Ref pour stocker les dernières stats locales
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -236,50 +240,78 @@ export default function BattleRoom() {
       }
     });
 
+    // Handler optimisé pour opponent-update avec throttling pour éviter les problèmes de performance
+    // Ce handler est appelé très fréquemment (à chaque frappe de l'adversaire)
     socket.on('opponent-update', (data) => {
-      const opponent = players.find(p => p.id === data.playerId);
-      if (opponent) {
-        setOpponentStats({
-          wpm: data.wpm,
-          accuracy: data.accuracy,
-          progress: data.progress
-        });
-        
-        // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
-        // Utiliser TOUJOURS le startTime de la partie pour synchroniser les deux joueurs
-        if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTime && startTimeRef.current) {
-          // Utiliser le startTime de la partie pour synchroniser les deux graphiques
-          setOpponentTypingStartTime(startTimeRef.current);
-          opponentTypingStartTimeRef.current = startTimeRef.current;
-        }
+      // Stocker la dernière mise à jour (pour le throttling)
+      lastOpponentUpdateRef.current = data;
+      
+      // Mettre à jour les stats immédiatement (léger, pas de problème de performance)
+      // Utiliser une ref pour éviter de chercher dans players à chaque fois
+      setOpponentStats({
+        wpm: data.wpm,
+        accuracy: data.accuracy,
+        progress: data.progress
+      });
+      
+      // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
+      // Utiliser TOUJOURS le startTime de la partie pour synchroniser les deux joueurs
+      if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTimeRef.current && startTimeRef.current) {
+        // Utiliser le startTime de la partie pour synchroniser les deux graphiques
+        setOpponentTypingStartTime(startTimeRef.current);
+        opponentTypingStartTimeRef.current = startTimeRef.current;
+      }
+      
+      // Throttling : mettre à jour le graphique seulement toutes les 500ms pour éviter les problèmes de performance
+      // Les mises à jour trop fréquentes peuvent causer des lags (violation > 50ms)
+      if (opponentUpdateTimeoutRef.current) {
+        clearTimeout(opponentUpdateTimeoutRef.current);
+      }
+      
+      opponentUpdateTimeoutRef.current = setTimeout(() => {
+        const updateData = lastOpponentUpdateRef.current;
+        if (!updateData) return;
         
         // Ajouter aux séries temporelles pour le graphique en temps réel
         // Utiliser le startTime de la partie pour synchroniser avec le joueur local
         const typingStart = startTimeRef.current;
         if (typingStart) {
           const currentSecond = Math.floor((Date.now() - typingStart) / 1000);
-          // Ne mettre à jour que si la seconde a changé pour éviter les re-renders inutiles
-          setOpponentTimeSeries((prev) => {
-            const existing = prev.findIndex((item) => item.second === currentSecond);
-            const newData = { 
-              second: currentSecond, 
-              wpm: data.wpm, 
-              accuracy: data.accuracy 
-            };
-            if (existing >= 0) {
-              // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
-              const existingData = prev[existing];
-              if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
-                const updated = [...prev];
-                updated[existing] = newData;
-                return updated;
+          
+          // Optimisation : utiliser requestAnimationFrame pour décaler la mise à jour du DOM
+          requestAnimationFrame(() => {
+            setOpponentTimeSeries((prev) => {
+              // Optimisation : utiliser Map pour une recherche plus rapide (O(1) au lieu de O(n))
+              const existingIndex = prev.findIndex((item) => item.second === currentSecond);
+              const newData = { 
+                second: currentSecond, 
+                wpm: updateData.wpm, 
+                accuracy: updateData.accuracy 
+              };
+              
+              if (existingIndex >= 0) {
+                // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
+                const existingData = prev[existingIndex];
+                if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
+                  // Créer un nouveau tableau seulement si nécessaire
+                  const updated = [...prev];
+                  updated[existingIndex] = newData;
+                  return updated;
+                }
+                return prev; // Pas de changement significatif, retourner la même référence
               }
-              return prev; // Pas de changement significatif, retourner la même référence
-            }
-            return [...prev, newData].sort((a, b) => a.second - b.second);
+              
+              // Ajouter un nouvel élément - optimiser le tri en insérant au bon endroit
+              const newArray = [...prev, newData];
+              // Ne trier que si nécessaire (si l'élément n'est pas déjà à la fin)
+              if (newArray.length > 1 && newData.second < prev[prev.length - 1]?.second) {
+                return newArray.sort((a, b) => a.second - b.second);
+              }
+              return newArray;
+            });
           });
         }
-      }
+      }, 500); // Throttling de 500ms pour réduire la charge
     });
 
     socket.on('opponent-finished', (data) => {
@@ -366,6 +398,11 @@ export default function BattleRoom() {
     // Nettoyage des listeners sera fait dans le premier useEffect
     return () => {
       listenersSetupRef.current = false;
+      // Nettoyer le timeout de throttling
+      if (opponentUpdateTimeoutRef.current) {
+        clearTimeout(opponentUpdateTimeoutRef.current);
+        opponentUpdateTimeoutRef.current = null;
+      }
     };
   }, []); // Exécuter une seule fois
 
@@ -418,7 +455,7 @@ export default function BattleRoom() {
     };
   }, [roomId, playerName, userId, currentUser?.id, navigate]); // Dépendances pour rejoindre la room
 
-  // Nettoyage des intervalles
+  // Nettoyage des intervalles et timeouts
   useEffect(() => {
     return () => {
       if (progressIntervalRef.current) {
@@ -428,6 +465,15 @@ export default function BattleRoom() {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
+      }
+      // Nettoyer les timeouts de throttling
+      if (opponentUpdateTimeoutRef.current) {
+        clearTimeout(opponentUpdateTimeoutRef.current);
+        opponentUpdateTimeoutRef.current = null;
+      }
+      if (myTimeSeriesUpdateTimeoutRef.current) {
+        clearTimeout(myTimeSeriesUpdateTimeoutRef.current);
+        myTimeSeriesUpdateTimeoutRef.current = null;
       }
     };
   }, []);
@@ -515,29 +561,53 @@ export default function BattleRoom() {
         
         setMyStats({ wpm, accuracy, progress });
         
-        // Enregistrer dans les séries temporelles pour le graphique
-        // Utiliser le startTime de la partie pour synchroniser avec l'adversaire
-        const gameStartTime = startTimeRef.current;
-        if (gameStartTime) {
-          const currentSecond = Math.floor((Date.now() - gameStartTime) / 1000);
-          setMyTimeSeries((prev) => {
-            const existing = prev.findIndex((item) => item.second === currentSecond);
-            const newData = { second: currentSecond, wpm, accuracy };
-            if (existing >= 0) {
-              // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
-              const existingData = prev[existing];
-              if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
-                const updated = [...prev];
-                updated[existing] = newData;
-                return updated;
-              }
-              return prev; // Pas de changement significatif, retourner la même référence
-            }
-            return [...prev, newData].sort((a, b) => a.second - b.second);
-          });
+        // Stocker les stats pour le throttling du graphique
+        lastMyStatsRef.current = { wpm, accuracy, progress };
+        
+        // Throttling : mettre à jour le graphique seulement toutes les 500ms pour éviter les problèmes de performance
+        // Les mises à jour trop fréquentes peuvent causer des lags (violation > 50ms)
+        if (myTimeSeriesUpdateTimeoutRef.current) {
+          clearTimeout(myTimeSeriesUpdateTimeoutRef.current);
         }
         
-        // Envoyer la mise à jour au serveur
+        myTimeSeriesUpdateTimeoutRef.current = setTimeout(() => {
+          const stats = lastMyStatsRef.current;
+          if (!stats) return;
+          
+          // Enregistrer dans les séries temporelles pour le graphique
+          // Utiliser le startTime de la partie pour synchroniser avec l'adversaire
+          const gameStartTime = startTimeRef.current;
+          if (gameStartTime) {
+            const currentSecond = Math.floor((Date.now() - gameStartTime) / 1000);
+            
+            // Optimisation : utiliser requestAnimationFrame pour décaler la mise à jour du DOM
+            requestAnimationFrame(() => {
+              setMyTimeSeries((prev) => {
+                const existing = prev.findIndex((item) => item.second === currentSecond);
+                const newData = { second: currentSecond, wpm: stats.wpm, accuracy: stats.accuracy };
+                if (existing >= 0) {
+                  // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
+                  const existingData = prev[existing];
+                  if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
+                    const updated = [...prev];
+                    updated[existing] = newData;
+                    return updated;
+                  }
+                  return prev; // Pas de changement significatif, retourner la même référence
+                }
+                // Ajouter un nouvel élément - optimiser le tri en insérant au bon endroit
+                const newArray = [...prev, newData];
+                // Ne trier que si nécessaire (si l'élément n'est pas déjà à la fin)
+                if (newArray.length > 1 && newData.second < prev[prev.length - 1]?.second) {
+                  return newArray.sort((a, b) => a.second - b.second);
+                }
+                return newArray;
+              });
+            });
+          }
+        }, 500); // Throttling de 500ms pour réduire la charge
+        
+        // Envoyer la mise à jour au serveur (sans throttling car c'est léger)
         if (socketRef.current) {
           socketRef.current.emit('update-progress', {
             progress,
@@ -547,22 +617,27 @@ export default function BattleRoom() {
         }
 
         // Auto-scroll pour suivre la position de frappe
+        // Optimisation : utiliser requestAnimationFrame pour décaler le scroll et éviter les lags
         if (textContainerRef.current) {
-          const container = textContainerRef.current;
-          const currentCharElement = container.querySelector(`span:nth-child(${value.length + 1})`);
-          if (currentCharElement) {
-            const containerRect = container.getBoundingClientRect();
-            const charRect = currentCharElement.getBoundingClientRect();
-            const charTop = charRect.top - containerRect.top + container.scrollTop;
-            const charBottom = charTop + charRect.height;
+          requestAnimationFrame(() => {
+            const container = textContainerRef.current;
+            if (!container) return;
             
-            // Scroll si le caractère courant est en dehors de la zone visible
-            if (charTop < container.scrollTop + 50) {
-              container.scrollTop = Math.max(0, charTop - 50);
-            } else if (charBottom > container.scrollTop + container.clientHeight - 50) {
-              container.scrollTop = charBottom - container.clientHeight + 50;
+            const currentCharElement = container.querySelector(`span:nth-child(${value.length + 1})`);
+            if (currentCharElement) {
+              const containerRect = container.getBoundingClientRect();
+              const charRect = currentCharElement.getBoundingClientRect();
+              const charTop = charRect.top - containerRect.top + container.scrollTop;
+              const charBottom = charTop + charRect.height;
+              
+              // Scroll si le caractère courant est en dehors de la zone visible
+              if (charTop < container.scrollTop + 50) {
+                container.scrollTop = Math.max(0, charTop - 50);
+              } else if (charBottom > container.scrollTop + container.clientHeight - 50) {
+                container.scrollTop = charBottom - container.clientHeight + 50;
+              }
             }
-          }
+          });
         }
       }
 

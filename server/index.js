@@ -333,9 +333,9 @@ if (process.env.SERVE_CLIENT === 'true') {
 }
 
 // Route de test pour Socket.io (sans connexion)
-// Cette route permet de vérifier que Socket.io est accessible
-// IMPORTANT: Cette route doit être AVANT la route catch-all
-app.get('/socket.io/test', (req, res) => {
+// IMPORTANT: Ne pas utiliser /socket.io/test car Socket.io intercepte toutes les requêtes /socket.io/*
+// Utiliser /api/socket-test à la place
+app.get('/api/socket-test', (req, res) => {
   res.json({ 
     message: 'Socket.io endpoint is accessible',
     socketIoPath: '/socket.io/',
@@ -347,7 +347,8 @@ app.get('/socket.io/test', (req, res) => {
     server: {
       nodeEnv: process.env.NODE_ENV || 'development',
       clientUrl: process.env.CLIENT_URL || 'not set'
-    }
+    },
+    note: 'Pour tester Socket.io directement, utilisez /socket.io/ avec un client Socket.io. Cette route vérifie uniquement la configuration.'
   });
 });
 
@@ -719,6 +720,9 @@ io.on('connection', (socket) => {
   }));
 
   // Mettre à jour la progression
+  // NOTE: Ce handler est appelé très fréquemment (à chaque frappe)
+  // Il est optimisé pour être rapide : seulement des lookups dans des Maps et une émission
+  // Le throttling est géré côté client pour éviter de bloquer le thread principal
   socket.on('update-progress', (data) => {
     const playerData = players.get(socket.id);
     if (!playerData) return;
@@ -730,11 +734,13 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return;
     
+    // Mise à jour rapide des données du joueur
     player.progress = data.progress;
     player.wpm = data.wpm || 0;
     player.accuracy = data.accuracy || 100;
     
-    // Envoyer la mise à jour aux autres joueurs
+    // Envoyer la mise à jour aux autres joueurs (opération légère)
+    // Le client gère le throttling pour éviter les problèmes de performance
     socket.to(roomId).emit('opponent-update', {
       playerId: socket.id,
       progress: player.progress,
@@ -1268,6 +1274,9 @@ io.on('connection', (socket) => {
   });
 
   // Mettre à jour la progression dans une compétition
+  // NOTE: Ce handler est appelé très fréquemment (à chaque frappe)
+  // Il est optimisé pour être rapide : seulement des lookups et une mise à jour du leaderboard
+  // Le throttling est géré côté client pour éviter de bloquer le thread principal
   socket.on('competition-progress', (data) => {
     const playerData = players.get(socket.id);
     if (!playerData || !playerData.competitionId) return;
@@ -1278,11 +1287,13 @@ io.on('connection', (socket) => {
     const player = competition.players.find(p => p.id === socket.id);
     if (!player || player.finished) return;
     
+    // Mise à jour rapide des données du joueur
     player.progress = data.progress || 0;
     player.wpm = data.wpm || 0;
     player.accuracy = data.accuracy || 100;
     
-    // Envoyer le classement mis à jour
+    // Envoyer le classement mis à jour (opération légère)
+    // Le client gère le throttling pour éviter les problèmes de performance
     updateCompetitionLeaderboard(competition);
   });
 
@@ -1513,7 +1524,7 @@ try {
     console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🌍 Origines Socket.io autorisées:`, allowedSocketOrigins);
     console.log(`✅ Le serveur est prêt à accepter les connexions`);
-    console.log(`🔍 Test Socket.io: http://${HOST}:${PORT}/socket.io/test`);
+    console.log(`🔍 Test Socket.io: http://${HOST}:${PORT}/api/socket-test`);
     console.log(`🔍 Santé Socket.io: http://${HOST}:${PORT}/api/socket-health`);
   }).on('error', (error) => {
     console.error('❌ Erreur lors du démarrage du serveur:', error);
