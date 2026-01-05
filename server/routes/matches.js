@@ -68,6 +68,24 @@ router.post('/solo', authenticateToken, async (req, res) => {
 
 /**
  * Récupère l'historique des matchs d'un utilisateur spécifique (public)
+ * GET /api/matches/user/:userId?limit=50&type=solo|multiplayer
+ * Cette route doit être avant GET /:userId pour éviter les conflits
+ */
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    const type = req.query.type; // 'solo', 'multiplayer', ou undefined pour tous
+    const matches = await getUserMatches(userId, limit, type);
+    res.json({ matches });
+  } catch (error) {
+    console.error('Error fetching user matches:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Récupère l'historique des matchs d'un utilisateur spécifique (public) - route alternative
  * GET /api/matches/:userId?limit=50&type=solo|multiplayer
  */
 router.get('/:userId', async (req, res) => {

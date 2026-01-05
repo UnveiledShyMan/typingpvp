@@ -1,6 +1,12 @@
 /**
  * Script de setup automatique de la base de données MariaDB
- * Crée la base de données, initialise le schéma et exécute les migrations
+ * Crée la base de données et initialise le schéma complet
+ * 
+ * Le schéma contient déjà toutes les tables et colonnes nécessaires :
+ * - users (avec provider, provider_id, preferences)
+ * - matches
+ * - user_matches
+ * - discord_links
  * 
  * Usage: node server/db/setup-database.js
  */
@@ -42,7 +48,7 @@ console.log(`   User: ${dbConfig.user}\n`);
 async function createDatabase() {
   let connection;
   try {
-    console.log('📦 Étape 1/4 : Création de la base de données...');
+    console.log('📦 Étape 1/3 : Création de la base de données...');
     
     // Se connecter sans spécifier la base de données
     connection = await mysql.createConnection({
@@ -69,7 +75,7 @@ async function createDatabase() {
 async function initSchema() {
   let connection;
   try {
-    console.log('📋 Étape 2/4 : Initialisation du schéma...');
+    console.log('📋 Étape 2/3 : Initialisation du schéma...');
     
     const schemaPath = join(__dirname, 'schema-mariadb.sql');
     
@@ -98,73 +104,7 @@ async function initSchema() {
   }
 }
 
-/**
- * Exécute une migration
- */
-async function runMigration(migrationName) {
-  let connection;
-  try {
-    // Essayer d'abord la version MariaDB, puis PostgreSQL en fallback
-    let migrationFile = join(__dirname, 'migrations', `${migrationName}-mariadb.sql`);
-    if (!existsSync(migrationFile)) {
-      migrationFile = join(__dirname, 'migrations', `${migrationName}.sql`);
-    }
-    
-    if (!existsSync(migrationFile)) {
-      console.log(`   ⚠️  Migration ${migrationName} non trouvée, ignorée`);
-      return;
-    }
-    
-    const sql = readFileSync(migrationFile, 'utf-8');
-    
-    connection = await mysql.createConnection({
-      ...dbConfig,
-      database: dbName
-    });
-    
-    // Exécuter la migration
-    await connection.query(sql);
-    
-    console.log(`   ✅ Migration '${migrationName}' exécutée`);
-    
-    await connection.end();
-  } catch (error) {
-    // Si c'est une erreur "already exists", c'est OK
-    if (error.message.includes('already exists') || 
-        error.code === 1050 || // ER_DUP_TABLE
-        error.code === 1060 || // ER_DUP_FIELDNAME
-        error.code === 1061 || // ER_DUP_KEYNAME
-        error.code === 'ER_DUP_TABLE' ||
-        error.code === 'ER_DUP_FIELDNAME' ||
-        error.code === 'ER_DUP_KEYNAME') {
-      console.log(`   ⏭️  Migration '${migrationName}' déjà exécutée`);
-    } else {
-      console.error(`   ❌ Erreur lors de la migration '${migrationName}':`, error.message);
-      if (connection) await connection.end();
-      throw error;
-    }
-    if (connection) await connection.end();
-  }
-}
-
-/**
- * Exécute toutes les migrations nécessaires
- */
-async function runMigrations() {
-  console.log('🔄 Étape 3/4 : Exécution des migrations...');
-  
-  const migrations = [
-    'add_oauth',
-    'add_preferences',
-    'add_discord_links'
-  ];
-  
-  for (const migration of migrations) {
-    await runMigration(migration);
-  }
-  
-  console.log('   ✅ Toutes les migrations exécutées\n');
-}
+// Les migrations ne sont plus nécessaires - le schéma contient déjà tout
 
 /**
  * Vérifie que tout fonctionne
@@ -172,7 +112,7 @@ async function runMigrations() {
 async function verifySetup() {
   let connection;
   try {
-    console.log('✅ Étape 4/4 : Vérification du setup...');
+    console.log('✅ Étape 3/3 : Vérification du setup...');
     
     connection = await mysql.createConnection({
       ...dbConfig,
@@ -205,13 +145,13 @@ async function verifySetup() {
     
     for (const table of optionalTables) {
       if (tableNames.includes(table)) {
-        console.log(`   ✅ Table '${table}' existe (optionnelle)`);
+        console.log(`   ✅ Table '${table}' existe`);
       } else {
-        console.log(`   ⚠️  Table '${table}' manquante (optionnelle, exécutez la migration si nécessaire)`);
+        console.log(`   ⚠️  Table '${table}' manquante`);
       }
     }
     
-    // Vérifier les colonnes importantes
+    // Vérifier les colonnes importantes (toutes incluses dans le schéma)
     const [columns] = await connection.query(`
       SELECT COLUMN_NAME 
       FROM information_schema.COLUMNS 
@@ -225,13 +165,13 @@ async function verifySetup() {
     if (columnNames.includes('provider')) {
       console.log(`   ✅ Colonne 'users.provider' existe`);
     } else {
-      console.log(`   ⚠️  Colonne 'users.provider' manquante (exécutez la migration add_oauth)`);
+      console.log(`   ⚠️  Colonne 'users.provider' manquante`);
     }
     
     if (columnNames.includes('preferences')) {
       console.log(`   ✅ Colonne 'users.preferences' existe`);
     } else {
-      console.log(`   ⚠️  Colonne 'users.preferences' manquante (exécutez la migration add_preferences)`);
+      console.log(`   ⚠️  Colonne 'users.preferences' manquante`);
     }
     
     await connection.end();
@@ -259,13 +199,10 @@ async function main() {
     // Étape 1 : Créer la base de données
     await createDatabase();
     
-    // Étape 2 : Initialiser le schéma
+    // Étape 2 : Initialiser le schéma (contient déjà toutes les tables et colonnes nécessaires)
     await initSchema();
     
-    // Étape 3 : Exécuter les migrations
-    await runMigrations();
-    
-    // Étape 4 : Vérifier que tout fonctionne
+    // Étape 3 : Vérifier que tout fonctionne
     await verifySetup();
     
     console.log('✨ Tout est prêt ! Vous pouvez maintenant démarrer l\'application.');

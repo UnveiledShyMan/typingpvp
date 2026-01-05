@@ -401,7 +401,16 @@ export async function getUserMatches(userId, limit = 50, type = undefined) {
     const result = await pool.query(query, params);
     
     return result.rows.map(row => {
-      const matchData = row.data;
+      // Parser le JSON si c'est une string (MariaDB peut retourner JSON comme string)
+      let matchData = row.data;
+      if (typeof matchData === 'string') {
+        try {
+          matchData = JSON.parse(matchData);
+        } catch (e) {
+          console.error('Error parsing match data:', e);
+          matchData = {};
+        }
+      }
       const players = matchData.players || [];
       
       // Trouver l'adversaire (autre joueur)
