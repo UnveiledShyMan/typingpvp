@@ -88,6 +88,15 @@ app.use('/api/matches', matchesRoutes);
 if (process.env.SERVE_CLIENT === 'true') {
   const clientDistPath = join(__dirname, '..', 'client', 'dist');
   
+  // Vérifier que le dossier client/dist existe
+  if (!existsSync(clientDistPath)) {
+    console.error('❌ ERREUR: Le dossier client/dist n\'existe pas!');
+    console.error('Le serveur ne peut pas servir le client sans ce dossier.');
+    console.error('Vérifiez que le build du client a été effectué correctement.');
+  } else {
+    console.log('✅ Dossier client/dist trouvé, configuration du serveur de fichiers statiques...');
+  }
+  
   // Middleware pour servir les fichiers statiques avec gestion d'erreur
   app.use(express.static(clientDistPath, {
     // Ne pas retourner d'erreur si le fichier n'existe pas, laisser passer à la route catch-all
@@ -95,13 +104,19 @@ if (process.env.SERVE_CLIENT === 'true') {
   }));
   
   // Route catch-all : servir index.html pour toutes les routes non-API
+  // IMPORTANT: Cette route doit être APRÈS toutes les routes API
   app.get('*', (req, res, next) => {
-    // Ne pas intercepter les routes API
+    // Ne pas intercepter les routes API - elles devraient déjà être traitées par les routes définies avant
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'API route not found' });
     }
-    // Servir index.html pour toutes les autres routes
-    res.sendFile(join(clientDistPath, 'index.html'), (err) => {
+    // Servir index.html pour toutes les autres routes (SPA routing)
+    const indexPath = join(clientDistPath, 'index.html');
+    if (!existsSync(indexPath)) {
+      console.error('❌ ERREUR: index.html non trouvé dans client/dist');
+      return res.status(500).json({ error: 'Client not built. Please build the client first.' });
+    }
+    res.sendFile(indexPath, (err) => {
       if (err) {
         console.error('Error sending index.html:', err);
         res.status(500).json({ error: 'Internal server error' });
