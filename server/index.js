@@ -261,22 +261,47 @@ io.engine.on('connection', (req) => {
   });
 });
 
+// Helper pour wrapper les handlers Socket.io avec gestion d'erreur
+function safeHandler(handler) {
+  return function(...args) {
+    try {
+      return handler.apply(this, args);
+    } catch (error) {
+      console.error('❌ Erreur dans handler Socket.io:', error);
+      console.error('Stack:', error.stack);
+      // Ne pas faire planter le serveur, juste logger
+      if (args[0] && typeof args[0].emit === 'function') {
+        try {
+          args[0].emit('error', { message: 'Internal server error' });
+        } catch (emitError) {
+          console.error('❌ Impossible d\'émettre l\'erreur:', emitError);
+        }
+      }
+    }
+  };
+}
+
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
   
   // Gérer les déconnexions proprement
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', safeHandler((reason) => {
     console.log('⚠️ User disconnected:', socket.id, 'Reason:', reason);
-  });
+  }));
   
   // Gérer les erreurs de connexion
   socket.conn.on('error', (err) => {
     console.error('❌ Erreur de connexion pour socket', socket.id, ':', err.message);
   });
+  
+  // Gérer les erreurs dans les handlers Socket.io
+  socket.on('error', (err) => {
+    console.error('❌ Erreur Socket.io pour socket', socket.id, ':', err.message);
+  });
 
   // Créer une nouvelle room
-  socket.on('create-room', (data) => {
+  socket.on('create-room', safeHandler((data) => {
     const roomId = nanoid(8);
     const text = getRandomText();
     
@@ -480,10 +505,10 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('player-joined', { players: room.players });
     
     console.log(`Player ${playerName} joined room ${roomId}`);
-  });
+  }));
 
   // Démarrer la partie
-  socket.on('start-game', (data) => {
+  socket.on('start-game', safeHandler((data) => {
     const { roomId, language = 'en', mode = 'timer', timerDuration = 60, difficulty = 'medium' } = data;
     const room = rooms.get(roomId);
     
