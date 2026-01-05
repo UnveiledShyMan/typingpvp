@@ -141,8 +141,26 @@ npm start
 6. **Configuration Socket.io pour Plesk** :
    - Socket.io est configuré pour utiliser uniquement le transport `polling` (compatible avec les reverse proxy)
    - Le path est `/socket.io/` (par défaut)
-   - Les timeouts sont augmentés pour éviter les déconnexions
-   - Si vous avez des erreurs 400 avec Socket.io, vérifiez que le reverse proxy n'interfère pas avec les requêtes long polling
+   - Les timeouts sont augmentés pour éviter les déconnexions (pingTimeout: 120s, connectTimeout: 60s)
+   - Si vous avez des erreurs 400/502 avec Socket.io, vérifiez la configuration nginx dans Plesk :
+     - Les requêtes long polling doivent être supportées
+     - Les timeouts doivent être suffisamment longs (au moins 2 minutes)
+     - Le proxy doit être configuré pour `/socket.io/`
+   - **Configuration nginx recommandée** (si vous avez accès) :
+     ```
+     location /socket.io/ {
+         proxy_pass http://localhost:PORT;
+         proxy_http_version 1.1;
+         proxy_set_header Upgrade $http_upgrade;
+         proxy_set_header Connection "upgrade";
+         proxy_set_header Host $host;
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_set_header X-Forwarded-Proto $scheme;
+         proxy_read_timeout 120s;
+         proxy_send_timeout 120s;
+     }
+     ```
 
 ## 📚 Documentation
 

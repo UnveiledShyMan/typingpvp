@@ -29,23 +29,51 @@ const httpServer = createServer(app);
 // Configuration Socket.io optimisée pour Plesk/nginx reverse proxy
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Accepter toutes les origines en production (géré par le reverse proxy)
+      const allowedOrigins = [
+        process.env.CLIENT_URL,
+        'https://typingpvp.com',
+        'http://localhost:5173',
+        'http://localhost:3000'
+      ].filter(Boolean);
+      
+      if (!origin || process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      
+      // Vérifier si l'origine est autorisée
+      if (allowedOrigins.some(allowed => origin.includes(allowed.replace(/^https?:\/\//, '')))) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Permettre pour compatibilité
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
   },
   // Forcer polling pour compatibilité avec Plesk/nginx
   transports: ['polling'],
   allowUpgrades: false, // Empêcher l'upgrade vers WebSocket
   // Configuration pour reverse proxy
   path: '/socket.io/',
-  // Timeouts augmentés pour polling
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  // Timeouts augmentés pour polling (nécessaire pour reverse proxy)
+  pingTimeout: 120000, // 2 minutes
+  pingInterval: 25000, // 25 secondes
   // Configuration pour éviter les problèmes de connexion
-  connectTimeout: 45000,
+  connectTimeout: 60000, // 1 minute
   // Permettre les connexions depuis le reverse proxy
-  allowEIO3: true
+  allowEIO3: true,
+  // Configuration pour le reverse proxy
+  cookie: {
+    httpOnly: false, // Permettre l'accès depuis le client
+    sameSite: 'lax'
+  },
+  // Désactiver la compression pour éviter les problèmes avec le reverse proxy
+  compression: false,
+  // Permettre les requêtes long polling
+  maxHttpBufferSize: 1e6 // 1MB
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -238,9 +266,22 @@ if (process.env.SERVE_CLIENT === 'true') {
   });
 }
 
+// Gestion des erreurs Socket.io
+io.engine.on('connection_error', (err) => {
+  console.error('❌ Erreur de connexion Socket.io:', err.req?.url, err.message);
+  console.error('Détails:', {
+    code: err.code,
+    context: err.context,
+    type: err.type
+  });
+});
+
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('✅ User connected:', socket.id, {
+    transport: socket.conn.transport.name,
+    remoteAddress: socket.handshake.address
+  });
 
   // Créer une nouvelle room
   socket.on('create-room', (data) => {
