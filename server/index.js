@@ -26,57 +26,16 @@ const __dirname = dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configuration Socket.io optimisée pour Plesk/nginx reverse proxy
+// Configuration Socket.io - version simplifiée pour compatibilité
 const io = new Server(httpServer, {
   cors: {
-    origin: function (origin, callback) {
-      // Accepter toutes les origines en production (géré par le reverse proxy)
-      const allowedOrigins = [
-        process.env.CLIENT_URL,
-        'https://typingpvp.com',
-        'http://localhost:5173',
-        'http://localhost:3000'
-      ].filter(Boolean);
-      
-      if (!origin || process.env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      
-      // Vérifier si l'origine est autorisée
-      if (allowedOrigins.some(allowed => origin.includes(allowed.replace(/^https?:\/\//, '')))) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permettre pour compatibilité
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true
   },
   // Forcer polling pour compatibilité avec Plesk/nginx
-  // IMPORTANT: Utiliser un tableau avec 'polling' explicitement
   transports: ['polling'],
-  allowUpgrades: false, // Empêcher l'upgrade vers WebSocket
-  // Forcer le transport polling (éviter les problèmes de détection)
-  upgrade: false,
-  // Configuration pour reverse proxy
-  path: '/socket.io/',
-  // Timeouts augmentés pour polling (nécessaire pour reverse proxy)
-  pingTimeout: 120000, // 2 minutes
-  pingInterval: 25000, // 25 secondes
-  // Configuration pour éviter les problèmes de connexion
-  connectTimeout: 60000, // 1 minute
-  // Permettre les connexions depuis le reverse proxy
-  allowEIO3: true,
-  // Configuration pour le reverse proxy
-  cookie: {
-    httpOnly: false, // Permettre l'accès depuis le client
-    sameSite: 'lax'
-  },
-  // Désactiver la compression pour éviter les problèmes avec le reverse proxy
-  compression: false,
-  // Permettre les requêtes long polling
-  maxHttpBufferSize: 1e6 // 1MB
+  allowUpgrades: false // Empêcher l'upgrade vers WebSocket
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
