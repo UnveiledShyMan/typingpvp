@@ -26,13 +26,21 @@ const __dirname = dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configuration Socket.io - configuration par défaut (comme avant)
+// Configuration Socket.io - optimisée pour Plesk/Apache
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
+  transports: ['polling'],
+  allowUpgrades: false,
+  // Timeouts plus courts pour éviter que Plesk tue les connexions
+  pingTimeout: 20000, // 20 secondes
+  pingInterval: 10000, // 10 secondes
+  // Permettre les reconnexions rapides
+  connectTimeout: 20000 // 20 secondes
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
