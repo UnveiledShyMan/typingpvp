@@ -120,12 +120,13 @@ export async function getAllUsers() {
  */
 export async function getRankingsByLanguage(language, limit = 100) {
   try {
+    // Récupérer tous les utilisateurs et calculer leur MMR pour la langue
+    // Inclure les utilisateurs qui n'ont pas de MMR pour cette langue (utiliser 1000 par défaut)
     const result = await pool.query(
       `SELECT 
         id, username, avatar, gear, mmr, stats
        FROM users
-       WHERE mmr ? $1
-       ORDER BY (mmr->>$1)::INTEGER DESC NULLS LAST
+       ORDER BY COALESCE((mmr->>$1)::INTEGER, 1000) DESC
        LIMIT $2`,
       [language, limit]
     );
@@ -135,17 +136,28 @@ export async function getRankingsByLanguage(language, limit = 100) {
         // mmr est déjà un JSONB, on peut l'utiliser directement
         const mmrObj = row.mmr || {};
         const mmrValue = parseInt(mmrObj[language] || 1000);
+        const statsObj = row.stats || {};
         return {
           id: row.id,
           username: row.username,
           avatar: row.avatar,
           gear: row.gear || '',
           mmr: mmrValue,
-          stats: row.stats || {},
+          stats: {
+            wins: statsObj.wins || 0,
+            losses: statsObj.losses || 0,
+            bestWPM: statsObj.bestWPM || 0,
+            totalMatches: statsObj.totalMatches || 0,
+            averageAccuracy: statsObj.averageAccuracy || 0
+          },
           rank: index + 1
         };
       })
-      .filter(user => user.mmr > 0);
+      .sort((a, b) => b.mmr - a.mmr)
+      .map((user, index) => ({
+        ...user,
+        rank: index + 1
+      }));
   } catch (error) {
     console.error('Error getting rankings:', error);
     return [];

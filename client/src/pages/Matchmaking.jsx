@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { languages } from '../data/languages'
+import Modal from '../components/Modal'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -10,6 +11,9 @@ export default function Matchmaking() {
   const [isInQueue, setIsInQueue] = useState(false);
   const [queueTime, setQueueTime] = useState(0);
   const [user, setUser] = useState(null);
+  const [guestUsername, setGuestUsername] = useState('');
+  const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [showGuestModal, setShowGuestModal] = useState(false);
   const socketRef = useRef(null);
   const intervalRef = useRef(null);
   const queueStartTimeRef = useRef(null);
@@ -45,8 +49,9 @@ export default function Matchmaking() {
   };
 
   const handleJoinQueue = () => {
+    // Si pas d'utilisateur, demander un pseudo pour joueur invité
     if (!user) {
-      alert('Please login to use matchmaking');
+      setShowGuestModal(true);
       return;
     }
 
@@ -97,11 +102,12 @@ export default function Matchmaking() {
       // Rediriger vers la battle room
       navigate(`/battle/${data.roomId}`, { 
         state: { 
-          playerName: user.username,
-          userId: user.id,
+          playerName: user ? user.username : guestUsername,
+          userId: user ? user.id : null,
           isCreator: false,
           matchmaking: true,
-          existingSocket: true // Indicateur pour BattleRoom
+          existingSocket: true, // Indicateur pour BattleRoom
+          isGuest: !user // Indicateur pour joueur invité
         } 
       });
     });
@@ -136,6 +142,82 @@ export default function Matchmaking() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Gérer le join en tant que guest
+  const handleGuestJoin = () => {
+    if (!guestUsername.trim()) {
+      alert('Please enter a username');
+      return;
+    }
+
+    setShowGuestModal(false);
+    setShowGuestWarning(true);
+  };
+
+  const handleConfirmGuestJoin = () => {
+    setShowGuestWarning(false);
+
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    socketRef.current = io(apiUrl, {
+      transports: ['polling'],
+      upgrade: false,
+      reconnection: true
+    });
+
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      socket.emit('join-matchmaking', {
+        userId: null, // Pas d'userId pour les guests
+        username: guestUsername.trim(),
+        language: selectedLang,
+        mmr: 1000 // MMR par défaut pour les guests
+      });
+    });
+
+    socket.on('matchmaking-joined', () => {
+      setIsInQueue(true);
+      queueStartTimeRef.current = Date.now();
+      
+      intervalRef.current = setInterval(() => {
+        if (queueStartTimeRef.current) {
+          setQueueTime(Math.floor((Date.now() - queueStartTimeRef.current) / 1000));
+        }
+      }, 1000);
+    });
+
+    socket.on('matchmaking-match-found', (data) => {
+      setIsInQueue(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      navigate(`/battle/${data.roomId}`, { 
+        state: { 
+          playerName: guestUsername.trim(),
+          userId: null,
+          isCreator: false,
+          matchmaking: true,
+          existingSocket: true,
+          isGuest: true
+        } 
+      });
+    });
+
+    socket.on('matchmaking-error', (error) => {
+      alert(error.message);
+      setIsInQueue(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    });
+  };
+
   const userMMR = user ? (user.mmr[selectedLang] || 1000) : 1000;
 
   return (
@@ -144,83 +226,163 @@ export default function Matchmaking() {
         Matchmaking
       </h1>
 
-      {!user && (
-        <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-8 text-center shadow-lg">
-          <p className="text-text-secondary text-lg mb-4">Please login to use matchmaking</p>
-          <button
-            onClick={() => navigate('/')}
-            className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-6 rounded-lg transition-colors"
-          >
-            Go to Login
-          </button>
-        </div>
-      )}
-
-      {user && (
-        <div className="space-y-6">
-          {/* Language Selector */}
-          <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-6 shadow-lg">
-            <label className="block text-text-primary mb-3 text-sm font-medium">Language</label>
-            <select
-              value={selectedLang}
-              onChange={(e) => setSelectedLang(e.target.value)}
-              disabled={isInQueue}
-              className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* Modal pour demander le pseudo guest */}
+      <Modal 
+        isOpen={showGuestModal} 
+        onClose={() => setShowGuestModal(false)}
+        title="Play as Guest"
+      >
+        <div className="space-y-4">
+          <p className="text-text-secondary text-sm">
+            Enter a username to play as a guest. Your progress will not be saved.
+          </p>
+          <input
+            type="text"
+            value={guestUsername}
+            onChange={(e) => setGuestUsername(e.target.value)}
+            placeholder="Username"
+            maxLength={20}
+            className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && guestUsername.trim()) {
+                handleGuestJoin();
+              }
+            }}
+            autoFocus
+          />
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setShowGuestModal(false)}
+              className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
             >
-              {Object.entries(languages).map(([code, lang]) => (
-                <option key={code} value={code} className="bg-bg-primary">
-                  {lang.name}
-                </option>
-              ))}
-            </select>
+              Cancel
+            </button>
+            <button
+              onClick={handleGuestJoin}
+              disabled={!guestUsername.trim()}
+              className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal d'avertissement pour les guests */}
+      <Modal 
+        isOpen={showGuestWarning} 
+        onClose={() => setShowGuestWarning(false)}
+        title="Guest Mode Warning"
+        showCloseButton={false}
+      >
+        <div className="space-y-4">
+          <div className="bg-text-error/10 border border-text-error/30 rounded-lg p-4">
+            <p className="text-text-primary text-sm leading-relaxed">
+              <strong className="text-text-error">Important:</strong> You are playing as a guest. 
+              Your progression, statistics, and match history will <strong>not be saved</strong>.
+            </p>
+          </div>
+          <p className="text-text-secondary text-sm">
+            To save your progress and compete on the leaderboard, please create an account.
+          </p>
+          <div className="flex gap-3 justify-end pt-2">
+            <button
+              onClick={() => {
+                setShowGuestWarning(false);
+                setShowGuestModal(true);
+              }}
+              className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmGuestJoin}
+              className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold rounded-lg transition-colors"
+            >
+              I Understand, Continue
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <div className="space-y-6">
+        {/* Language Selector */}
+        <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-6 shadow-lg">
+          <label className="block text-text-primary mb-3 text-sm font-medium">Language</label>
+          <select
+            value={selectedLang}
+            onChange={(e) => setSelectedLang(e.target.value)}
+            disabled={isInQueue}
+            className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {Object.entries(languages).map(([code, lang]) => (
+              <option key={code} value={code} className="bg-bg-primary">
+                {lang.name}
+              </option>
+            ))}
+          </select>
+          {user && (
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-text-secondary">Your ELO:</span>
               <span className="text-text-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>
                 {userMMR}
               </span>
             </div>
-          </div>
-
-          {/* Queue Status */}
-          {isInQueue ? (
-            <div className="bg-bg-secondary rounded-lg border border-accent-primary/30 p-8 text-center shadow-lg battle-glow">
-              <div className="mb-6">
-                <div className="inline-flex items-center gap-3 px-4 py-2 bg-bg-primary/50 rounded-full border border-accent-primary/20 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-accent-primary animate-pulse"></div>
-                  <span className="text-text-primary font-medium">Searching for opponent...</span>
-                </div>
-                <div className="text-3xl font-bold text-text-primary mb-2" style={{ fontFamily: 'JetBrains Mono' }}>
-                  {formatTime(queueTime)}
-                </div>
-                <div className="text-text-secondary text-sm">Time in queue</div>
-              </div>
-              <button
-                onClick={handleLeaveQueue}
-                className="bg-text-error hover:bg-text-error/80 text-bg-primary font-semibold py-3 px-8 rounded-lg transition-colors"
-              >
-                Cancel Search
-              </button>
-            </div>
-          ) : (
-            <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-8 text-center shadow-lg">
-              <div className="mb-6">
-                <p className="text-text-secondary mb-4">
-                  Find an opponent with similar skill level (MMR: {userMMR})
-                </p>
-                <p className="text-text-secondary/70 text-sm">
-                  Matchmaking will find you an opponent within ±200 MMR range
-                </p>
-              </div>
-              <button
-                onClick={handleJoinQueue}
-                className="bg-gradient-to-r from-accent-primary to-accent-hover hover:from-accent-hover hover:to-accent-primary text-bg-primary font-semibold py-4 px-12 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl battle-glow text-lg"
-              >
-                Find Match
-              </button>
+          )}
+          {!user && (
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Guest ELO:</span>
+              <span className="text-text-primary font-bold" style={{ fontFamily: 'JetBrains Mono' }}>
+                1000
+              </span>
             </div>
           )}
         </div>
-      )}
+
+        {/* Queue Status */}
+        {isInQueue ? (
+          <div className="bg-bg-secondary rounded-lg border border-accent-primary/30 p-8 text-center shadow-lg battle-glow">
+            <div className="mb-6">
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-bg-primary/50 rounded-full border border-accent-primary/20 mb-4">
+                <div className="w-3 h-3 rounded-full bg-accent-primary animate-pulse"></div>
+                <span className="text-text-primary font-medium">Searching for opponent...</span>
+              </div>
+              <div className="text-3xl font-bold text-text-primary mb-2" style={{ fontFamily: 'JetBrains Mono' }}>
+                {formatTime(queueTime)}
+              </div>
+              <div className="text-text-secondary text-sm">Time in queue</div>
+            </div>
+            <button
+              onClick={handleLeaveQueue}
+              className="bg-text-error hover:bg-text-error/80 text-bg-primary font-semibold py-3 px-8 rounded-lg transition-colors"
+            >
+              Cancel Search
+            </button>
+          </div>
+        ) : (
+          <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-8 text-center shadow-lg">
+            <div className="mb-6">
+              <p className="text-text-secondary mb-4">
+                Find an opponent with similar skill level {user ? `(MMR: ${userMMR})` : '(MMR: 1000)'}
+              </p>
+              <p className="text-text-secondary/70 text-sm">
+                Matchmaking will find you an opponent within ±200 MMR range
+              </p>
+              {!user && (
+                <p className="text-text-error/80 text-xs mt-2">
+                  ⚠️ Guest mode: Your progress will not be saved
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleJoinQueue}
+              className="bg-gradient-to-r from-accent-primary to-accent-hover hover:from-accent-hover hover:to-accent-primary text-bg-primary font-semibold py-4 px-12 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl battle-glow text-lg"
+            >
+              Find Match
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

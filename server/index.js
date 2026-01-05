@@ -257,12 +257,27 @@ io.on('connection', (socket) => {
     if (allFinished) {
       room.status = 'finished';
       
-      // Mettre à jour MMR et stats si c'est un match compétitif (matchmaking ou room avec userId)
+      // Calculer les changements d'ELO pour les résultats
+      let eloChanges = {};
       if (room.matchmaking || room.players.some(p => p.userId)) {
+        const user1 = await getUserById(room.players[0].userId);
+        const user2 = await getUserById(room.players[1].userId);
+        
+        if (user1 && user2) {
+          const language = room.language || 'en';
+          const mmr1 = user1.getMMR(language);
+          const mmr2 = user2.getMMR(language);
+          const player1Won = result1.wpm > result2.wpm || (result1.wpm === result2.wpm && result1.accuracy > result2.accuracy);
+          const newMMR1 = calculateNewMMR(mmr1, mmr2, player1Won);
+          const newMMR2 = calculateNewMMR(mmr2, mmr1, !player1Won);
+          eloChanges[room.players[0].id] = newMMR1 - mmr1;
+          eloChanges[room.players[1].id] = newMMR2 - mmr2;
+        }
+        
         updateMatchResults(room).catch(err => console.error('Error updating match results:', err));
       }
       
-      io.to(roomId).emit('game-finished', { results: room.results, players: room.players });
+      io.to(roomId).emit('game-finished', { results: room.results, players: room.players, eloChanges });
     } else {
       socket.to(roomId).emit('opponent-finished', {
         playerId: socket.id,
@@ -326,7 +341,11 @@ io.on('connection', (socket) => {
     await updateUser(user1);
     await updateUser(user2);
     
-    // Enregistrer le match
+    // Calculer les changements d'ELO
+    const eloChange1 = newMMR1 - mmr1;
+    const eloChange2 = newMMR2 - mmr2;
+    
+    // Enregistrer le match avec les changements d'ELO
     await recordMatch({
       type: 'battle',
       language: language,
@@ -335,13 +354,19 @@ io.on('connection', (socket) => {
         username: user1.username,
         wpm: result1.wpm,
         accuracy: result1.accuracy,
-        won: player1Won
+        won: player1Won,
+        eloBefore: mmr1,
+        eloAfter: newMMR1,
+        eloChange: eloChange1
       }, {
         userId: user2.id,
         username: user2.username,
         wpm: result2.wpm,
         accuracy: result2.accuracy,
-        won: !player1Won
+        won: !player1Won,
+        eloBefore: mmr2,
+        eloAfter: newMMR2,
+        eloChange: eloChange2
       }]
     });
     
@@ -351,7 +376,7 @@ io.on('connection', (socket) => {
   // MATCHMAKING SYSTEM
   // Rejoindre la queue de matchmaking
   socket.on('join-matchmaking', async (data) => {
-    const { userId, language = 'en', mmr = 1000 } = data;
+    const { userId, username, language = 'en', mmr = 1000 } = data;
     
     // Vérifier si déjà dans la queue
     if (matchmakingQueue.has(socket.id)) {
@@ -359,9 +384,10 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Ajouter à la queue
+    // Ajouter à la queue (userId peut être null pour les guests)
     matchmakingQueue.set(socket.id, {
-      userId,
+      userId: userId || null,
+      username: username || null, // Pour les guests
       mmr: parseInt(mmr) || 1000,
       language,
       socketId: socket.id,
@@ -369,7 +395,7 @@ io.on('connection', (socket) => {
     });
     
     socket.emit('matchmaking-joined', { language, mmr });
-    console.log(`Player ${userId} joined matchmaking queue (${language}, MMR: ${mmr})`);
+    console.log(`Player ${userId || username || 'guest'} joined matchmaking queue (${language}, MMR: ${mmr})`);
     
     // Chercher un match
     findMatch(socket.id, language, mmr);
@@ -440,10 +466,11 @@ io.on('connection', (socket) => {
     rooms.set(roomId, room);
     
     // Ajouter les joueurs à la room
+    // Utiliser username pour les guests, sinon utiliser user.username
     const player1Data = {
       id: socketId1,
-      userId: player1.userId,
-      name: user1 ? user1.username : `Player ${player1.userId}`,
+      userId: player1.userId || null,
+      name: user1 ? user1.username : (player1.username || `Guest ${socketId1.substring(0, 4)}`),
       progress: 0,
       wpm: 0,
       accuracy: 100,
@@ -453,8 +480,8 @@ io.on('connection', (socket) => {
     
     const player2Data = {
       id: socketId2,
-      userId: player2.userId,
-      name: user2 ? user2.username : `Player ${player2.userId}`,
+      userId: player2.userId || null,
+      name: user2 ? user2.username : (player2.username || `Guest ${socketId2.substring(0, 4)}`),
       progress: 0,
       wpm: 0,
       accuracy: 100,
@@ -489,7 +516,7 @@ io.on('connection', (socket) => {
       }
     }, 3000);
     
-    console.log(`Matchmaking match created: Room ${roomId} with players ${player1.userId} and ${player2.userId}`);
+    console.log(`Matchmaking match created: Room ${roomId} with players ${player1Data.name} and ${player2Data.name}`);
   }
 
   // COMPETITION SYSTEM
