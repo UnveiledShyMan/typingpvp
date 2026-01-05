@@ -16,6 +16,7 @@ import rankingsRoutes from './routes/rankings.js';
 import meRoutes from './routes/me.js';
 import friendsRoutes, { setOnlineUsers } from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
+import discordRoutes from './routes/discord.js';
 import { getUserById, recordMatch, updateUser } from './db.js';
 import { calculateNewMMR } from './utils/elo.js';
 
@@ -71,6 +72,30 @@ function getRandomText() {
   return defaultTexts[Math.floor(Math.random() * defaultTexts.length)];
 }
 
+// Mots les plus utilisés par langue (version simplifiée pour le serveur)
+const languageWords = {
+  en: ['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take', 'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us'],
+  fr: ['le', 'de', 'et', 'à', 'un', 'il', 'être', 'en', 'avoir', 'que', 'pour', 'dans', 'ce', 'son', 'une', 'sur', 'avec', 'ne', 'se', 'pas', 'tout', 'plus', 'par', 'grand', 'autre', 'du', 'de', 'le', 'et', 'à', 'il', 'être', 'en', 'avoir', 'que', 'pour', 'dans', 'ce', 'son', 'une', 'sur', 'avec', 'ne', 'se', 'pas', 'tout', 'plus', 'par', 'grand', 'en', 'une', 'autre', 'du', 'de', 'le', 'et', 'à', 'être', 'avoir', 'faire', 'dire', 'aller', 'voir', 'savoir', 'vouloir', 'venir', 'falloir', 'pouvoir', 'devoir', 'parler', 'trouver', 'donner', 'prendre', 'mettre', 'rester', 'passer', 'comprendre', 'connaître', 'rendre', 'laisser', 'entendre', 'sortir', 'monter', 'descendre', 'arriver', 'partir', 'revenir'],
+  es: ['el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'ser', 'se', 'no', 'haber', 'por', 'con', 'su', 'para', 'como', 'estar', 'tener', 'le', 'lo', 'todo', 'pero', 'más', 'hacer', 'o', 'poder', 'decir', 'este', 'ir', 'otro', 'ese', 'la', 'si', 'me', 'ya', 'ver', 'porque', 'dar', 'cuando', 'él', 'muy', 'sin', 'vez', 'mucho', 'saber', 'qué', 'sobre', 'mi', 'alguno', 'mismo', 'yo', 'también', 'hasta', 'año', 'dos', 'querer', 'entre', 'así', 'primero', 'desde', 'grande', 'eso', 'ni', 'nos', 'llegar', 'pasar', 'tiempo', 'ella', 'sí', 'día', 'uno', 'bien', 'poco', 'deber', 'entonces', 'poner', 'cosa', 'tanto', 'hombre', 'parecer', 'nuestro', 'tan', 'donde', 'ahora', 'parte', 'después', 'vida', 'quedar', 'siempre', 'creer', 'hablar', 'llevar', 'dejar', 'nada', 'cada', 'seguir', 'menos', 'nuevo', 'encontrar', 'venir', 'pensar', 'casa', 'mujer', 'mirar', 'otro', 'acción', 'ir', 'ver', 'dos', 'tener', 'querer', 'hablar', 'dar', 'usar', 'encontrar', 'decir', 'trabajar', 'llamar', 'tratar', 'preguntar', 'necesitar', 'sentir', 'convertir', 'dejar', 'empezar', 'ayudar', 'mostrar', 'escuchar', 'cambiar', 'vivir', 'terminar', 'continuar', 'establecer', 'aprender', 'añadir', 'seguir', 'empezar', 'cambiar', 'crear', 'abrir', 'caminar', 'ofrecer', 'recordar', 'amar', 'considerar', 'aparecer', 'comprar', 'esperar', 'servir', 'morir', 'enviar', 'construir', 'permanecer', 'caer', 'cortar', 'alcanzar', 'matar', 'levantar']
+};
+
+// Fonction pour générer un texte dans une langue spécifique
+function generateTextForLanguage(langCode = 'en', wordCount = 50) {
+  const words = languageWords[langCode] || languageWords.en;
+  const result = [];
+  
+  for (let i = 0; i < wordCount; i++) {
+    const randomIndex = Math.floor(Math.random() * words.length);
+    if (i === 0) {
+      result.push(words[randomIndex]);
+    } else {
+      result.push(' ' + words[randomIndex]);
+    }
+  }
+  
+  return result.join('');
+}
+
 // Routes API
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -86,6 +111,7 @@ setOnlineUsers(onlineUsers);
 
 app.use('/api/friends', friendsRoutes);
 app.use('/api/matches', matchesRoutes);
+app.use('/api/discord', discordRoutes);
 
 // Servir les fichiers statiques du client (frontend) - UNIQUEMENT si SERVE_CLIENT=true
 // Par défaut, le client est servi séparément sur un autre port
@@ -220,16 +246,40 @@ io.on('connection', (socket) => {
 
   // Démarrer la partie
   socket.on('start-game', (data) => {
-    const { roomId } = data;
+    const { roomId, language = 'en', mode = 'timer', timerDuration = 60, difficulty = 'medium' } = data;
     const room = rooms.get(roomId);
     
     if (!room || room.status !== 'waiting') return;
     if (room.players.length < 2) return;
     
+    let newText = '';
+    
+    // Générer le texte selon le mode
+    if (mode === 'phrases') {
+      // Mode phrases : générer plusieurs phrases selon la difficulté
+      const phraseCount = difficulty === 'easy' ? 15 : difficulty === 'medium' ? 20 : difficulty === 'hard' ? 25 : 30;
+      newText = generatePhraseTextForLanguage(language, difficulty, phraseCount);
+    } else {
+      // Mode timer : générer un texte long comme Solo
+      newText = generateTextForLanguage(language, 300); // 300 mots pour avoir assez de texte
+    }
+    
+    room.text = newText;
+    room.language = language;
+    room.mode = mode;
+    room.timerDuration = mode === 'timer' ? timerDuration : null;
+    room.difficulty = mode === 'phrases' ? difficulty : null;
+    
     room.status = 'playing';
     room.startTime = Date.now();
     
-    io.to(roomId).emit('game-started', { startTime: room.startTime });
+    io.to(roomId).emit('game-started', { 
+      startTime: room.startTime, 
+      text: newText,
+      mode: mode,
+      timerDuration: room.timerDuration,
+      difficulty: room.difficulty
+    });
   });
 
   // Mettre à jour la progression

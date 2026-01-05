@@ -3,15 +3,24 @@
  * Usage: node server/db/migrate.js [migration_name]
  * 
  * Exemple: node server/db/migrate.js add_oauth
+ *          node server/db/migrate.js add_discord_links
  */
 
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
+// Charger les variables d'environnement depuis le .env à la racine du projet
+import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import pool from './connection.js';
+import { dirname, join, resolve } from 'path';
 
+// Trouver le chemin de la racine du projet (2 niveaux au-dessus de ce fichier)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = resolve(__dirname, '..', '..');
+
+// Charger le .env depuis la racine
+dotenv.config({ path: join(projectRoot, '.env') });
+
+import { readFileSync, readdirSync } from 'fs';
+import pool from './connection.js';
 
 /**
  * Exécute une migration SQL
@@ -34,33 +43,36 @@ async function runMigration(migrationName) {
     
     console.log(`✅ Migration ${migrationName} exécutée avec succès!`);
     
-    // Vérifier que les colonnes ont été ajoutées
-    const checkResult = await pool.query(`
-      SELECT column_name, data_type, is_nullable
-      FROM information_schema.columns
-      WHERE table_name = 'users'
-      AND column_name IN ('provider', 'provider_id')
-      ORDER BY column_name;
-    `);
-    
-    if (checkResult.rows.length > 0) {
-      console.log('\n📊 Colonnes vérifiées:');
-      checkResult.rows.forEach(col => {
-        console.log(`  - ${col.column_name} (${col.data_type}, nullable: ${col.is_nullable})`);
-      });
-    }
-    
-    // Vérifier l'index
-    const indexResult = await pool.query(`
-      SELECT indexname, indexdef
-      FROM pg_indexes
-      WHERE tablename = 'users'
-      AND indexname = 'idx_users_provider_provider_id';
-    `);
-    
-    if (indexResult.rows.length > 0) {
-      console.log('\n📇 Index vérifié:');
-      console.log(`  - ${indexResult.rows[0].indexname}`);
+    // Vérifier que les tables/colonnes ont été créées selon la migration
+    if (migrationName === 'add_discord_links') {
+      const checkResult = await pool.query(`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'discord_links'
+        ORDER BY column_name;
+      `);
+      
+      if (checkResult.rows.length > 0) {
+        console.log('\n📊 Table discord_links vérifiée:');
+        checkResult.rows.forEach(col => {
+          console.log(`  - ${col.column_name} (${col.data_type}, nullable: ${col.is_nullable})`);
+        });
+      }
+    } else if (migrationName === 'add_oauth') {
+      const checkResult = await pool.query(`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+        AND column_name IN ('provider', 'provider_id')
+        ORDER BY column_name;
+      `);
+      
+      if (checkResult.rows.length > 0) {
+        console.log('\n📊 Colonnes vérifiées:');
+        checkResult.rows.forEach(col => {
+          console.log(`  - ${col.column_name} (${col.data_type}, nullable: ${col.is_nullable})`);
+        });
+      }
     }
     
   } catch (error) {
@@ -68,8 +80,8 @@ async function runMigration(migrationName) {
     console.error(error.message);
     
     // Si c'est une erreur "already exists", c'est OK
-    if (error.message.includes('already exists') || error.code === '42P07') {
-      console.log('\n⚠️  La migration semble déjà avoir été exécutée (colonne/index déjà existants)');
+    if (error.message.includes('already exists') || error.code === '42P07' || error.code === '23505') {
+      console.log('\n⚠️  La migration semble déjà avoir été exécutée (table/colonne/index déjà existants)');
       console.log('   C\'est normal, vous pouvez continuer.');
     } else {
       process.exit(1);
@@ -109,6 +121,10 @@ async function main() {
     console.log('🔧 Script de migration SQL\n');
     console.log('Usage: node server/db/migrate.js [migration_name]');
     console.log('       node server/db/migrate.js list\n');
+    console.log('Exemples:');
+    console.log('  node server/db/migrate.js add_discord_links');
+    console.log('  node server/db/migrate.js add_oauth');
+    console.log('  node server/db/migrate.js list\n');
     await listMigrations();
     process.exit(0);
   }
@@ -118,7 +134,19 @@ async function main() {
     process.exit(0);
   }
   
-  const migrationName = args[0];
+  // Extraire le nom de la migration (sans chemin ni extension)
+  let migrationName = args[0];
+  
+  // Si l'utilisateur a passé un chemin, extraire juste le nom
+  if (migrationName.includes('/') || migrationName.includes('\\')) {
+    const parts = migrationName.split(/[/\\]/);
+    migrationName = parts[parts.length - 1];
+  }
+  
+  // Enlever l'extension .sql si présente
+  if (migrationName.endsWith('.sql')) {
+    migrationName = migrationName.replace('.sql', '');
+  }
   
   console.log('🔧 Script de migration SQL');
   console.log('==========================\n');
@@ -135,4 +163,3 @@ async function main() {
 }
 
 main();
-

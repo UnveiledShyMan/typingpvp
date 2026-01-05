@@ -1,0 +1,22 @@
+{
+  "name": "typingpvp-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for typingpvp.com",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "setup": "node setup-server.js",
+    "dev": "node --watch index.js",
+    "organize-roles": "node scripts/organize-roles.js"
+  },
+  "keywords": ["discord", "bot", "typing"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2"
+  }
+}
+

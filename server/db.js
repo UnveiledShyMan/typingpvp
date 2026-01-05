@@ -1,4 +1,4 @@
-// Base de données PostgreSQL
+// Base de données MariaDB
 import pool from './db/connection.js';
 import { User } from './models/User.js';
 import { nanoid } from 'nanoid';
@@ -23,10 +23,10 @@ export async function createUser(username, email, password = null, provider = 'l
   }
   
   try {
-    const result = await pool.query(
+    // MariaDB n'a pas RETURNING, on fait INSERT puis SELECT
+    await pool.query(
       `INSERT INTO users (id, username, email, password_hash, provider, provider_id, avatar, mmr, stats)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         username,
@@ -47,6 +47,8 @@ export async function createUser(username, email, password = null, provider = 'l
       ]
     );
     
+    // Récupérer l'utilisateur créé
+    const result = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
     return rowToUser(result.rows[0]);
   } catch (error) {
     if (error.code === '23505') { // Unique violation
@@ -69,7 +71,7 @@ export async function createUser(username, email, password = null, provider = 'l
  */
 export async function getUserById(id) {
   try {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    const result = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
     if (result.rows.length === 0) return null;
     return rowToUser(result.rows[0]);
   } catch (error) {
@@ -84,7 +86,7 @@ export async function getUserById(id) {
 export async function getUserByUsername(username) {
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
+      'SELECT * FROM users WHERE LOWER(username) = LOWER(?)',
       [username]
     );
     if (result.rows.length === 0) return null;
@@ -101,7 +103,7 @@ export async function getUserByUsername(username) {
 export async function getUserByEmail(email) {
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+      'SELECT * FROM users WHERE LOWER(email) = LOWER(?)',
       [email]
     );
     if (result.rows.length === 0) return null;
@@ -118,7 +120,7 @@ export async function getUserByEmail(email) {
 export async function getUserByProviderId(provider, providerId) {
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE provider = $1 AND provider_id = $2',
+      'SELECT * FROM users WHERE provider = ? AND provider_id = ?',
       [provider, providerId]
     );
     if (result.rows.length === 0) return null;
@@ -156,18 +158,19 @@ export async function getRankingsByLanguage(language, limit = 100) {
   try {
     // Récupérer tous les utilisateurs et calculer leur MMR pour la langue
     // Inclure les utilisateurs qui n'ont pas de MMR pour cette langue (utiliser 1000 par défaut)
+    // MariaDB : utiliser JSON_EXTRACT au lieu de l'opérateur ->
     const result = await pool.query(
       `SELECT 
         id, username, avatar, gear, mmr, stats
        FROM users
-       ORDER BY COALESCE((mmr->>$1)::INTEGER, 1000) DESC
-       LIMIT $2`,
+       ORDER BY COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(mmr, CONCAT('$."', ?, '"'))) AS UNSIGNED), 1000) DESC
+       LIMIT ?`,
       [language, limit]
     );
     
     return result.rows
       .map((row, index) => {
-        // mmr est déjà un JSONB, on peut l'utiliser directement
+        // mmr est déjà un JSON, on peut l'utiliser directement
         const mmrObj = row.mmr || {};
         const mmrValue = parseInt(mmrObj[language] || 1000);
         const statsObj = row.stats || {};
@@ -210,15 +213,16 @@ export async function updateUser(user) {
       WHERE table_name='users' AND column_name='preferences'
     `);
     
+    // MariaDB : friends et friend_requests sont maintenant JSON au lieu de TEXT[]
     const updateFields = hasPreferences.rows.length > 0
-      ? `username = $1, email = $2, password_hash = $3, avatar = $4, 
-         bio = $5, gear = $6, social_media = $7, friends = $8, 
-         friend_requests_sent = $9, friend_requests_received = $10, 
-         mmr = $11, stats = $12, preferences = $13, provider = $14, provider_id = $15`
-      : `username = $1, email = $2, password_hash = $3, avatar = $4, 
-         bio = $5, gear = $6, social_media = $7, friends = $8, 
-         friend_requests_sent = $9, friend_requests_received = $10, 
-         mmr = $11, stats = $12, provider = $13, provider_id = $14`;
+      ? `username = ?, email = ?, password_hash = ?, avatar = ?, 
+         bio = ?, gear = ?, social_media = ?, friends = ?, 
+         friend_requests_sent = ?, friend_requests_received = ?, 
+         mmr = ?, stats = ?, preferences = ?, provider = ?, provider_id = ?`
+      : `username = ?, email = ?, password_hash = ?, avatar = ?, 
+         bio = ?, gear = ?, social_media = ?, friends = ?, 
+         friend_requests_sent = ?, friend_requests_received = ?, 
+         mmr = ?, stats = ?, provider = ?, provider_id = ?`;
     
     const params = hasPreferences.rows.length > 0
       ? [
@@ -229,9 +233,9 @@ export async function updateUser(user) {
           user.bio,
           user.gear,
           JSON.stringify(user.socialMedia),
-          user.friends,
-          user.friendRequests.sent,
-          user.friendRequests.received,
+          JSON.stringify(user.friends || []), // Convertir en JSON
+          JSON.stringify(user.friendRequests.sent || []), // Convertir en JSON
+          JSON.stringify(user.friendRequests.received || []), // Convertir en JSON
           JSON.stringify(user.mmr),
           JSON.stringify(user.stats),
           JSON.stringify(user.preferences || { defaultMode: 'solo' }),
@@ -247,9 +251,9 @@ export async function updateUser(user) {
           user.bio,
           user.gear,
           JSON.stringify(user.socialMedia),
-          user.friends,
-          user.friendRequests.sent,
-          user.friendRequests.received,
+          JSON.stringify(user.friends || []), // Convertir en JSON
+          JSON.stringify(user.friendRequests.sent || []), // Convertir en JSON
+          JSON.stringify(user.friendRequests.received || []), // Convertir en JSON
           JSON.stringify(user.mmr),
           JSON.stringify(user.stats),
           user.provider || 'local',
@@ -260,7 +264,7 @@ export async function updateUser(user) {
     await pool.query(
       `UPDATE users 
        SET ${updateFields}
-       WHERE id = $${params.length}`,
+       WHERE id = ?`,
       params
     );
   } catch (error) {
@@ -282,7 +286,7 @@ export async function recordMatch(matchData) {
     // Insérer le match
     await client.query(
       `INSERT INTO matches (id, type, language, date, data)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES (?, ?, ?, ?, ?)`,
       [
         matchId,
         matchData.type,
@@ -293,12 +297,12 @@ export async function recordMatch(matchData) {
     );
     
     // Insérer les performances de chaque joueur
+    // MariaDB : utiliser INSERT IGNORE au lieu de ON CONFLICT
     for (const player of matchData.players) {
       if (player.userId) {
         await client.query(
-          `INSERT INTO user_matches (user_id, match_id, wpm, accuracy, won, position)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT (user_id, match_id) DO NOTHING`,
+          `INSERT IGNORE INTO user_matches (user_id, match_id, wpm, accuracy, won, position)
+           VALUES (?, ?, ?, ?, ?, ?)`,
           [
             player.userId,
             matchId,
@@ -333,21 +337,21 @@ export async function getUserMatches(userId, limit = 50, type = undefined) {
         um.wpm, um.accuracy, um.won, um.position
       FROM user_matches um
       JOIN matches m ON um.match_id = m.id
-      WHERE um.user_id = $1
+      WHERE um.user_id = ?
     `;
     
     const params = [userId];
     
     // Filtrer par type si spécifié
     if (type === 'solo') {
-      query += ' AND m.type = $2';
+      query += ' AND m.type = ?';
       params.push('solo');
     } else if (type === 'multiplayer') {
-      query += ' AND m.type != $2';
+      query += ' AND m.type != ?';
       params.push('solo');
     }
     
-    query += ' ORDER BY m.date DESC LIMIT $' + (params.length + 1);
+    query += ' ORDER BY m.date DESC LIMIT ?';
     params.push(limit);
     
     const result = await pool.query(query, params);
@@ -456,10 +460,41 @@ function rowToUser(row) {
     bio: row.bio || '',
     gear: row.gear || '',
     socialMedia: socialMedia,
-    friends: row.friends || [],
+    // MariaDB : friends est maintenant JSON, parser si nécessaire
+    friends: (() => {
+      let friends = row.friends;
+      if (typeof friends === 'string') {
+        try {
+          friends = JSON.parse(friends);
+        } catch (e) {
+          friends = [];
+        }
+      }
+      return Array.isArray(friends) ? friends : [];
+    })(),
     friendRequests: {
-      sent: row.friend_requests_sent || [],
-      received: row.friend_requests_received || []
+      sent: (() => {
+        let sent = row.friend_requests_sent;
+        if (typeof sent === 'string') {
+          try {
+            sent = JSON.parse(sent);
+          } catch (e) {
+            sent = [];
+          }
+        }
+        return Array.isArray(sent) ? sent : [];
+      })(),
+      received: (() => {
+        let received = row.friend_requests_received;
+        if (typeof received === 'string') {
+          try {
+            received = JSON.parse(received);
+          } catch (e) {
+            received = [];
+          }
+        }
+        return Array.isArray(received) ? received : [];
+      })()
     },
     createdAt: row.created_at,
     mmr: mmr,

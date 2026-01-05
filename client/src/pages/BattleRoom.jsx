@@ -5,19 +5,41 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import LogoIconSmall from '../components/icons/LogoIconSmall'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
+import { useUser } from '../contexts/UserContext'
+import Modal from '../components/Modal'
+import { languages } from '../data/languages'
+import { generateText } from '../data/languages'
+import { generatePhraseText } from '../data/phrases'
 
 export default function BattleRoom() {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { playerName, userId, isCreator, matchmaking } = location.state || {};
+  const { playerName: initialPlayerName, userId, isCreator, matchmaking } = location.state || {};
   const { toast } = useToastContext();
+  const { user: currentUserFromContext } = useUser();
+  
+  // État pour gérer le pseudo si l'utilisateur rejoint via un lien direct
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [tempPlayerName, setTempPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(initialPlayerName || currentUserFromContext?.username || '');
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  
+  // État pour le mode de battle
+  const [battleMode, setBattleMode] = useState('timer'); // 'timer' ou 'phrases'
+  const [timerDuration, setTimerDuration] = useState(60); // 60, 30, ou 10 secondes
+  const [phraseDifficulty, setPhraseDifficulty] = useState('medium'); // 'easy', 'medium', 'hard', 'hardcore'
+  const [timeLeft, setTimeLeft] = useState(null); // Temps restant pour le mode timer
   
   const [text, setText] = useState('');
   const [input, setInput] = useState('');
   const [players, setPlayers] = useState([]);
-  const [gameStatus, setGameStatus] = useState('waiting'); // waiting, playing, finished
-  const [startTime, setStartTime] = useState(null);
+  const [gameStatus, setGameStatus] = useState('connecting'); // connecting, waiting, playing, finished
+  const [startTime, setStartTime] = useState(null); // Temps de début de la partie (pour le timer)
+  const [typingStartTime, setTypingStartTime] = useState(null); // Temps de début de la frappe (pour le WPM)
+  const typingStartTimeRef = useRef(null); // Ref pour accéder à typingStartTime dans les callbacks
+  const [opponentTypingStartTime, setOpponentTypingStartTime] = useState(null); // Temps de début de frappe de l'adversaire
+  const opponentTypingStartTimeRef = useRef(null); // Ref pour accéder à opponentTypingStartTime dans les callbacks
   const [myStats, setMyStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
   const [opponentStats, setOpponentStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
   const [results, setResults] = useState(null);
@@ -35,13 +57,26 @@ export default function BattleRoom() {
   const textContainerRef = useRef(null);
   const chatContainerRef = useRef(null);
 
+  // Vérifier si l'utilisateur doit choisir un pseudo
+  useEffect(() => {
+    if (!playerName && !currentUserFromContext) {
+      setShowNameModal(true);
+      return;
+    } else if (currentUserFromContext && !playerName) {
+      setPlayerName(currentUserFromContext.username);
+    }
+  }, [playerName, currentUserFromContext]);
+
   // Récupérer l'utilisateur courant si userId est fourni
   useEffect(() => {
-    if (userId || matchmaking) {
+    if (userId || matchmaking || currentUserFromContext) {
       const fetchUser = async () => {
         try {
           const userData = await authService.getCurrentUser();
           setCurrentUser(userData);
+          if (!playerName && userData) {
+            setPlayerName(userData.username);
+          }
         } catch (error) {
           // Erreur gérée par apiService
           setCurrentUser(null);
@@ -49,12 +84,21 @@ export default function BattleRoom() {
       };
       fetchUser();
     }
-  }, [userId, matchmaking]);
+  }, [userId, matchmaking, currentUserFromContext]);
+
+  // Gérer la soumission du nom
+  const handleNameSubmit = () => {
+    if (!tempPlayerName.trim()) {
+      toast.warning('Please enter a name');
+      return;
+    }
+    setPlayerName(tempPlayerName.trim());
+    setShowNameModal(false);
+  };
 
   useEffect(() => {
     if (!playerName) {
-      navigate('/battle');
-      return;
+      return; // Attendre que le nom soit défini
     }
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -101,6 +145,7 @@ export default function BattleRoom() {
     socket.on('room-joined', (data) => {
       setText(data.text);
       setPlayers(data.players);
+      setGameStatus('waiting'); // Passer à 'waiting' une fois la room jointe
       if (data.chatMessages) {
         setChatMessages(data.chatMessages);
       }
@@ -117,12 +162,70 @@ export default function BattleRoom() {
     socket.on('game-started', (data) => {
       setGameStatus('playing');
       setStartTime(data.startTime);
+      setTypingStartTime(null); // Réinitialiser le temps de début de frappe
+      typingStartTimeRef.current = null; // Réinitialiser aussi la ref
+      setOpponentTypingStartTime(null); // Réinitialiser le temps de début de frappe de l'adversaire
+      opponentTypingStartTimeRef.current = null; // Réinitialiser aussi la ref
+      // Mettre à jour le texte si une nouvelle langue a été choisie
+      if (data.text) {
+        setText(data.text);
+      }
+      // Mettre à jour le mode et les paramètres
+      if (data.mode) {
+        setBattleMode(data.mode);
+      }
+      if (data.timerDuration) {
+        setTimerDuration(data.timerDuration);
+        setTimeLeft(data.timerDuration);
+      }
+      if (data.difficulty) {
+        setPhraseDifficulty(data.difficulty);
+      }
+      setInput(''); // Réinitialiser l'input
       setMyTimeSeries([]);
       setOpponentTimeSeries([]);
       
       // Arrêter l'interval précédent s'il existe
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
+      }
+      
+      // Démarrer le timer si mode timer
+      if (data.mode === 'timer' && data.timerDuration) {
+        setTimeLeft(data.timerDuration);
+        timerIntervalRef.current = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              // Finir automatiquement quand le timer atteint 0
+              if (socketRef.current) {
+                // Utiliser la ref pour accéder à la valeur actuelle dans le callback
+                const typingStart = typingStartTimeRef.current;
+                if (typingStart && input.length > 0) {
+                  const finalTime = (Date.now() - typingStart) / 1000 / 60;
+                  const wordsTyped = input.trim().split(/\s+/).filter(w => w.length > 0).length;
+                  const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
+                  const finalAccuracy = input.length > 0 ? Math.round(((input.length - errors) / input.length) * 100) : 100;
+                  socketRef.current.emit('finish-game', {
+                    wpm: finalWpm,
+                    accuracy: finalAccuracy
+                  });
+                } else {
+                  // Si l'utilisateur n'a pas commencé à taper, envoyer 0
+                  socketRef.current.emit('finish-game', {
+                    wpm: 0,
+                    accuracy: 100
+                  });
+                }
+              }
+              if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+              }
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       }
       
       // L'enregistrement des stats se fera dans handleInputChange et opponent-update
@@ -142,9 +245,18 @@ export default function BattleRoom() {
           progress: data.progress
         });
         
+        // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
+        if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTime) {
+          const now = Date.now();
+          setOpponentTypingStartTime(now);
+          opponentTypingStartTimeRef.current = now;
+        }
+        
         // Ajouter aux séries temporelles pour le graphique en temps réel
-        if (startTime) {
-          const currentSecond = Math.floor((Date.now() - startTime) / 1000);
+        // Utiliser le temps depuis la première frappe de l'adversaire
+        const typingStart = opponentTypingStartTimeRef.current;
+        if (typingStart) {
+          const currentSecond = Math.floor((Date.now() - typingStart) / 1000);
           setOpponentTimeSeries((prev) => {
             const existing = prev.findIndex((item) => item.second === currentSecond);
             const newData = { 
@@ -235,6 +347,10 @@ export default function BattleRoom() {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
       socket.disconnect();
     };
   }, [roomId, playerName, currentUser]);
@@ -276,7 +392,13 @@ export default function BattleRoom() {
 
   const handleStartGame = () => {
     if (players.length === 2 && socketRef.current) {
-      socketRef.current.emit('start-game', { roomId });
+      socketRef.current.emit('start-game', { 
+        roomId, 
+        language: selectedLanguage,
+        mode: battleMode,
+        timerDuration: battleMode === 'timer' ? timerDuration : null,
+        difficulty: battleMode === 'phrases' ? phraseDifficulty : null
+      });
     }
   };
 
@@ -284,6 +406,13 @@ export default function BattleRoom() {
     if (gameStatus !== 'playing') return;
     
     const value = e.target.value;
+    
+    // Définir le temps de début de frappe à la première frappe
+    if (value.length > 0 && !typingStartTime) {
+      const now = Date.now();
+      setTypingStartTime(now);
+      typingStartTimeRef.current = now; // Mettre à jour aussi la ref
+    }
     
     if (value.length <= text.length) {
       setInput(value);
@@ -297,9 +426,9 @@ export default function BattleRoom() {
       }
       setErrors(errorCount);
 
-      // Calculer les stats
-      if (startTime) {
-        const timeElapsed = (Date.now() - startTime) / 1000 / 60;
+      // Calculer les stats - utiliser typingStartTime au lieu de startTime pour le WPM
+      if (typingStartTime) {
+        const timeElapsed = (Date.now() - typingStartTime) / 1000 / 60;
         const wordsTyped = value.trim().split(/\s+/).filter(w => w.length > 0).length;
         const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
         const accuracy = value.length > 0 
@@ -310,7 +439,8 @@ export default function BattleRoom() {
         setMyStats({ wpm, accuracy, progress });
         
         // Enregistrer dans les séries temporelles pour le graphique
-        const currentSecond = Math.floor((Date.now() - startTime) / 1000);
+        // Utiliser le temps depuis le début de la frappe
+        const currentSecond = Math.floor((Date.now() - typingStartTime) / 1000);
         setMyTimeSeries((prev) => {
           const existing = prev.findIndex((item) => item.second === currentSecond);
           const newData = { second: currentSecond, wpm, accuracy };
@@ -352,8 +482,8 @@ export default function BattleRoom() {
       }
 
       // Vérifier si terminé
-      if (value === text && startTime) {
-        const finalTime = (Date.now() - startTime) / 1000 / 60;
+      if (value === text && typingStartTime) {
+        const finalTime = (Date.now() - typingStartTime) / 1000 / 60;
         const finalWpm = finalTime > 0 ? Math.round(text.trim().split(/\s+/).filter(w => w.length > 0).length / finalTime) : 0;
         const finalAccuracy = Math.round(((text.length - errorCount) / text.length) * 100);
         
@@ -395,13 +525,60 @@ export default function BattleRoom() {
   const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));
   const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
 
+  // Écran de chargement
+  if (gameStatus === 'connecting' || !playerName) {
+    return (
+      <>
+        <Modal isOpen={showNameModal} onClose={() => navigate('/battle')} title="Choose your name">
+          <div className="space-y-4">
+            <p className="text-text-secondary text-sm">
+              Enter your name to join this battle room
+            </p>
+            <input
+              type="text"
+              value={tempPlayerName}
+              onChange={(e) => setTempPlayerName(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleNameSubmit()}
+              className="input-modern w-full"
+              placeholder="Enter your name"
+              autoFocus
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => navigate('/battle')}
+                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNameSubmit}
+                className="btn-primary"
+              >
+                Join Room
+              </button>
+            </div>
+          </div>
+        </Modal>
+        <div className="h-full w-full flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="relative w-16 h-16 mx-auto">
+              <div className="absolute inset-0 border-4 border-accent-primary/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
+            </div>
+            <p className="text-text-primary">Connecting to room...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
         <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 lg:p-8 flex-1 min-h-0 flex flex-col">
-          {/* Layout en deux colonnes : jeu à gauche, chat à droite */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+          {/* Layout amélioré : jeu principal, chat en bas sur mobile, à droite sur desktop */}
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6">
             {/* Colonne principale : jeu */}
-            <div className="min-w-0">
+            <div className="flex-1 min-w-0 flex flex-col">
               {/* En-tête sobre */}
               <div className="mb-6 pb-4">
                 <div className="flex items-center justify-between">
@@ -483,12 +660,82 @@ export default function BattleRoom() {
                       )}
                     </div>
                     {players.length === 2 && isCreator && (
-                      <button
-                        onClick={handleStartGame}
-                        className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20"
-                      >
-                        Start Battle
-                      </button>
+                      <div className="space-y-4">
+                        {/* Sélecteur de mode */}
+                        <div>
+                          <label className="block text-text-secondary text-sm mb-2 font-medium">
+                            Battle Mode
+                          </label>
+                          <select
+                            value={battleMode}
+                            onChange={(e) => setBattleMode(e.target.value)}
+                            className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                          >
+                            <option value="timer" className="bg-bg-primary">Duel Classique (Timer)</option>
+                            <option value="phrases" className="bg-bg-primary">Phrases (Difficulté)</option>
+                          </select>
+                        </div>
+
+                        {/* Options selon le mode */}
+                        {battleMode === 'timer' && (
+                          <div>
+                            <label className="block text-text-secondary text-sm mb-2 font-medium">
+                              Duration
+                            </label>
+                            <select
+                              value={timerDuration}
+                              onChange={(e) => setTimerDuration(parseInt(e.target.value))}
+                              className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                            >
+                              <option value={60} className="bg-bg-primary">60 seconds</option>
+                              <option value={30} className="bg-bg-primary">30 seconds</option>
+                              <option value={10} className="bg-bg-primary">10 seconds</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {battleMode === 'phrases' && (
+                          <div>
+                            <label className="block text-text-secondary text-sm mb-2 font-medium">
+                              Difficulty
+                            </label>
+                            <select
+                              value={phraseDifficulty}
+                              onChange={(e) => setPhraseDifficulty(e.target.value)}
+                              className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                            >
+                              <option value="easy" className="bg-bg-primary">Facile</option>
+                              <option value="medium" className="bg-bg-primary">Moyen</option>
+                              <option value="hard" className="bg-bg-primary">Difficile</option>
+                              <option value="hardcore" className="bg-bg-primary">Hardcore</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Sélecteur de langue pour l'host */}
+                        <div>
+                          <label className="block text-text-secondary text-sm mb-2 font-medium">
+                            Select Language
+                          </label>
+                          <select
+                            value={selectedLanguage}
+                            onChange={(e) => setSelectedLanguage(e.target.value)}
+                            className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                          >
+                            {Object.entries(languages).map(([code, lang]) => (
+                              <option key={code} value={code} className="bg-bg-primary">
+                                {lang.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          onClick={handleStartGame}
+                          className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 w-full"
+                        >
+                          Start Battle
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -498,6 +745,17 @@ export default function BattleRoom() {
 
           {gameStatus === 'playing' && (
             <>
+              {/* Timer pour le mode timer */}
+              {battleMode === 'timer' && timeLeft !== null && (
+                <div className="mb-4 text-center">
+                  <div className="inline-block bg-bg-primary/30 backdrop-blur-sm rounded-lg px-6 py-3">
+                    <div className="text-3xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                      {timeLeft}s
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Stats des joueurs - design sobre */}
               <div className="grid md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
@@ -538,10 +796,10 @@ export default function BattleRoom() {
               {/* Graphique de progression en temps réel */}
               {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
                 <div className="mb-6 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress</div>
+                  <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress - Depuis la première frappe</div>
                   <ResponsiveContainer width="100%" height={150}>
                     <LineChart data={(() => {
-                      // Fusionner les deux séries en combinant par seconde
+                      // Fusionner les deux séries en combinant par seconde depuis la première frappe
                       const maxSecond = Math.max(
                         myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
                         opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
@@ -552,8 +810,8 @@ export default function BattleRoom() {
                         const oppData = opponentTimeSeries.find(d => d.second === i);
                         chartData.push({
                           time: i,
-                          me: myData?.wpm || 0,
-                          opponent: oppData?.wpm || 0
+                          me: myData?.wpm || null,
+                          opponent: oppData?.wpm || null
                         });
                       }
                       return chartData;
@@ -577,23 +835,29 @@ export default function BattleRoom() {
                           borderRadius: '8px',
                           color: '#e8e8e8'
                         }}
+                        formatter={(value, name) => {
+                          if (value === null || value === undefined) return ['-', name];
+                          return [value + ' WPM', name];
+                        }}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
                       <Line 
                         type="monotone" 
                         dataKey="me" 
                         stroke="#00ff9f" 
-                        strokeWidth={2}
+                        strokeWidth={2.5}
                         dot={false}
                         name={myPlayer?.name || 'You'}
+                        connectNulls={false}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="opponent" 
-                        stroke="#646669" 
-                        strokeWidth={2}
+                        stroke="#ff6b6b" 
+                        strokeWidth={2.5}
                         dot={false}
                         name={opponent?.name || 'Opponent'}
+                        connectNulls={false}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -678,7 +942,7 @@ export default function BattleRoom() {
                   <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={(() => {
-                      // Fusionner les deux séries en combinant par seconde
+                      // Fusionner les deux séries en combinant par seconde depuis la première frappe de chacun
                       const maxSecond = Math.max(
                         myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
                         opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
@@ -689,8 +953,8 @@ export default function BattleRoom() {
                         const oppData = opponentTimeSeries.find(d => d.second === i);
                         chartData.push({
                           time: i,
-                          me: myData?.wpm || 0,
-                          opponent: oppData?.wpm || 0
+                          me: myData?.wpm || null, // null pour ne pas afficher de point si pas de données
+                          opponent: oppData?.wpm || null
                         });
                       }
                       return chartData;
@@ -699,7 +963,7 @@ export default function BattleRoom() {
                       <XAxis 
                         dataKey="time" 
                         stroke="#646669"
-                        label={{ value: 'Time (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
+                        label={{ value: 'Temps depuis première frappe (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
                         domain={['dataMin', 'dataMax']}
                       />
                       <YAxis 
@@ -714,23 +978,34 @@ export default function BattleRoom() {
                           borderRadius: '8px',
                           color: '#e8e8e8'
                         }}
+                        formatter={(value, name) => {
+                          if (value === null || value === undefined) return ['-', name];
+                          return [value + ' WPM', name];
+                        }}
                       />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Legend 
+                        wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                        iconType="line"
+                      />
                       <Line 
                         type="monotone" 
                         dataKey="me" 
                         stroke="#00ff9f" 
-                        strokeWidth={2.5}
+                        strokeWidth={3}
                         dot={false}
+                        activeDot={{ r: 5, fill: '#00ff9f' }}
                         name={myPlayer?.name || 'You'}
+                        connectNulls={false}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="opponent" 
-                        stroke="#646669" 
-                        strokeWidth={2.5}
+                        stroke="#ff6b6b" 
+                        strokeWidth={3}
                         dot={false}
+                        activeDot={{ r: 5, fill: '#ff6b6b' }}
                         name={opponent?.name || 'Opponent'}
+                        connectNulls={false}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -750,8 +1025,8 @@ export default function BattleRoom() {
             </div>
 
             {/* Colonne droite : Chat */}
-            <div className="lg:pl-6">
-              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg h-full flex flex-col" style={{ minHeight: '500px', maxHeight: 'calc(100vh - 200px)' }}>
+            <div className="lg:w-80 lg:flex-shrink-0 flex flex-col">
+              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg flex-1 min-h-0 flex flex-col">
                 {/* En-tête du chat */}
                 <div className="p-4">
                   <h3 className="text-text-primary font-semibold" style={{ fontFamily: 'Inter' }}>Chat</h3>

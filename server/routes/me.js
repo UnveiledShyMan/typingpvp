@@ -32,13 +32,49 @@ router.put('/preferences', authenticateToken, async (req, res) => {
     const { preferences } = req.body;
     
     if (preferences && typeof preferences === 'object') {
+      // Mettre à jour les préférences
       req.user.preferences = {
         ...(req.user.preferences || { defaultMode: 'solo' }),
         ...preferences
       };
       
-      const { updateUser } = await import('../db.js');
-      await updateUser(req.user);
+      // Mettre à jour directement dans la base de données avec une requête simple
+      const pool = (await import('../db/connection.js')).default;
+      
+      // Vérifier si la colonne preferences existe
+      const hasPreferences = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='users' AND column_name='preferences'
+      `);
+      
+      if (hasPreferences.rows.length > 0) {
+        // La colonne existe, on peut la mettre à jour
+        await pool.query(
+          `UPDATE users 
+           SET preferences = $1
+           WHERE id = $2`,
+          [JSON.stringify(req.user.preferences), req.user.id]
+        );
+      } else {
+        // La colonne n'existe pas, on essaie de l'ajouter
+        try {
+          await pool.query(`
+            ALTER TABLE users 
+            ADD COLUMN preferences JSONB DEFAULT '{"defaultMode": "solo"}'
+          `);
+          // Puis mettre à jour
+          await pool.query(
+            `UPDATE users 
+             SET preferences = $1
+             WHERE id = $2`,
+            [JSON.stringify(req.user.preferences), req.user.id]
+          );
+        } catch (alterError) {
+          // Si l'ajout échoue (colonne existe déjà ou autre erreur), on continue
+          console.warn('Could not add preferences column:', alterError.message);
+        }
+      }
       
       res.json({
         success: true,
@@ -49,7 +85,7 @@ router.put('/preferences', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('Error updating preferences:', error);
-    res.status(500).json({ error: 'Error updating preferences' });
+    res.status(500).json({ error: 'Error updating preferences: ' + error.message });
   }
 });
 

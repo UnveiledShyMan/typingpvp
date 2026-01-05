@@ -247,6 +247,23 @@ export const matchesService = {
   },
 };
 
+/**
+ * Service Discord
+ */
+export const discordService = {
+  async generateCode(discordId, discordUsername) {
+    return post('/api/discord/generate-code', { discordId, discordUsername });
+  },
+  
+  async unlink() {
+    return del('/api/discord/unlink');
+  },
+  
+  async getLinkedUser(discordId) {
+    return get(`/api/discord/user/${discordId}`);
+  },
+};
+
 export default {
   get,
   post,
@@ -258,6 +275,7 @@ export default {
   friendsService,
   profileService,
   matchesService,
+  discordService,
   setErrorHandlers,
 };
 

@@ -16,7 +16,7 @@ async function initDatabase() {
     console.log('Connecting to database...');
     
     // Lire le fichier schema.sql
-    const schemaPath = join(__dirname, 'schema.sql');
+    const schemaPath = join(__dirname, 'schema-mariadb.sql');
     const schema = readFileSync(schemaPath, 'utf8');
     
     // Exécuter le schéma

@@ -130,11 +130,12 @@ export default function MainPage() {
       <div className="h-screen bg-bg-primary flex flex-col overflow-hidden">
       {/* Header avec navigation horizontale */}
       <header 
-        className="w-full bg-bg-primary/60 backdrop-blur-md z-30"
+        className="w-full bg-bg-primary/60 backdrop-blur-md relative"
         style={{
           background: 'rgba(10, 14, 26, 0.6)',
           backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)'
+          WebkitBackdropFilter: 'blur(12px)',
+          zIndex: 100
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -146,14 +147,14 @@ export default function MainPage() {
                 setActiveSection('solo');
                 saveModePreference('solo');
               }}
-              className="flex items-center gap-3 cursor-pointer group"
+              className="flex items-center gap-2 sm:gap-3 cursor-pointer group flex-shrink-0"
             >
               <LogoIcon 
-                className="w-8 h-8 text-text-primary/80 group-hover:text-accent-primary transition-all duration-200" 
+                className="w-7 h-7 sm:w-8 sm:h-8 text-text-primary/80 group-hover:text-accent-primary transition-all duration-200" 
                 stroke="currentColor"
               />
               <h1 
-                className="text-xl font-bold text-text-primary/90 group-hover:text-accent-primary transition-all duration-200"
+                className="text-base sm:text-xl font-bold text-text-primary/90 group-hover:text-accent-primary transition-all duration-200 whitespace-nowrap"
                 style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}
               >
                 typingpvp.com
@@ -161,7 +162,7 @@ export default function MainPage() {
             </button>
 
             {/* Navigation horizontale */}
-            <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
+            <nav className="hidden md:flex items-center gap-1 flex-1 justify-center min-w-0 overflow-hidden">
               {sections.map((section) => {
                 const Icon = section.Icon;
                 const isActive = activeSection === section.id;
@@ -186,24 +187,24 @@ export default function MainPage() {
                     >
                       <button
                         onClick={() => {
-                          setShowSandbox(false);
-                          setActiveSection('solo');
-                          saveModePreference('solo');
+                          // Sur desktop, le hover gère l'ouverture du dropdown
+                          // Sur mobile, le clic toggle le dropdown (géré par SoloDropdown)
+                          // On ne change pas la section ici pour éviter les conflits
                         }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                           (isActive && !showSandbox) || showSandbox
                             ? 'text-accent-primary'
                             : 'text-text-secondary/70 hover:text-text-primary/90'
                         }`}
                       >
                         <Icon 
-                          className="w-4 h-4 transition-all duration-200" 
+                          className="w-4 h-4 transition-all duration-200 flex-shrink-0" 
                           stroke={(isActive && !showSandbox) || showSandbox ? '#8b5cf6' : 'currentColor'}
                           style={{ opacity: (isActive && !showSandbox) || showSandbox ? 1 : 0.7 }}
                         />
-                        <span className={(isActive && !showSandbox) || showSandbox ? 'font-semibold' : 'font-medium'}>{displayLabel}</span>
+                        <span className={`${(isActive && !showSandbox) || showSandbox ? 'font-semibold' : 'font-medium'} whitespace-nowrap`}>{displayLabel}</span>
                         <svg
-                          className="w-3 h-3 transition-transform opacity-50"
+                          className="w-3 h-3 transition-transform opacity-50 flex-shrink-0"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -226,18 +227,18 @@ export default function MainPage() {
                     }`}
                   >
                     <Icon 
-                      className="w-4 h-4 transition-all duration-200" 
+                      className="w-4 h-4 transition-all duration-200 flex-shrink-0" 
                       stroke={isActive ? '#8b5cf6' : 'currentColor'}
                       style={{ opacity: isActive ? 1 : 0.7 }}
                     />
-                    <span className={isActive ? 'font-semibold' : 'font-medium'}>{section.label}</span>
+                    <span className={`${isActive ? 'font-semibold' : 'font-medium'} whitespace-nowrap`}>{section.label}</span>
                   </button>
                 );
               })}
             </nav>
 
             {/* User section / Auth buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               {user ? (
                 <>
                   {/* Profile button dans la nav pour mobile */}
@@ -306,8 +307,8 @@ export default function MainPage() {
           </div>
 
           {/* Navigation mobile (menu déroulant) */}
-          <div className="md:hidden pb-4 overflow-x-auto">
-            <nav className="flex items-center gap-1">
+          <div className="md:hidden pt-2 pb-4 overflow-x-auto scrollbar-hide -mx-4 sm:-mx-6 px-4 sm:px-6">
+            <nav className="flex items-center gap-1 min-w-max">
               {sections.map((section) => {
                 const Icon = section.Icon;
                 const isActive = activeSection === section.id;
@@ -332,9 +333,9 @@ export default function MainPage() {
                     >
                       <button
                         onClick={() => {
-                          setShowSandbox(false);
-                          setActiveSection('solo');
-                          saveModePreference('solo');
+                          // Sur desktop, le hover gère l'ouverture du dropdown
+                          // Sur mobile, le clic toggle le dropdown (géré par SoloDropdown)
+                          // On ne change pas la section ici pour éviter les conflits
                         }}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
                           (isActive && !showSandbox) || showSandbox
@@ -343,13 +344,13 @@ export default function MainPage() {
                         }`}
                       >
                         <Icon 
-                          className="w-4 h-4 transition-all duration-200" 
+                          className="w-4 h-4 transition-all duration-200 flex-shrink-0" 
                           stroke={(isActive && !showSandbox) || showSandbox ? '#8b5cf6' : 'currentColor'}
                           style={{ opacity: (isActive && !showSandbox) || showSandbox ? 1 : 0.7 }}
                         />
-                        <span className={(isActive && !showSandbox) || showSandbox ? 'font-semibold' : 'font-medium'}>{displayLabel}</span>
+                        <span className={`${(isActive && !showSandbox) || showSandbox ? 'font-semibold' : 'font-medium'} whitespace-nowrap`}>{displayLabel}</span>
                         <svg
-                          className="w-2.5 h-2.5 transition-transform opacity-60"
+                          className="w-2.5 h-2.5 transition-transform opacity-60 flex-shrink-0"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -372,11 +373,11 @@ export default function MainPage() {
                     }`}
                   >
                     <Icon 
-                      className="w-4 h-4 transition-all duration-200" 
+                      className="w-4 h-4 transition-all duration-200 flex-shrink-0" 
                       stroke={isActive ? '#8b5cf6' : 'currentColor'}
                       style={{ opacity: isActive ? 1 : 0.7 }}
                     />
-                    <span className={isActive ? 'font-semibold' : 'font-medium'}>{section.label}</span>
+                    <span className={`${isActive ? 'font-semibold' : 'font-medium'} whitespace-nowrap`}>{section.label}</span>
                   </button>
                 );
               })}
@@ -386,7 +387,7 @@ export default function MainPage() {
       </header>
 
       {/* Main content avec lazy loading et animation - Parfaitement centré, non scrollable */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden relative" style={{ zIndex: 1 }}>
         <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Suspense fallback={<LoadingSpinner />}>
             <div key={`${activeSection}-${showSandbox}`} className="h-full overflow-hidden animate-fade-in">

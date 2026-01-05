@@ -117,27 +117,7 @@ export async function query(sql, params) {
  * Obtenir une connexion pour les transactions
  */
 export async function getConnection() {
-  const conn = await pool.getConnection();
-  // Wrapper pour compatibilité avec PostgreSQL
-  return {
-    query: async (sql, params) => {
-      if (sql === 'BEGIN') {
-        await conn.beginTransaction();
-        return { rows: [] };
-      }
-      if (sql === 'COMMIT') {
-        await conn.commit();
-        return { rows: [] };
-      }
-      if (sql === 'ROLLBACK') {
-        await conn.rollback();
-        return { rows: [] };
-      }
-      const [rows] = await conn.execute(sql, params);
-      return { rows: Array.isArray(rows) ? rows : [rows] };
-    },
-    release: () => conn.release()
-  };
+  return await pool.getConnection();
 }
 
 /**
@@ -147,10 +127,11 @@ export async function closePool() {
   await pool.end();
 }
 
-// Wrapper pour compatibilité avec l'ancien code (pool.query)
-const poolWrapper = {
+// Exporter le pool et les fonctions utilitaires
+export default {
   query,
-  connect: getConnection
+  getConnection,
+  closePool,
+  pool // Exporter aussi le pool directement si nécessaire
 };
 
-export default poolWrapper;

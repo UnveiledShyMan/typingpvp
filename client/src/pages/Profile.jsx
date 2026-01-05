@@ -145,8 +145,8 @@ export default function Profile({ userId: currentUserId }) {
 
   if (loading) {
     return (
-      <div className="h-full w-full overflow-hidden">
-        <div className="w-full h-full max-w-5xl mx-auto overflow-y-auto p-6">
+      <div className="h-full w-full flex flex-col overflow-hidden">
+        <div className="w-full h-full max-w-5xl mx-auto flex-1 min-h-0 overflow-y-auto profile-scroll p-6">
           <ProfileSkeleton />
         </div>
       </div>
@@ -155,7 +155,7 @@ export default function Profile({ userId: currentUserId }) {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+      <div className="h-full w-full flex items-center justify-center">
         <div className="text-text-primary">User not found</div>
       </div>
     );
@@ -180,20 +180,20 @@ export default function Profile({ userId: currentUserId }) {
         description={user.bio || `View ${user.username}'s typing stats, ELO, and match history`}
         keywords={`${user.username}, typing profile, typing stats, ${user.gear || ''}`}
       />
-      <div className="h-full w-full overflow-hidden">
-        <div className="w-full h-full max-w-5xl mx-auto overflow-y-auto">
-      {/* Header avec avatar et infos principales - Style osu! */}
-      <div className="relative mb-8">
-        {/* Bannière de fond avec gradient */}
-        <div 
-          className="absolute inset-0 rounded-2xl opacity-20"
-          style={{
-            background: `linear-gradient(135deg, ${getRankColor(rankInfo)}40 0%, ${getRankColor(rankInfo)}10 100%)`
-          }}
-        ></div>
-        
-        <div className="relative bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+      <div className="h-full w-full flex flex-col overflow-hidden">
+        <div className="w-full h-full max-w-5xl mx-auto flex-1 min-h-0 overflow-y-auto profile-scroll p-4 sm:p-6">
+          {/* Header avec avatar et infos principales - Style osu! */}
+          <div className="relative mb-6 sm:mb-8">
+            {/* Bannière de fond avec gradient */}
+            <div 
+              className="absolute inset-0 rounded-2xl opacity-20"
+              style={{
+                background: `linear-gradient(135deg, ${getRankColor(rankInfo)}40 0%, ${getRankColor(rankInfo)}10 100%)`
+              }}
+            ></div>
+            
+            <div className="relative bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Avatar large */}
             <div className="relative">
               {isEditing ? (
@@ -433,15 +433,14 @@ export default function Profile({ userId: currentUserId }) {
                   </button>
                 </div>
               )}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
       {!isEditing && (
         <>
           {/* Stats Cards - Style osu! */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 sm:mb-8">
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
               <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
@@ -484,7 +483,7 @@ export default function Profile({ userId: currentUserId }) {
           </div>
 
           {/* Language Selector */}
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <select
               value={selectedLang}
               onChange={(e) => setSelectedLang(e.target.value)}
@@ -503,7 +502,7 @@ export default function Profile({ userId: currentUserId }) {
             <div className="space-y-6">
               {/* Matchs Solo */}
               {soloMatches.length > 0 && (
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
                   <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
                     <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Solo Matches
@@ -552,7 +551,7 @@ export default function Profile({ userId: currentUserId }) {
 
               {/* Matchs Multijoueurs */}
               {multiplayerMatches.length > 0 && (
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
                   <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
                     <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Multiplayer Matches

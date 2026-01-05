@@ -324,6 +324,26 @@ code {
   display: none; /* Chrome, Safari, Opera */
 }
 
+/* Scrollbar masquée pour les profils utilisateurs */
+.profile-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE et Edge */
+}
+
+.profile-scroll::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Masquer la scrollbar horizontale pour la navigation mobile */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE et Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 /* Animations et effets éthérés modernes */
 @keyframes pulseGlow {
   0%, 100% {
