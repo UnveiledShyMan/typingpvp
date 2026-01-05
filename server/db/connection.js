@@ -83,9 +83,17 @@ pool.on('error', (err) => {
   console.error('❌ Erreur de connexion MariaDB:', err);
   if (err.code === 'PROTOCOL_CONNECTION_LOST') {
     console.error('Connexion à la base de données perdue');
+    // Ne pas faire planter le serveur, juste logger
   } else if (err.fatal) {
-    console.error('Erreur fatale de connexion, arrêt du processus');
-    process.exit(-1);
+    console.error('Erreur fatale de connexion MariaDB:', err.message);
+    // En production, ne pas faire planter le serveur immédiatement
+    // Le serveur pourra continuer et réessayer plus tard
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('⚠️ En développement, arrêt du processus');
+      process.exit(-1);
+    } else {
+      console.error('⚠️ En production, le serveur continue de fonctionner');
+    }
   }
 });
 
