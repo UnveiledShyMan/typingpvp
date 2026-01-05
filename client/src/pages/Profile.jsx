@@ -441,175 +441,175 @@ export default function Profile({ userId: currentUserId }) {
             <>
               {/* Stats Cards - Style osu! */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 sm:mb-8">
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
-              <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
-              <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
-                {user.stats.totalMatches}
-              </div>
-              <div className="text-text-muted text-xs">
-                {user.stats.wins}W - {user.stats.losses}L
-              </div>
-            </div>
-            
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
-              <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Win Rate</div>
-              <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: winRate >= 50 ? '#10b981' : '#f472b6' }}>
-                {winRate}%
-              </div>
-              <div className="text-text-muted text-xs">
-                {user.stats.wins} wins
-              </div>
-            </div>
-            
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
-              <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Best WPM</div>
-              <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#fbbf24' }}>
-                {user.stats.bestWPM}
-              </div>
-              <div className="text-text-muted text-xs">
-                Personal best
-              </div>
-            </div>
-            
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
-              <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Accuracy</div>
-              <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#06b6d4' }}>
-                {user.stats.averageAccuracy.toFixed(1)}%
-              </div>
-              <div className="text-text-muted text-xs">
-                Average
-              </div>
-            </div>
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                  <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
+                  <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
+                    {user.stats.totalMatches}
+                  </div>
+                  <div className="text-text-muted text-xs">
+                    {user.stats.wins}W - {user.stats.losses}L
+                  </div>
+                </div>
+                
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                  <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Win Rate</div>
+                  <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: winRate >= 50 ? '#10b981' : '#f472b6' }}>
+                    {winRate}%
+                  </div>
+                  <div className="text-text-muted text-xs">
+                    {user.stats.wins} wins
+                  </div>
+                </div>
+                
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                  <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Best WPM</div>
+                  <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#fbbf24' }}>
+                    {user.stats.bestWPM}
+                  </div>
+                  <div className="text-text-muted text-xs">
+                    Personal best
+                  </div>
+                </div>
+                
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                  <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Accuracy</div>
+                  <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#06b6d4' }}>
+                    {user.stats.averageAccuracy.toFixed(1)}%
+                  </div>
+                  <div className="text-text-muted text-xs">
+                    Average
+                  </div>
+                </div>
               </div>
 
               {/* Language Selector */}
               <div className="mb-4 sm:mb-6">
-            <select
-              value={selectedLang}
-              onChange={(e) => setSelectedLang(e.target.value)}
-              className="bg-bg-secondary/40 backdrop-blur-sm text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-secondary/60 transition-colors font-medium"
-            >
-              {Object.entries(user.mmr || {}).map(([lang]) => (
-                <option key={lang} value={lang} className="bg-bg-primary">
-                  {lang.toUpperCase()}
-                </option>
-              ))}
-              </select>
+                <select
+                  value={selectedLang}
+                  onChange={(e) => setSelectedLang(e.target.value)}
+                  className="bg-bg-secondary/40 backdrop-blur-sm text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-secondary/60 transition-colors font-medium"
+                >
+                  {Object.entries(user.mmr || {}).map(([lang]) => (
+                    <option key={lang} value={lang} className="bg-bg-primary">
+                      {lang.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Historique des matchs - Deux sections : Solo et Multijoueurs */}
               {(soloMatches.length > 0 || multiplayerMatches.length > 0) && (
                 <div className="space-y-6">
-                {/* Matchs Solo */}
-                {soloMatches.length > 0 && (
-                  <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
-                  <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
-                    <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
-                    Solo Matches
-                  </h2>
-                  
-                  <div className="space-y-3">
-                    {soloMatches.map((match) => (
-                      <div
-                        key={match.id}
-                        className="bg-bg-primary rounded-xl p-4 border border-border-secondary/50 transition-all hover:scale-[1.02] hover:border-accent-primary/50"
-                      >
-                        <div className="flex items-center justify-between flex-wrap gap-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg bg-accent-primary/20 text-accent-primary">
-                              ⌨️
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-3 mb-1">
-                                <span className="text-text-primary font-semibold">Solo Practice</span>
+                  {/* Matchs Solo */}
+                  {soloMatches.length > 0 && (
+                    <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+                      <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
+                        <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
+                        Solo Matches
+                      </h2>
+                      
+                      <div className="space-y-3">
+                        {soloMatches.map((match) => (
+                          <div
+                            key={match.id}
+                            className="bg-bg-primary rounded-xl p-4 border border-border-secondary/50 transition-all hover:scale-[1.02] hover:border-accent-primary/50"
+                          >
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg bg-accent-primary/20 text-accent-primary">
+                                  ⌨️
+                                </div>
+                                
+                                <div>
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <span className="text-text-primary font-semibold">Solo Practice</span>
+                                  </div>
+                                  <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
+                                </div>
                               </div>
-                              <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
+                              
+                              <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                                    {match.wpm}
+                                  </div>
+                                  <div className="text-text-muted text-xs">WPM</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                                    {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
+                                  </div>
+                                  <div className="text-text-muted text-xs">ACC</div>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center gap-6">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                {match.wpm}
-                              </div>
-                              <div className="text-text-muted text-xs">WPM</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
-                              </div>
-                              <div className="text-text-muted text-xs">ACC</div>
-                            </div>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Matchs Multijoueurs */}
-                {multiplayerMatches.length > 0 && (
-                  <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
-                  <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
-                    <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
-                    Multiplayer Matches
-                  </h2>
-                  
-                  <div className="space-y-3">
-                    {multiplayerMatches.map((match) => (
-                      <div
-                        key={match.id}
-                        className={`bg-bg-primary rounded-xl p-4 border transition-all hover:scale-[1.02] ${
-                          match.won 
-                            ? 'border-correct-char/30 hover:border-correct-char/50' 
-                            : 'border-incorrect-char/30 hover:border-incorrect-char/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between flex-wrap gap-4">
-                          <div className="flex items-center gap-4">
-                            <div 
-                              className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
-                                match.won 
-                                  ? 'bg-correct-char/20 text-correct-char' 
-                                  : 'bg-incorrect-char/20 text-incorrect-char'
-                              }`}
-                            >
-                              {match.won ? '✓' : '✗'}
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-3 mb-1">
-                                <span className="text-text-primary font-semibold">{getMatchTypeLabel(match.type)}</span>
-                                {match.opponent && (
-                                  <span className="text-text-secondary text-sm">vs {match.opponent}</span>
-                                )}
+                  {/* Matchs Multijoueurs */}
+                  {multiplayerMatches.length > 0 && (
+                    <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+                      <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
+                        <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
+                        Multiplayer Matches
+                      </h2>
+                      
+                      <div className="space-y-3">
+                        {multiplayerMatches.map((match) => (
+                          <div
+                            key={match.id}
+                            className={`bg-bg-primary rounded-xl p-4 border transition-all hover:scale-[1.02] ${
+                              match.won 
+                                ? 'border-correct-char/30 hover:border-correct-char/50' 
+                                : 'border-incorrect-char/30 hover:border-incorrect-char/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                              <div className="flex items-center gap-4">
+                                <div 
+                                  className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
+                                    match.won 
+                                      ? 'bg-correct-char/20 text-correct-char' 
+                                      : 'bg-incorrect-char/20 text-incorrect-char'
+                                  }`}
+                                >
+                                  {match.won ? '✓' : '✗'}
+                                </div>
+                                
+                                <div>
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <span className="text-text-primary font-semibold">{getMatchTypeLabel(match.type)}</span>
+                                    {match.opponent && (
+                                      <span className="text-text-secondary text-sm">vs {match.opponent}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
+                                </div>
                               </div>
-                              <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
+                              
+                              <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                                    {match.wpm}
+                                  </div>
+                                  <div className="text-text-muted text-xs">WPM</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                                    {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
+                                  </div>
+                                  <div className="text-text-muted text-xs">ACC</div>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center gap-6">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                {match.wpm}
-                              </div>
-                              <div className="text-text-muted text-xs">WPM</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
-                              </div>
-                              <div className="text-text-muted text-xs">ACC</div>
-                            </div>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
                     </div>
-                  </div>
-                )}
+                  )}
                 </div>
               )}
             </>
