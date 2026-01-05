@@ -9,7 +9,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import rankingsRoutes from './routes/rankings.js';
 import meRoutes from './routes/me.js';
-import friendsRoutes from './routes/friends.js';
+import friendsRoutes, { setOnlineUsers } from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 import { getUserById, recordMatch, updateUser } from './db.js';
 import { calculateNewMMR } from './utils/elo.js';
