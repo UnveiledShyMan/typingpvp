@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
-import { io } from 'socket.io-client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
 import { useToastContext } from '../contexts/ToastContext'
@@ -10,6 +9,7 @@ import Modal from '../components/Modal'
 import { languages } from '../data/languages'
 import { generateText } from '../data/languages'
 import { generatePhraseText } from '../data/phrases'
+import { getSocket, cleanupSocket } from '../services/socketService'
 
 export default function BattleRoom() {
   const { roomId } = useParams();
@@ -58,6 +58,8 @@ export default function BattleRoom() {
   const socketRef = useRef(null);
   const textContainerRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const hasJoinedRoomRef = useRef(false); // Ref pour éviter de joindre plusieurs fois
+  const listenersSetupRef = useRef(false); // Ref pour éviter de configurer les listeners plusieurs fois
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -98,55 +100,43 @@ export default function BattleRoom() {
     setShowNameModal(false);
   };
 
+  // Initialiser le socket une seule fois au montage du composant
   useEffect(() => {
-    if (!playerName) {
-      return; // Attendre que le nom soit défini
-    }
-
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    // Obtenir l'instance unique de socket (ou la créer si elle n'existe pas)
+    // Pour les battle rooms, on peut réutiliser la connexion existante
+    socketRef.current = getSocket(false);
     
-    // Si on vient du matchmaking, essayer de réutiliser le socket existant si possible
-    // Sinon créer un nouveau socket
-    if (!socketRef.current || !socketRef.current.connected) {
-      socketRef.current = io(apiUrl, {
-        transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-        upgrade: false,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-        forceNew: true // Forcer une nouvelle connexion pour éviter les problèmes
-      });
-    }
-    const socket = socketRef.current;
-
-    // Attendre que le socket soit connecté avant d'émettre join-room
-    const handleJoinRoom = () => {
-      if (socket.connected) {
-        socket.emit('join-room', { 
-          roomId, 
-          playerName,
-          userId: userId || currentUser?.id || null
-        });
-      } else {
-        // Si pas encore connecté, attendre la connexion
-        socket.once('connect', () => {
-          socket.emit('join-room', { 
-            roomId, 
-            playerName,
-            userId: userId || currentUser?.id || null
-          });
-        });
+    return () => {
+      // Ne pas déconnecter le socket ici car il peut être utilisé par d'autres composants
+      // On nettoie juste les listeners spécifiques à cette room
+      if (socketRef.current) {
+        cleanupSocket(socketRef.current, [
+          'room-joined',
+          'player-joined',
+          'player-left',
+          'game-started',
+          'opponent-update',
+          'opponent-finished',
+          'game-finished',
+          'chat-message',
+          'error'
+        ]);
       }
     };
+  }, []); // Exécuter une seule fois au montage
 
-    // Essayer de joindre immédiatement ou après connexion
-    if (socket.connected) {
-      handleJoinRoom();
-    } else {
-      socket.once('connect', handleJoinRoom);
+  // Configurer les listeners socket une seule fois
+  useEffect(() => {
+    if (!socketRef.current || listenersSetupRef.current) {
+      return;
     }
 
+    const socket = socketRef.current;
+    listenersSetupRef.current = true;
+
+    // Configurer tous les listeners socket
     socket.on('room-joined', (data) => {
+      console.log('✅ Room joined:', data);
       setText(data.text);
       setPlayers(data.players);
       // Ne pas changer le statut si on rejoint une room finished (le statut sera mis à jour par game-finished)
@@ -159,10 +149,12 @@ export default function BattleRoom() {
     });
 
     socket.on('player-joined', (data) => {
+      console.log('👤 Player joined:', data);
       setPlayers(data.players);
     });
 
     socket.on('player-left', (data) => {
+      console.log('👋 Player left:', data);
       setPlayers(data.players);
     });
 
@@ -364,22 +356,71 @@ export default function BattleRoom() {
     });
 
     socket.on('error', (error) => {
-      toast.error(error.message);
+      console.error('❌ Socket error:', error);
+      toast.error(error.message || 'An error occurred');
       setTimeout(() => {
-        window.location.href = '/';
+        navigate('/');
       }, 2000);
     });
 
+    // Nettoyage des listeners sera fait dans le premier useEffect
     return () => {
-      socket.off('room-joined');
-      socket.off('player-joined');
-      socket.off('player-left');
-      socket.off('game-started');
-      socket.off('opponent-update');
-      socket.off('opponent-finished');
-      socket.off('game-finished');
-      socket.off('chat-message');
-      socket.off('error');
+      listenersSetupRef.current = false;
+    };
+  }, []); // Exécuter une seule fois
+
+  // Joindre la room une fois que le playerName est défini
+  useEffect(() => {
+    // Attendre que le nom soit défini et que le socket soit prêt
+    if (!playerName || !socketRef.current || hasJoinedRoomRef.current) {
+      return;
+    }
+
+    const socket = socketRef.current;
+
+    // Fonction pour joindre la room
+    const handleJoinRoom = () => {
+      // Éviter de joindre plusieurs fois
+      if (hasJoinedRoomRef.current) return;
+      hasJoinedRoomRef.current = true;
+
+      if (socket.connected) {
+        console.log('🔌 Joining room:', roomId, 'as', playerName);
+        socket.emit('join-room', { 
+          roomId, 
+          playerName,
+          userId: userId || currentUser?.id || null
+        });
+      } else {
+        // Si pas encore connecté, attendre la connexion
+        console.log('⏳ Waiting for socket connection before joining room...');
+        socket.once('connect', () => {
+          console.log('✅ Socket connected, joining room:', roomId);
+          socket.emit('join-room', { 
+            roomId, 
+            playerName,
+            userId: userId || currentUser?.id || null
+          });
+        });
+      }
+    };
+
+    // Essayer de joindre immédiatement ou après connexion
+    if (socket.connected) {
+      handleJoinRoom();
+    } else {
+      socket.once('connect', handleJoinRoom);
+    }
+
+    // Nettoyage: réinitialiser le flag si on quitte la room
+    return () => {
+      hasJoinedRoomRef.current = false;
+    };
+  }, [roomId, playerName, userId, currentUser?.id, navigate]); // Dépendances pour rejoindre la room
+
+  // Nettoyage des intervalles
+  useEffect(() => {
+    return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
@@ -388,9 +429,8 @@ export default function BattleRoom() {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
-      socket.disconnect();
     };
-  }, [roomId, playerName, currentUser]);
+  }, []);
 
   useEffect(() => {
     if (inputRef.current && gameStatus === 'playing') {

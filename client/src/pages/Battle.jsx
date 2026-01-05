@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { io } from 'socket.io-client'
 import { useToastContext } from '../contexts/ToastContext'
 import { useUser } from '../contexts/UserContext'
+import { getSocket, cleanupSocket } from '../services/socketService'
 
 export default function Battle() {
   const [roomId, setRoomId] = useState('');
@@ -21,30 +21,28 @@ export default function Battle() {
   }, [user]);
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-      upgrade: false,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
-    });
+    // Utiliser le service centralisé de socket
+    socketRef.current = getSocket(false);
     const socket = socketRef.current;
 
+    // Écouter les événements de création de room
     socket.on('room-created', (data) => {
+      console.log('✅ Room created:', data.roomId);
       setCreatedRoomId(data.roomId);
     });
 
     socket.on('error', (error) => {
-      toast.error(error.message);
+      console.error('❌ Socket error in Battle:', error);
+      toast.error(error.message || 'An error occurred');
     });
 
+    // Nettoyage: retirer seulement les listeners spécifiques à ce composant
     return () => {
-      socket.off('room-created');
-      socket.off('error');
-      socket.disconnect();
+      if (socket) {
+        cleanupSocket(socket, ['room-created', 'error']);
+      }
     };
-  }, []);
+  }, [toast]);
 
   const handleCreateRoom = () => {
     const name = user ? user.username : playerName;

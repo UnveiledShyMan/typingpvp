@@ -1,43 +1,117 @@
 // Service Socket.io centralisé
+// Gère une instance unique de socket pour éviter les connexions multiples
 import { io } from 'socket.io-client';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+// Instance unique de socket (singleton)
+let socketInstance = null;
+
 /**
- * Crée une nouvelle instance de socket
- * Configuration par défaut (comme avant)
+ * Configuration standardisée pour tous les sockets
+ * Utilise polling uniquement pour compatibilité avec Plesk/Apache
  */
-export function createSocket() {
-  return io(API_URL, {
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: 5,
-  });
+const SOCKET_CONFIG = {
+  transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
+  upgrade: false, // Désactiver l'upgrade vers WebSocket
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5,
+  // Ne pas forcer une nouvelle connexion par défaut
+  // forceNew sera utilisé uniquement quand nécessaire
+};
+
+/**
+ * Obtient ou crée l'instance unique de socket
+ * @param {boolean} forceNew - Si true, crée une nouvelle connexion même si une existe déjà
+ * @returns {Socket} Instance de socket
+ */
+export function getSocket(forceNew = false) {
+  // Si on force une nouvelle connexion, fermer l'ancienne d'abord
+  if (forceNew && socketInstance) {
+    console.log('🔄 Fermeture de la connexion socket existante pour créer une nouvelle');
+    socketInstance.disconnect();
+    socketInstance = null;
+  }
+  
+  // Si aucune instance n'existe ou si elle n'est pas connectée, en créer une
+  if (!socketInstance || !socketInstance.connected) {
+    console.log('🔌 Création d\'une nouvelle connexion socket');
+    socketInstance = io(API_URL, {
+      ...SOCKET_CONFIG,
+      forceNew: forceNew
+    });
+    
+    // Ajouter des listeners pour le debugging
+    socketInstance.on('connect', () => {
+      console.log('✅ Socket connecté:', socketInstance.id);
+    });
+    
+    socketInstance.on('disconnect', (reason) => {
+      console.log('⚠️ Socket déconnecté:', reason);
+    });
+    
+    socketInstance.on('connect_error', (error) => {
+      console.error('❌ Erreur de connexion socket:', error.message);
+    });
+  }
+  
+  return socketInstance;
 }
 
 /**
- * Ferme une connexion socket proprement
+ * Crée une nouvelle instance de socket (pour cas spéciaux)
+ * À utiliser uniquement quand vous avez besoin d'une connexion séparée
+ * @returns {Socket} Nouvelle instance de socket
  */
-export function disconnectSocket(socket) {
-  if (socket && socket.connected) {
-    socket.disconnect();
+export function createSocket() {
+  console.log('🔌 Création d\'une nouvelle instance de socket (non partagée)');
+  return io(API_URL, SOCKET_CONFIG);
+}
+
+/**
+ * Ferme la connexion socket principale proprement
+ */
+export function disconnectSocket() {
+  if (socketInstance && socketInstance.connected) {
+    console.log('🔌 Fermeture de la connexion socket principale');
+    socketInstance.disconnect();
+    socketInstance = null;
   }
 }
 
 /**
  * Nettoie tous les listeners d'un socket
+ * @param {Socket} socket - Instance de socket à nettoyer
+ * @param {string[]} events - Liste des événements à retirer
  */
 export function cleanupSocket(socket, events = []) {
   if (!socket) return;
   
-  events.forEach(event => {
-    socket.off(event);
-  });
+  if (events.length > 0) {
+    // Retirer des événements spécifiques
+    events.forEach(event => {
+      socket.off(event);
+    });
+  } else {
+    // Si aucun événement spécifié, retirer tous les listeners
+    socket.removeAllListeners();
+  }
+}
+
+/**
+ * Vérifie si le socket principal est connecté
+ * @returns {boolean} True si connecté
+ */
+export function isSocketConnected() {
+  return socketInstance && socketInstance.connected;
 }
 
 export default {
+  getSocket,
   createSocket,
   disconnectSocket,
   cleanupSocket,
+  isSocketConnected,
 };
 

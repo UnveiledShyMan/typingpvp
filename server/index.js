@@ -250,22 +250,29 @@ app.get('/socket.io/test', (req, res) => {
   });
 });
 
-// Gestion des erreurs Socket.io
+// Gestion des erreurs Socket.io avec logs détaillés
 io.engine.on('connection_error', (err) => {
   console.error('❌ Erreur de connexion Socket.io:', err.message);
+  console.error('Code:', err.code);
   if (err.req) {
     console.error('URL:', err.req.url);
     console.error('SID:', err.req._query?.sid);
     console.error('Transport:', err.req._query?.transport);
+    console.error('Origin:', err.req.headers?.origin);
+  }
+  if (err.context) {
+    console.error('Context:', err.context);
   }
   // Ne pas faire planter le serveur pour une erreur de connexion
 });
 
-// Logger les tentatives de connexion réussies
+// Logger les tentatives de connexion réussies avec plus de détails
 io.engine.on('connection', (req) => {
-  console.log('🔌 Connexion Socket.io:', {
+  console.log('🔌 Connexion Socket.io établie:', {
     url: req.url,
-    transport: req._query?.transport || 'polling'
+    transport: req._query?.transport || 'polling',
+    origin: req.headers?.origin || 'unknown',
+    userAgent: req.headers?.['user-agent']?.substring(0, 50) || 'unknown'
   });
 });
 
@@ -312,14 +319,21 @@ io.on('connection', (socket) => {
     console.log(`⚠️ User disconnected: ${socket.id}, Reason: ${reason} (Total: ${socketDisconnectionCount})`);
   }));
   
-  // Gérer les erreurs de connexion
+  // Gérer les erreurs de connexion avec plus de détails
   socket.conn.on('error', (err) => {
     console.error('❌ Erreur de connexion pour socket', socket.id, ':', err.message);
+    console.error('Type:', err.type);
+    if (err.description) {
+      console.error('Description:', err.description);
+    }
   });
   
   // Gérer les erreurs dans les handlers Socket.io
   socket.on('error', (err) => {
     console.error('❌ Erreur Socket.io pour socket', socket.id, ':', err.message);
+    if (err.stack) {
+      console.error('Stack:', err.stack);
+    }
   });
 
   // Créer une nouvelle room
@@ -347,12 +361,23 @@ io.on('connection', (socket) => {
   // Rejoindre une room
   socket.on('join-room', safeHandler((data) => {
     const { roomId, playerName, userId } = data;
+    console.log(`🔌 Tentative de rejoindre la room ${roomId} par ${playerName} (${userId || 'guest'})`);
+    
+    if (!roomId) {
+      console.error('❌ join-room appelé sans roomId');
+      socket.emit('error', { message: 'Room ID is required' });
+      return;
+    }
+    
     const room = rooms.get(roomId);
     
     if (!room) {
+      console.error(`❌ Room ${roomId} not found`);
       socket.emit('error', { message: 'Room not found' });
       return;
     }
+    
+    console.log(`✅ Room ${roomId} trouvée, statut: ${room.status}, joueurs: ${room.players.length}`);
     
     // Pour les rooms de matchmaking, vérifier si le joueur fait déjà partie de la room
     if (room.matchmaking && userId) {
@@ -1252,9 +1277,14 @@ io.on('connection', (socket) => {
 
   // Déconnexion
   socket.on('disconnect', () => {
-    // Retirer de la queue de matchmaking
-    if (matchmakingQueue.has(socket.id)) {
-      matchmakingQueue.delete(socket.id);
+    // Retirer de la queue de matchmaking (ranked ou unrated)
+    if (rankedMatchmakingQueue.has(socket.id)) {
+      rankedMatchmakingQueue.delete(socket.id);
+      console.log(`Player ${socket.id} removed from ranked matchmaking queue`);
+    }
+    if (unratedMatchmakingQueue.has(socket.id)) {
+      unratedMatchmakingQueue.delete(socket.id);
+      console.log(`Player ${socket.id} removed from unrated matchmaking queue`);
     }
     
     const playerData = players.get(socket.id);
