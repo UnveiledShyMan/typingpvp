@@ -109,8 +109,6 @@ export default function BattleRoom() {
     // Sinon créer un nouveau socket
     if (!socketRef.current || !socketRef.current.connected) {
       socketRef.current = io(apiUrl, {
-        transports: ['polling'], // Utiliser polling pour Plesk
-        upgrade: false, // Empêcher l'upgrade vers WebSocket
         reconnection: true,
         forceNew: true // Forcer une nouvelle connexion pour éviter les problèmes
       });
