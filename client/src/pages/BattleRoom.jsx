@@ -672,7 +672,6 @@ export default function BattleRoom() {
               </div>
             </div>
           )}
-          </div>
             </div>
 
             {/* Colonne droite : Chat */}
