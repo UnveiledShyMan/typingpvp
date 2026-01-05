@@ -651,6 +651,7 @@ export default function Profile({ userId: currentUserId }) {
           )}
         </>
       )}
+      </div>
     </div>
   )
 }
