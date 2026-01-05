@@ -437,9 +437,9 @@ export default function Profile({ userId: currentUserId }) {
             </div>
           </div>
 
-      {!isEditing && (
-        <>
-          {/* Stats Cards - Style osu! */}
+          {!isEditing && (
+            <>
+              {/* Stats Cards - Style osu! */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 sm:mb-8">
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
@@ -612,10 +612,10 @@ export default function Profile({ userId: currentUserId }) {
               )}
             </div>
           )}
-        </>
-      )}
+            </>
+          )}
         </div>
       </div>
     </>
-  )
+  );
 }
