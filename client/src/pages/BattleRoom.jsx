@@ -57,19 +57,45 @@ export default function BattleRoom() {
     }
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Utiliser polling pour Plesk
-      upgrade: false, // Empêcher l'upgrade vers WebSocket
-      reconnection: true
-    });
+    
+    // Si on vient du matchmaking, essayer de réutiliser le socket existant si possible
+    // Sinon créer un nouveau socket
+    if (!socketRef.current || !socketRef.current.connected) {
+      socketRef.current = io(apiUrl, {
+        transports: ['polling'], // Utiliser polling pour Plesk
+        upgrade: false, // Empêcher l'upgrade vers WebSocket
+        reconnection: true,
+        forceNew: true // Forcer une nouvelle connexion pour éviter les problèmes
+      });
+    }
     const socket = socketRef.current;
 
-    // Pour les rooms matchmaking, envoyer userId pour permettre la reconnexion
-    socket.emit('join-room', { 
-      roomId, 
-      playerName,
-      userId: userId || currentUser?.id || null
-    });
+    // Attendre que le socket soit connecté avant d'émettre join-room
+    const handleJoinRoom = () => {
+      if (socket.connected) {
+        socket.emit('join-room', { 
+          roomId, 
+          playerName,
+          userId: userId || currentUser?.id || null
+        });
+      } else {
+        // Si pas encore connecté, attendre la connexion
+        socket.once('connect', () => {
+          socket.emit('join-room', { 
+            roomId, 
+            playerName,
+            userId: userId || currentUser?.id || null
+          });
+        });
+      }
+    };
+
+    // Essayer de joindre immédiatement ou après connexion
+    if (socket.connected) {
+      handleJoinRoom();
+    } else {
+      socket.once('connect', handleJoinRoom);
+    }
 
     socket.on('room-joined', (data) => {
       setText(data.text);

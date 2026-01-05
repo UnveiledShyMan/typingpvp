@@ -91,13 +91,17 @@ export default function Matchmaking() {
         intervalRef.current = null;
       }
       
+      // NE PAS déconnecter le socket ici - le laisser ouvert pour que BattleRoom puisse l'utiliser
+      // Ne pas appeler socket.disconnect() pour permettre la transition vers BattleRoom
+      
       // Rediriger vers la battle room
       navigate(`/battle/${data.roomId}`, { 
         state: { 
           playerName: user.username,
           userId: user.id,
           isCreator: false,
-          matchmaking: true 
+          matchmaking: true,
+          existingSocket: true // Indicateur pour BattleRoom
         } 
       });
     });

@@ -789,8 +789,23 @@ io.on('connection', (socket) => {
         const room = rooms.get(playerData.roomId);
         if (room) {
           room.players = room.players.filter(p => p.id !== socket.id);
+          
+          // Pour les rooms matchmaking, ne pas supprimer immédiatement
+          // Attendre 30 secondes avant de supprimer pour permettre la reconnexion
           if (room.players.length === 0) {
-            rooms.delete(playerData.roomId);
+            if (room.matchmaking) {
+              // Délai de grâce pour les rooms matchmaking (reconnexion possible)
+              setTimeout(() => {
+                const checkRoom = rooms.get(playerData.roomId);
+                if (checkRoom && checkRoom.players.length === 0) {
+                  rooms.delete(playerData.roomId);
+                  console.log(`Matchmaking room ${playerData.roomId} deleted after grace period`);
+                }
+              }, 30000); // 30 secondes
+            } else {
+              // Suppression immédiate pour les rooms normales
+              rooms.delete(playerData.roomId);
+            }
           } else {
             io.to(playerData.roomId).emit('player-left', { players: room.players });
           }
