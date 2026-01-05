@@ -68,6 +68,7 @@ async function initDatabase() {
 
 /**
  * Vérifie si le client est buildé
+ * (Non utilisé maintenant car on supprime toujours dist/ avant de builder)
  */
 function checkClientBuild() {
   const indexHtml = join(CLIENT_DIST_DIR, 'index.html');
@@ -76,16 +77,21 @@ function checkClientBuild() {
 
 /**
  * Build le client si nécessaire
+ * Supprime client/dist/ avant de builder pour forcer un rebuild propre
  */
 async function buildClient() {
-  if (checkClientBuild()) {
-    console.log('✅ Client déjà buildé');
-    return true;
-  }
-  
   try {
-    console.log('Build du client en cours...');
+    console.log('Vérification du client...');
     const clientDir = join(__dirname, 'client');
+    const clientDistDir = join(__dirname, 'client', 'dist');
+    
+    // Supprimer client/dist/ s'il existe pour forcer un rebuild propre
+    if (existsSync(clientDistDir)) {
+      console.log('Suppression de client/dist/ pour forcer un rebuild propre...');
+      const { rmSync } = await import('fs');
+      rmSync(clientDistDir, { recursive: true, force: true });
+      console.log('✅ client/dist/ supprimé');
+    }
     
     // Vérifier si node_modules existe
     if (!existsSync(join(clientDir, 'node_modules'))) {
@@ -101,10 +107,17 @@ async function buildClient() {
       const envContent = `VITE_API_URL=${clientUrl}\n`;
       const { writeFileSync } = await import('fs');
       writeFileSync(envProdPath, envContent, 'utf8');
+    } else {
+      // Mettre à jour .env.production avec la bonne URL si nécessaire
+      const { readFileSync, writeFileSync } = await import('fs');
+      const clientUrl = process.env.CLIENT_URL || 'https://typingpvp.com';
+      const envContent = `VITE_API_URL=${clientUrl}\n`;
+      writeFileSync(envProdPath, envContent, 'utf8');
+      console.log('✅ .env.production mis à jour avec la bonne URL');
     }
     
     // Builder
-    console.log('Build en cours...');
+    console.log('Build du client en cours...');
     await execAsync('npm run build', { cwd: clientDir });
     
     console.log('✅ Client buildé avec succès');
@@ -155,7 +168,8 @@ async function main() {
     // 1. Vérifier les dépendances serveur
     await checkServerDependencies();
     
-    // 2. Vérifier et builder le client (en mode non-bloquant)
+    // 2. Builder le client (supprime client/dist/ et rebuild)
+    // En mode non-bloquant pour ne pas bloquer le démarrage du serveur
     buildClient().catch(err => {
       console.error('Avertissement: Le build du client a échoué, mais le serveur continue:', err.message);
     });

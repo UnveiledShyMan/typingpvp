@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
 
 export default function BattleRoom() {
@@ -17,10 +18,15 @@ export default function BattleRoom() {
   const [myStats, setMyStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
   const [opponentStats, setOpponentStats] = useState({ wpm: 0, accuracy: 100, progress: 0 });
   const [results, setResults] = useState(null);
+  const [eloChanges, setEloChanges] = useState({});
   const [errors, setErrors] = useState(0);
   const [currentUser, setCurrentUser] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
+  // Séries temporelles pour les graphiques
+  const [myTimeSeries, setMyTimeSeries] = useState([]);
+  const [opponentTimeSeries, setOpponentTimeSeries] = useState([]);
+  const progressIntervalRef = useRef(null);
   const inputRef = useRef(null);
   const socketRef = useRef(null);
   const textContainerRef = useRef(null);
@@ -116,6 +122,17 @@ export default function BattleRoom() {
     socket.on('game-started', (data) => {
       setGameStatus('playing');
       setStartTime(data.startTime);
+      setMyTimeSeries([]);
+      setOpponentTimeSeries([]);
+      
+      // Arrêter l'interval précédent s'il existe
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      
+      // L'enregistrement des stats se fera dans handleInputChange et opponent-update
+      // Pas besoin d'interval ici car on met à jour à chaque frappe
+      
       if (inputRef.current) {
         inputRef.current.focus();
       }
@@ -129,6 +146,25 @@ export default function BattleRoom() {
           accuracy: data.accuracy,
           progress: data.progress
         });
+        
+        // Ajouter aux séries temporelles pour le graphique en temps réel
+        if (startTime) {
+          const currentSecond = Math.floor((Date.now() - startTime) / 1000);
+          setOpponentTimeSeries((prev) => {
+            const existing = prev.findIndex((item) => item.second === currentSecond);
+            const newData = { 
+              second: currentSecond, 
+              wpm: data.wpm, 
+              accuracy: data.accuracy 
+            };
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = newData;
+              return updated;
+            }
+            return [...prev, newData].sort((a, b) => a.second - b.second);
+          });
+        }
       }
     });
 
@@ -143,6 +179,14 @@ export default function BattleRoom() {
     socket.on('game-finished', (data) => {
       setGameStatus('finished');
       setResults(data.results);
+      if (data.eloChanges) {
+        setEloChanges(data.eloChanges);
+      }
+      // Arrêter l'interval d'enregistrement
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
     });
 
     socket.on('chat-message', (message) => {
@@ -170,6 +214,10 @@ export default function BattleRoom() {
       socket.off('game-finished');
       socket.off('chat-message');
       socket.off('error');
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       socket.disconnect();
     };
   }, [roomId, playerName, currentUser]);
@@ -243,6 +291,19 @@ export default function BattleRoom() {
         const progress = Math.round((value.length / text.length) * 100);
         
         setMyStats({ wpm, accuracy, progress });
+        
+        // Enregistrer dans les séries temporelles pour le graphique
+        const currentSecond = Math.floor((Date.now() - startTime) / 1000);
+        setMyTimeSeries((prev) => {
+          const existing = prev.findIndex((item) => item.second === currentSecond);
+          const newData = { second: currentSecond, wpm, accuracy };
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = newData;
+            return updated;
+          }
+          return [...prev, newData].sort((a, b) => a.second - b.second);
+        });
         
         // Envoyer la mise à jour au serveur
         if (socketRef.current) {
@@ -319,35 +380,27 @@ export default function BattleRoom() {
 
   return (
     <div className="page-container p-4 lg:p-8">
-        <div className="bg-bg-secondary rounded-lg p-6 lg:p-10 border border-border-primary shadow-lg relative overflow-hidden">
+        <div className="bg-bg-secondary/50 rounded-lg p-6 lg:p-8 border border-text-secondary/10 shadow-lg">
           {/* Layout en deux colonnes : jeu à gauche, chat à droite */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
             {/* Colonne principale : jeu */}
             <div className="min-w-0">
-          {/* Effet de fond éthéré amélioré */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent-primary rounded-full blur-3xl animate-pulse-subtle"></div>
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-secondary rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '1s' }}></div>
-          </div>
-          
-          <div className="relative z-10">
-          <div className="mb-8 text-center">
-            <div className="inline-flex items-center gap-3 mb-4">
-              <div className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></div>
-              <h1 className="text-3xl font-bold text-text-primary" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
-                <span className="text-accent-primary">BATTLE</span> #{roomId}
-              </h1>
-              <div className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></div>
-            </div>
-            <div className="flex justify-center gap-4 text-text-secondary text-sm">
-              {players.map((player, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${player.name === playerName ? 'bg-accent-primary' : 'bg-text-secondary'}`}></div>
-                  <span>{player.name}</span>
+              {/* En-tête sobre */}
+              <div className="mb-6 pb-4 border-b border-text-secondary/10">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-xl font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
+                    Battle #{roomId}
+                  </h1>
+                  <div className="flex items-center gap-3 text-sm text-text-secondary">
+                    {players.map((player, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${player.name === playerName ? 'bg-accent-primary' : 'bg-text-secondary/50'}`}></div>
+                        <span>{player.name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
 
           {gameStatus === 'waiting' && (
             <div className="text-center py-12">
@@ -370,24 +423,18 @@ export default function BattleRoom() {
 
           {gameStatus === 'playing' && (
             <>
+              {/* Stats des joueurs - design sobre */}
               <div className="grid md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-bg-primary rounded p-4 border border-accent-primary/30">
-                  <div className="text-text-primary mb-3 font-semibold text-sm">{myPlayer?.name} (you)</div>
-                  <div className="flex gap-6 text-text-primary">
-                    <div>
-                      <div className="text-3xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
-                      <div className="text-text-secondary text-xs mt-1">wpm</div>
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.accuracy}%</div>
-                      <div className="text-text-secondary text-xs mt-1">acc</div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-text-secondary text-xs mb-1">progress</div>
-                      <div className="w-full bg-text-secondary/20 rounded-full h-1.5">
+                <div className="bg-bg-primary/50 rounded-lg p-4 border border-text-secondary/10">
+                  <div className="text-text-primary mb-2 text-sm font-medium">{myPlayer?.name || 'You'}</div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
+                    <div className="text-sm text-text-secondary">{myStats.accuracy}%</div>
+                    <div className="flex-1 ml-2">
+                      <div className="w-full bg-text-secondary/10 rounded-full h-2">
                         <div 
-                          className="bg-accent-primary h-1.5 rounded-full transition-all"
-                          style={{ width: `${myStats.progress}%` }}
+                          className="bg-accent-primary h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(myStats.progress, 100)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -395,41 +442,96 @@ export default function BattleRoom() {
                 </div>
                 
                 {opponent && (
-                  <div className="bg-bg-primary rounded p-4 border border-text-secondary/30">
-                    <div className="text-text-primary mb-3 font-semibold text-sm">{opponent.name}</div>
-                    <div className="flex gap-6 text-text-primary">
-                      <div>
-                        <div className="text-3xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.wpm}</div>
-                        <div className="text-text-secondary text-xs mt-1">wpm</div>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.accuracy}%</div>
-                        <div className="text-text-secondary text-xs mt-1">acc</div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-text-secondary text-xs mb-1">progress</div>
-                        <div className="w-full bg-text-secondary/20 rounded-full h-1.5">
+                  <div className="bg-bg-primary/50 rounded-lg p-4 border border-text-secondary/10">
+                    <div className="text-text-primary mb-2 text-sm font-medium">{opponent.name}</div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.wpm}</div>
+                      <div className="text-sm text-text-secondary">{opponentStats.accuracy}%</div>
+                      <div className="flex-1 ml-2">
+                        <div className="w-full bg-text-secondary/10 rounded-full h-2">
                           <div 
-                            className="bg-text-secondary h-1.5 rounded-full transition-all"
-                            style={{ width: `${opponentStats.progress}%` }}
+                            className="bg-text-secondary/50 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(opponentStats.progress, 100)}%` }}
                           ></div>
                         </div>
                       </div>
-                      </div>
                     </div>
-                  )}
-                </div>
-
-                <div 
-                  ref={textContainerRef}
-                  className="mb-6 typing-text bg-bg-card p-8 rounded-lg relative overflow-hidden border border-border-secondary" 
-                  style={{ minHeight: '200px', maxHeight: '300px', overflowY: 'auto', scrollBehavior: 'smooth' }}
-                >
-                  <div className="absolute inset-0 pointer-events-none shimmer-effect"></div>
-                  <div className="relative z-10">
-                    {renderText()}
                   </div>
+                )}
+              </div>
+
+              {/* Graphique de progression en temps réel */}
+              {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
+                <div className="mb-6 bg-bg-primary/30 rounded-lg p-4 border border-text-secondary/10">
+                  <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress</div>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <LineChart data={(() => {
+                      // Fusionner les deux séries en combinant par seconde
+                      const maxSecond = Math.max(
+                        myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
+                        opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
+                      );
+                      const chartData = [];
+                      for (let i = 0; i <= maxSecond; i++) {
+                        const myData = myTimeSeries.find(d => d.second === i);
+                        const oppData = opponentTimeSeries.find(d => d.second === i);
+                        chartData.push({
+                          time: i,
+                          me: myData?.wpm || 0,
+                          opponent: oppData?.wpm || 0
+                        });
+                      }
+                      return chartData;
+                    })()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.3} />
+                      <XAxis 
+                        dataKey="time" 
+                        stroke="#646669"
+                        style={{ fontSize: '11px' }}
+                        domain={['dataMin', 'dataMax']}
+                      />
+                      <YAxis 
+                        stroke="#646669"
+                        style={{ fontSize: '11px' }}
+                        domain={[0, 'auto']}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1e1e1e', 
+                          border: '1px solid #646669',
+                          borderRadius: '8px',
+                          color: '#e8e8e8'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="me" 
+                        stroke="#00ff9f" 
+                        strokeWidth={2}
+                        dot={false}
+                        name={myPlayer?.name || 'You'}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="opponent" 
+                        stroke="#646669" 
+                        strokeWidth={2}
+                        dot={false}
+                        name={opponent?.name || 'Opponent'}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
+              )}
+
+              <div 
+                ref={textContainerRef}
+                className="mb-6 typing-text bg-bg-primary/30 p-6 rounded-lg border border-text-secondary/10" 
+                style={{ minHeight: '180px', maxHeight: '280px', overflowY: 'auto', scrollBehavior: 'smooth' }}
+              >
+                {renderText()}
+              </div>
 
               <div className="mb-6">
                 <input
@@ -437,7 +539,7 @@ export default function BattleRoom() {
                   type="text"
                   value={input}
                   onChange={handleInputChange}
-                  className="w-full p-4 bg-bg-card border border-border-secondary rounded-lg text-text-primary text-lg focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all"
+                  className="w-full p-4 bg-bg-primary/50 border border-text-secondary/10 rounded-lg text-text-primary text-lg focus:outline-none focus:border-accent-primary/50 transition-all"
                   placeholder="Start typing..."
                   style={{ fontFamily: 'JetBrains Mono' }}
                 />
@@ -446,42 +548,128 @@ export default function BattleRoom() {
           )}
 
           {gameStatus === 'finished' && results && (
-            <div className="text-center py-8">
-              <h2 className="text-2xl font-bold text-text-primary mb-6">finished</h2>
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <div className="py-8">
+              {/* Résultats finaux - design sobre */}
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
                 {players.map((player) => {
                   const result = results[player.id];
-                  const isWinner = result && (!opponent || !results[opponent.id] || result.wpm > results[opponent.id].wpm);
+                  const isMe = player.name === playerName || (player.userId && player.userId === (userId || currentUser?.id));
+                  const isWinner = result && players.length === 2 && (
+                    !results[players.find(p => p.id !== player.id)?.id] || 
+                    result.wpm > results[players.find(p => p.id !== player.id)?.id]?.wpm ||
+                    (result.wpm === results[players.find(p => p.id !== player.id)?.id]?.wpm && result.accuracy > results[players.find(p => p.id !== player.id)?.id]?.accuracy)
+                  );
+                  const eloChange = eloChanges[player.id];
+                  
                   return (
                     <div
                       key={player.id}
-                      className={`bg-bg-primary rounded p-6 border-2 ${
-                        isWinner ? 'border-accent-primary' : 'border-text-secondary/20'
+                      className={`bg-bg-primary/50 rounded-lg p-6 border ${
+                        isWinner ? 'border-accent-primary/50' : 'border-text-secondary/10'
                       }`}
                     >
-                      {isWinner && (
-                        <div className="text-2xl mb-2">🏆</div>
-                      )}
-                      <div className="text-lg font-bold text-text-primary mb-4">
-                        {player.name === playerName ? `${player.name} (you)` : player.name}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-lg font-semibold text-text-primary">
+                          {isMe ? 'You' : player.name}
+                        </div>
+                        {isWinner && <span className="text-xl">🏆</span>}
                       </div>
+                      
                       {result && (
-                        <div className="space-y-2 text-text-primary">
-                          <div className="text-3xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{result.wpm} wpm</div>
-                          <div className="text-text-secondary">{result.accuracy}% accuracy</div>
-                          <div className="text-text-secondary">{Math.round(result.time)}s</div>
+                        <div className="space-y-3">
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-4xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{result.wpm}</span>
+                            <span className="text-text-secondary text-sm">wpm</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-text-secondary">
+                            <span>{result.accuracy}% accuracy</span>
+                            <span>{Math.round(result.time / 1000)}s</span>
+                          </div>
+                          {eloChange !== undefined && (
+                            <div className={`text-sm font-semibold ${eloChange >= 0 ? 'text-accent-secondary' : 'text-red-400'}`}>
+                              ELO: {eloChange >= 0 ? '+' : ''}{eloChange}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   );
                 })}
               </div>
+
+              {/* Graphique de fin de partie */}
+              {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
+                <div className="mb-8 bg-bg-primary/30 rounded-lg p-6 border border-text-secondary/10">
+                  <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={(() => {
+                      // Fusionner les deux séries en combinant par seconde
+                      const maxSecond = Math.max(
+                        myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
+                        opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
+                      );
+                      const chartData = [];
+                      for (let i = 0; i <= maxSecond; i++) {
+                        const myData = myTimeSeries.find(d => d.second === i);
+                        const oppData = opponentTimeSeries.find(d => d.second === i);
+                        chartData.push({
+                          time: i,
+                          me: myData?.wpm || 0,
+                          opponent: oppData?.wpm || 0
+                        });
+                      }
+                      return chartData;
+                    })()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.2} />
+                      <XAxis 
+                        dataKey="time" 
+                        stroke="#646669"
+                        label={{ value: 'Time (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
+                        domain={['dataMin', 'dataMax']}
+                      />
+                      <YAxis 
+                        stroke="#646669"
+                        label={{ value: 'WPM', angle: -90, position: 'insideLeft', style: { fill: '#646669', fontSize: '12px' } }}
+                        domain={[0, 'auto']}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1e1e1e', 
+                          border: '1px solid #646669',
+                          borderRadius: '8px',
+                          color: '#e8e8e8'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="me" 
+                        stroke="#00ff9f" 
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={myPlayer?.name || 'You'}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="opponent" 
+                        stroke="#646669" 
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={opponent?.name || 'Opponent'}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              <div className="text-center">
                 <button
-                  onClick={() => window.location.href = '/'}
-                  className="bg-gradient-to-r from-accent-primary to-accent-hover hover:from-accent-hover hover:to-accent-primary text-bg-primary font-semibold py-3 px-8 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                  onClick={() => navigate('/')}
+                  className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded-lg transition-colors"
                 >
-                  NEW BATTLE
+                  New Battle
                 </button>
+              </div>
             </div>
           )}
           </div>

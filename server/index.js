@@ -87,16 +87,26 @@ app.use('/api/matches', matchesRoutes);
 // Par défaut, le client est servi séparément sur un autre port
 if (process.env.SERVE_CLIENT === 'true') {
   const clientDistPath = join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientDistPath));
+  
+  // Middleware pour servir les fichiers statiques avec gestion d'erreur
+  app.use(express.static(clientDistPath, {
+    // Ne pas retourner d'erreur si le fichier n'existe pas, laisser passer à la route catch-all
+    fallthrough: true
+  }));
   
   // Route catch-all : servir index.html pour toutes les routes non-API
-  app.get('*', (req, res) => {
+  app.get('*', (req, res, next) => {
     // Ne pas intercepter les routes API
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'API route not found' });
     }
     // Servir index.html pour toutes les autres routes
-    res.sendFile(join(clientDistPath, 'index.html'));
+    res.sendFile(join(clientDistPath, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error sending index.html:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
   });
 } else {
   // Si le client n'est pas servi par le serveur, retourner 404 pour les routes non-API
