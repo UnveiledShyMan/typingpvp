@@ -276,6 +276,15 @@ io.engine.on('connection_error', (err) => {
   });
 });
 
+// Route de test pour Socket.io (sans connexion)
+app.get('/socket.io/test', (req, res) => {
+  res.json({ 
+    message: 'Socket.io endpoint is accessible',
+    socketIoPath: '/socket.io/',
+    transports: ['polling']
+  });
+});
+
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id, {
