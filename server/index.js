@@ -295,8 +295,19 @@ io.on('connection', (socket) => {
   socketConnectionCount++;
   console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
   
-  // Gérer les déconnexions proprement
+  // Heartbeat manuel pour maintenir la connexion active avec Plesk
+  // Plesk tue les connexions inactives, donc on envoie un ping toutes les 4 secondes
+  const heartbeatInterval = setInterval(() => {
+    if (socket.connected) {
+      socket.emit('ping', { timestamp: Date.now() });
+    } else {
+      clearInterval(heartbeatInterval);
+    }
+  }, 4000); // Ping toutes les 4 secondes
+  
+  // Nettoyer l'intervalle à la déconnexion
   socket.on('disconnect', safeHandler((reason) => {
+    clearInterval(heartbeatInterval);
     socketDisconnectionCount++;
     console.log(`⚠️ User disconnected: ${socket.id}, Reason: ${reason} (Total: ${socketDisconnectionCount})`);
   }));
