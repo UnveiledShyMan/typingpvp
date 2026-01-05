@@ -34,6 +34,7 @@ export default function Profile({ userId: currentUserId }) {
     }
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [recentMatches, setRecentMatches] = useState([]);
   const [soloMatches, setSoloMatches] = useState([]);
   const [multiplayerMatches, setMultiplayerMatches] = useState([]);
@@ -113,6 +114,40 @@ export default function Profile({ userId: currentUserId }) {
       // Erreur gérée par apiService
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Gérer l'upload d'une image de profil
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Vérifier que c'est une image
+    if (!file.type.startsWith('image/')) {
+      toast.error('Veuillez sélectionner une image valide');
+      return;
+    }
+
+    // Vérifier la taille (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('L\'image est trop grande (maximum 5MB)');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const response = await profileService.uploadAvatar(userId, file);
+      // Mettre à jour l'avatar dans le formulaire d'édition
+      setEditForm({ ...editForm, avatar: response.avatar });
+      toast.success('Photo de profil uploadée avec succès !');
+      // Rafraîchir le profil pour afficher la nouvelle image
+      refetchProfile();
+    } catch (error) {
+      // Erreur gérée par apiService
+    } finally {
+      setUploadingAvatar(false);
+      // Réinitialiser l'input file
+      event.target.value = '';
     }
   };
 
@@ -332,14 +367,36 @@ export default function Profile({ userId: currentUserId }) {
               {isEditing && (
                 <div className="space-y-4 mt-4">
                   <div>
-                    <label className="block text-text-primary mb-2 text-sm font-medium">Avatar URL</label>
-                    <input
-                      type="text"
-                      value={editForm.avatar}
-                      onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
-                      placeholder="https://example.com/avatar.jpg"
-                      className="input-modern"
-                    />
+                    <label className="block text-text-primary mb-2 text-sm font-medium">Photo de profil</label>
+                    <div className="space-y-2">
+                      {/* Input file pour uploader une image */}
+                      <div className="flex items-center gap-3">
+                        <label className="cursor-pointer bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 shadow-lg inline-block">
+                          {uploadingAvatar ? 'Upload en cours...' : 'Choisir une image'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                            disabled={uploadingAvatar}
+                            className="hidden"
+                          />
+                        </label>
+                        {uploadingAvatar && (
+                          <span className="text-text-secondary text-sm">Upload en cours...</span>
+                        )}
+                      </div>
+                      {/* Input text pour URL (optionnel) */}
+                      <div className="mt-2">
+                        <label className="block text-text-secondary mb-1 text-xs">Ou entrez une URL d'image</label>
+                        <input
+                          type="text"
+                          value={editForm.avatar}
+                          onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
+                          placeholder="https://example.com/avatar.jpg"
+                          className="input-modern text-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-text-primary mb-2 text-sm font-medium">Bio</label>

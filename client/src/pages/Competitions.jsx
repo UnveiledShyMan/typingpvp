@@ -1,4 +1,5 @@
 import CompetitionIcon from '../components/icons/CompetitionIcon'
+import DiscordIcon from '../components/icons/DiscordIcon'
 
 export default function Competitions() {
   return (
@@ -27,6 +28,23 @@ export default function Competitions() {
           We're working hard to bring you exciting competitive typing tournaments. 
           Stay tuned for updates!
         </p>
+
+        {/* Message Discord */}
+        <div className="bg-bg-secondary/40 backdrop-blur-sm border border-accent-primary/20 rounded-lg p-4 max-w-md mx-auto">
+          <p className="text-text-secondary text-sm leading-relaxed">
+            Pour patienter et être informé des mises à jour, rejoignez notre{' '}
+            <a
+              href="https://discord.gg/ztc3gnVmAd"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-primary hover:text-accent-primary/80 transition-colors font-medium inline-flex items-center gap-1.5"
+            >
+              <DiscordIcon className="w-4 h-4" fill="currentColor" />
+              <span>Discord</span>
+            </a>
+            {' '}!
+          </p>
+        </div>
 
         {/* Badge informatif */}
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent-primary/10 border border-accent-primary/20 rounded-full">

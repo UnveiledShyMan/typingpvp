@@ -50,7 +50,8 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ showToast, removeToast, toast }}>
       {children}
       {/* Container pour les toasts */}
-      <div className="fixed top-4 right-4 z-50 pointer-events-none" style={{ maxWidth: '420px' }}>
+      {/* z-index 101 pour être au-dessus du header (z-index 100) */}
+      <div className="fixed top-4 right-4 pointer-events-none" style={{ maxWidth: '420px', zIndex: 101 }}>
         {toasts.map((toastItem, index) => (
           <div 
             key={toastItem.id} 

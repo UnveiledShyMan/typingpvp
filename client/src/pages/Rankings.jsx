@@ -7,6 +7,7 @@ import SEOHead from '../components/SEOHead'
 
 export default function Rankings() {
   const [selectedLang, setSelectedLang] = useState('en');
+  const navigate = useNavigate();
   
   // Utiliser React Query pour le cache automatique
   const { data: rankings = [], isLoading: loading, refetch } = useRankings(selectedLang);
@@ -86,11 +87,7 @@ export default function Rankings() {
                       key={player.id}
                       className="hover:bg-bg-primary/30 transition-all duration-200 cursor-pointer group"
                       onClick={() => {
-                        if (onProfileClick) {
-                          onProfileClick(player.id);
-                        } else {
-                          window.location.href = `/profile/${player.id}`;
-                        }
+                        navigate(`/profile/${player.id}`);
                       }}
                     >
                       <td className="px-6 py-5 text-text-primary font-bold group-hover:text-accent-primary transition-colors" style={{ fontFamily: 'JetBrains Mono' }}>

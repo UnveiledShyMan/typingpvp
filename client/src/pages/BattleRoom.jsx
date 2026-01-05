@@ -52,6 +52,7 @@ export default function BattleRoom() {
   const [myTimeSeries, setMyTimeSeries] = useState([]);
   const [opponentTimeSeries, setOpponentTimeSeries] = useState([]);
   const progressIntervalRef = useRef(null);
+  const timerIntervalRef = useRef(null); // Ref pour le timer du mode timer
   const inputRef = useRef(null);
   const socketRef = useRef(null);
   const textContainerRef = useRef(null);

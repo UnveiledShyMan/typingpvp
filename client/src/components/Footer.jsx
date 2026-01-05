@@ -1,5 +1,6 @@
 // Composant Footer avec liens vers les pages légales
 import { Link } from 'react-router-dom';
+import DiscordIcon from './icons/DiscordIcon';
 
 export default function Footer() {
   return (
@@ -31,6 +32,17 @@ export default function Footer() {
             >
               Confidentialité
             </Link>
+            <span className="text-text-muted/40">•</span>
+            <a
+              href="https://discord.gg/ztc3gnVmAd"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-secondary/50 hover:text-text-secondary/80 transition-colors font-light flex items-center gap-1.5"
+              style={{ fontFamily: 'Inter', fontWeight: 300 }}
+            >
+              <DiscordIcon className="w-4 h-4" fill="currentColor" />
+              <span>Discord</span>
+            </a>
           </nav>
         </div>
       </div>

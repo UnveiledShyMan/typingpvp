@@ -231,6 +231,42 @@ export const profileService = {
   async updatePreferences(preferences) {
     return put('/api/me/preferences', { preferences });
   },
+  
+  /**
+   * Upload une image de profil
+   * @param {string} userId - ID de l'utilisateur
+   * @param {File} file - Fichier image à uploader
+   * @returns {Promise<Object>} - Réponse avec l'URL de l'image
+   */
+  async uploadAvatar(userId, file) {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    const response = await fetch(`${API_URL}/api/users/${userId}/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ 
+        error: `Erreur HTTP ${response.status}` 
+      }));
+      
+      const errorMessage = error.error || `Erreur HTTP ${response.status}`;
+      
+      if (errorHandler) {
+        errorHandler(errorMessage, 'error');
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  },
 };
 
 /**

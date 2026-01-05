@@ -161,27 +161,16 @@ export default function SoloDropdown({ children, onSandboxClick, onSoloClick, is
   const dropdownContent = isOpen ? (
     <div
       ref={dropdownRef}
-      className={`rounded-lg min-w-[140px] overflow-hidden animate-fade-in shadow-xl ${
-        isMobileRef.current ? 'fixed' : 'absolute'
-      }`}
+      className="rounded-lg min-w-[140px] overflow-hidden animate-fade-in shadow-xl fixed"
       style={{
         background: 'rgba(19, 24, 37, 0.95)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         border: '1px solid rgba(100, 102, 105, 0.2)',
-        zIndex: 99999, // Z-index très élevé pour être au-dessus de tout
-        ...(isMobileRef.current 
-          ? {
-              top: `${dropdownPosition.top}px`,
-              left: `${dropdownPosition.left}px`,
-              width: `${Math.max(dropdownPosition.width, 140)}px`
-            }
-          : {
-              top: '100%',
-              left: 0,
-              marginTop: '4px'
-            }
-        )
+        zIndex: 10001, // Z-index au-dessus du header (100) et des toasts (101)
+        top: `${dropdownPosition.top}px`,
+        left: `${dropdownPosition.left}px`,
+        width: `${Math.max(dropdownPosition.width, 140)}px`
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -226,6 +215,7 @@ export default function SoloDropdown({ children, onSandboxClick, onSoloClick, is
     <div 
       ref={containerRef}
       className="relative"
+      style={{ zIndex: isOpen ? 10001 : 'auto' }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -233,9 +223,9 @@ export default function SoloDropdown({ children, onSandboxClick, onSoloClick, is
         {children}
       </div>
       
-      {/* Sur mobile, utiliser un portal pour rendre au niveau du body */}
-      {/* Sur desktop, garder le positionnement relatif */}
-      {isMobileRef.current && typeof document !== 'undefined'
+      {/* Utiliser un portal pour être sûr que le dropdown soit au-dessus de tout */}
+      {/* Sur desktop aussi, pour éviter les problèmes de z-index avec le header */}
+      {typeof document !== 'undefined'
         ? createPortal(dropdownContent, document.body)
         : dropdownContent
       }

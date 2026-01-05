@@ -113,6 +113,14 @@ app.use('/api/friends', friendsRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/discord', discordRoutes);
 
+// Servir les fichiers uploadés statiquement
+// Les avatars seront accessibles via /uploads/avatars/filename
+const uploadsPath = join(__dirname, 'uploads');
+if (existsSync(uploadsPath)) {
+  app.use('/uploads', express.static(uploadsPath));
+  console.log('✅ Dossier uploads configuré pour servir les fichiers statiques');
+}
+
 // Servir les fichiers statiques du client (frontend) - UNIQUEMENT si SERVE_CLIENT=true
 // Par défaut, le client est servi séparément sur un autre port
 if (process.env.SERVE_CLIENT === 'true') {
