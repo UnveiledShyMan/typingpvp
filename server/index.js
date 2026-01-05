@@ -283,11 +283,14 @@ function safeHandler(handler) {
 
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
-  console.log('✅ User connected:', socket.id);
+  // Monitoring des connexions Socket.io
+  socketConnectionCount++;
+  console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
   
   // Gérer les déconnexions proprement
   socket.on('disconnect', safeHandler((reason) => {
-    console.log('⚠️ User disconnected:', socket.id, 'Reason:', reason);
+    socketDisconnectionCount++;
+    console.log(`⚠️ User disconnected: ${socket.id}, Reason: ${reason} (Total: ${socketDisconnectionCount})`);
   }));
   
   // Gérer les erreurs de connexion
@@ -1399,16 +1402,6 @@ io.engine.on('connection_error', (err) => {
   console.error('Context:', err.context);
 });
 
-io.on('connection', (socket) => {
-  socketConnectionCount++;
-  console.log(`✅ Nouvelle connexion Socket.io: ${socket.id} (Total: ${socketConnectionCount})`);
-  
-  socket.on('disconnect', () => {
-    socketDisconnectionCount++;
-    console.log(`❌ Déconnexion Socket.io: ${socket.id} (Total: ${socketDisconnectionCount})`);
-  });
-});
-  
 } catch (error) {
   console.error('❌ Erreur fatale lors de la configuration du serveur:', error);
   console.error('Stack:', error.stack);
