@@ -26,7 +26,20 @@ import pool from './connection.js';
  * Exécute une migration SQL
  */
 async function runMigration(migrationName) {
-  const migrationFile = join(__dirname, 'migrations', `${migrationName}.sql`);
+  // Extraire le nom de la migration si un chemin complet ou une extension est fourni
+  let cleanMigrationName = migrationName;
+  if (cleanMigrationName.includes('/') || cleanMigrationName.includes('\\')) {
+    cleanMigrationName = cleanMigrationName.split(/[/\\]/).pop();
+  }
+  if (cleanMigrationName.endsWith('.sql')) {
+    cleanMigrationName = cleanMigrationName.replace('.sql', '');
+  }
+  
+  // Essayer d'abord la version MariaDB, puis PostgreSQL en fallback
+  let migrationFile = join(__dirname, 'migrations', `${cleanMigrationName}-mariadb.sql`);
+  if (!existsSync(migrationFile)) {
+    migrationFile = join(__dirname, 'migrations', `${cleanMigrationName}.sql`);
+  }
   
   try {
     console.log(`📄 Lecture de la migration: ${migrationFile}`);
@@ -58,7 +71,7 @@ async function runMigration(migrationName) {
           console.log(`  - ${col.column_name} (${col.data_type}, nullable: ${col.is_nullable})`);
         });
       }
-    } else if (migrationName === 'add_oauth') {
+    } else if (cleanMigrationName === 'add_oauth') {
       const checkResult = await pool.query(`
         SELECT column_name, data_type, is_nullable
         FROM information_schema.columns
@@ -76,7 +89,7 @@ async function runMigration(migrationName) {
     }
     
   } catch (error) {
-    console.error(`❌ Erreur lors de l'exécution de la migration ${migrationName}:`);
+    console.error(`❌ Erreur lors de l'exécution de la migration ${cleanMigrationName}:`);
     console.error(error.message);
     
     // Si c'est une erreur "already exists", c'est OK
