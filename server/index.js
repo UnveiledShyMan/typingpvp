@@ -54,8 +54,11 @@ const io = new Server(httpServer, {
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
   },
   // Forcer polling pour compatibilité avec Plesk/nginx
+  // IMPORTANT: Utiliser un tableau avec 'polling' explicitement
   transports: ['polling'],
   allowUpgrades: false, // Empêcher l'upgrade vers WebSocket
+  // Forcer le transport polling (éviter les problèmes de détection)
+  upgrade: false,
   // Configuration pour reverse proxy
   path: '/socket.io/',
   // Timeouts augmentés pour polling (nécessaire pour reverse proxy)
@@ -272,7 +275,31 @@ io.engine.on('connection_error', (err) => {
   console.error('Détails:', {
     code: err.code,
     context: err.context,
-    type: err.type
+    type: err.type,
+    transport: err.req?.headers?.['transport']
+  });
+  
+  // Si c'est une erreur "Transport unknown", logger plus d'infos
+  if (err.message && err.message.includes('Transport unknown')) {
+    console.error('⚠️ Transport inconnu détecté. Requête:', {
+      url: err.req?.url,
+      method: err.req?.method,
+      headers: {
+        'user-agent': err.req?.headers?.['user-agent'],
+        'origin': err.req?.headers?.['origin'],
+        'transport': err.req?.headers?.['transport']
+      }
+    });
+  }
+});
+
+// Logger les tentatives de connexion
+io.engine.on('connection', (req) => {
+  console.log('🔌 Tentative de connexion Socket.io:', {
+    url: req.url,
+    method: req.method,
+    transport: req.headers?.['transport'] || 'polling',
+    origin: req.headers?.['origin']
   });
 });
 
@@ -289,7 +316,14 @@ app.get('/socket.io/test', (req, res) => {
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id, {
     transport: socket.conn.transport.name,
-    remoteAddress: socket.handshake.address
+    remoteAddress: socket.handshake.address,
+    query: socket.handshake.query,
+    headers: socket.handshake.headers
+  });
+  
+  // Logger les erreurs de transport
+  socket.conn.on('error', (err) => {
+    console.error('❌ Erreur de transport pour socket', socket.id, ':', err.message);
   });
 
   // Créer une nouvelle room
