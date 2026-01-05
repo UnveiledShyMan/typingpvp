@@ -54,8 +54,9 @@ const SOCKET_CONFIG = {
   transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
   upgrade: false, // Désactiver l'upgrade vers WebSocket
   reconnection: true,
-  reconnectionDelay: 1000,
-  reconnectionAttempts: 5,
+  reconnectionDelay: 2000, // Augmenter le délai initial de reconnexion
+  reconnectionDelayMax: 10000, // Délai maximum entre les tentatives
+  reconnectionAttempts: 10, // Augmenter le nombre de tentatives
   // Ne pas forcer une nouvelle connexion par défaut
   // forceNew sera utilisé uniquement quand nécessaire
 };
@@ -81,17 +82,16 @@ export function getSocket(forceNew = false) {
       forceNew: forceNew,
       // Ajouter le path explicitement pour éviter les problèmes de routage
       path: '/socket.io/',
-      // Timeouts plus longs en production pour éviter les erreurs 400
-      timeout: 20000,
+      // Timeouts plus longs en production pour éviter les erreurs "xhr poll error"
+      timeout: 45000, // Augmenté à 45 secondes pour correspondre au serveur
       // Ajouter des options supplémentaires pour la stabilité
       autoConnect: true,
-      reconnectionDelayMax: 5000,
       // Forcer explicitement le transport polling dès le début pour éviter "Transport unknown"
       // Ne pas laisser Socket.io négocier d'autres transports
       rememberUpgrade: false, // Ne pas se souvenir des upgrades précédents
-      // S'assurer que seul polling est utilisé
-      transports: ['polling'],
-      upgrade: false,
+      // Options pour améliorer la stabilité du polling
+      withCredentials: false // Désactiver les credentials pour éviter les problèmes CORS
+      // Note: transports: ['polling'] et upgrade: false sont déjà dans SOCKET_CONFIG
     });
     
     // Ajouter des listeners pour le debugging
@@ -108,7 +108,20 @@ export function getSocket(forceNew = false) {
       console.error('❌ Erreur de connexion socket:', error.message);
       console.error('URL tentée:', API_URL);
       console.error('Type d\'erreur:', error.type);
-      // Si l'erreur persiste, on peut essayer de réinitialiser après plusieurs tentatives
+      // Si c'est une erreur de transport, ne pas spammer les reconnexions
+      if (error.type === 'TransportError' || error.message.includes('xhr poll error')) {
+        console.warn('⚠️ Erreur de transport détectée - la reconnexion sera tentée automatiquement');
+      }
+    });
+    
+    // Gérer spécifiquement les erreurs de transport
+    socketInstance.io.on('error', (error) => {
+      if (error.type === 'TransportError' || error.message?.includes('xhr poll error')) {
+        console.warn('⚠️ Erreur de transport polling:', error.message);
+        console.warn('⚠️ La reconnexion sera tentée automatiquement');
+      } else {
+        console.error('❌ Erreur Socket.io:', error.message);
+      }
     });
     
     // Logger les tentatives de reconnexion

@@ -71,18 +71,21 @@ const io = new Server(httpServer, {
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  // Timeouts très courts pour éviter que Plesk tue les connexions
-  // Plesk vérifie les connexions long-running, donc on doit être très agressif
-  pingTimeout: 10000, // 10 secondes (réduit de 20s)
-  pingInterval: 5000, // 5 secondes (réduit de 10s) - heartbeat plus fréquent
-  // Permettre les reconnexions rapides
-  connectTimeout: 10000, // 10 secondes (réduit de 20s)
+  // Timeouts augmentés pour éviter les erreurs "xhr poll error"
+  // Les timeouts trop courts causaient des déconnexions immédiates
+  pingTimeout: 60000, // 60 secondes - temps avant de considérer la connexion morte
+  pingInterval: 25000, // 25 secondes - intervalle entre les pings (augmenté pour réduire la charge)
+  // Permettre les reconnexions avec timeout plus long
+  connectTimeout: 45000, // 45 secondes - temps max pour établir une connexion
   // Réduire la taille du buffer pour éviter les timeouts
   maxHttpBufferSize: 1e6, // 1MB au lieu de la valeur par défaut
   // Forcer la fermeture des connexions inactives rapidement
   allowEIO3: true,
   // Compression désactivée pour réduire la latence
-  compression: false
+  compression: false,
+  // Options supplémentaires pour la stabilité du polling
+  httpCompression: false // Désactiver la compression HTTP pour polling
+  // Note: transports: ['polling'] est déjà défini plus haut
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -428,14 +431,15 @@ io.on('connection', (socket) => {
   console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
   
   // Heartbeat manuel pour maintenir la connexion active avec Plesk
-  // Plesk tue les connexions inactives, donc on envoie un ping toutes les 4 secondes
+  // Réduire la fréquence pour éviter de surcharger les requêtes polling
+  // Plesk tue les connexions inactives, donc on envoie un ping toutes les 20 secondes
   const heartbeatInterval = setInterval(() => {
     if (socket.connected) {
       socket.emit('ping', { timestamp: Date.now() });
     } else {
       clearInterval(heartbeatInterval);
     }
-  }, 4000); // Ping toutes les 4 secondes
+  }, 20000); // Ping toutes les 20 secondes (réduit pour éviter les erreurs de transport)
   
   // Nettoyer l'intervalle à la déconnexion
   socket.on('disconnect', safeHandler((reason) => {
