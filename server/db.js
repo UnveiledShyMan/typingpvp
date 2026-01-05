@@ -6,21 +6,35 @@ import bcrypt from 'bcryptjs';
 
 /**
  * Crée un nouvel utilisateur
+ * @param {string} username - Nom d'utilisateur
+ * @param {string} email - Email
+ * @param {string} password - Mot de passe (optionnel pour OAuth)
+ * @param {string} provider - Provider d'authentification ('local', 'google', 'x')
+ * @param {string} providerId - ID du provider (pour OAuth)
+ * @param {string} avatar - URL de l'avatar (optionnel, souvent fourni par OAuth)
  */
-export async function createUser(username, email, password) {
+export async function createUser(username, email, password = null, provider = 'local', providerId = null, avatar = null) {
   const id = nanoid();
-  const passwordHash = await bcrypt.hash(password, 10);
+  let passwordHash = null;
+  
+  // Hasher le mot de passe seulement si fourni (authentification locale)
+  if (password) {
+    passwordHash = await bcrypt.hash(password, 10);
+  }
   
   try {
     const result = await pool.query(
-      `INSERT INTO users (id, username, email, password_hash, mmr, stats)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (id, username, email, password_hash, provider, provider_id, avatar, mmr, stats)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         id,
         username,
-        email.toLowerCase(),
+        email ? email.toLowerCase() : null,
         passwordHash,
+        provider,
+        providerId,
+        avatar,
         JSON.stringify({}), // MMR vide au départ
         JSON.stringify({
           totalMatches: 0,
@@ -41,6 +55,9 @@ export async function createUser(username, email, password) {
       }
       if (error.constraint === 'users_email_key') {
         throw new Error('Email already taken');
+      }
+      if (error.constraint === 'idx_users_provider_provider_id') {
+        throw new Error('Account already exists with this provider');
       }
     }
     throw error;
@@ -91,6 +108,23 @@ export async function getUserByEmail(email) {
     return rowToUser(result.rows[0]);
   } catch (error) {
     console.error('Error getting user by email:', error);
+    return null;
+  }
+}
+
+/**
+ * Récupère un utilisateur par provider et provider_id (pour OAuth)
+ */
+export async function getUserByProviderId(provider, providerId) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE provider = $1 AND provider_id = $2',
+      [provider, providerId]
+    );
+    if (result.rows.length === 0) return null;
+    return rowToUser(result.rows[0]);
+  } catch (error) {
+    console.error('Error getting user by provider id:', error);
     return null;
   }
 }
@@ -180,11 +214,11 @@ export async function updateUser(user) {
       ? `username = $1, email = $2, password_hash = $3, avatar = $4, 
          bio = $5, gear = $6, social_media = $7, friends = $8, 
          friend_requests_sent = $9, friend_requests_received = $10, 
-         mmr = $11, stats = $12, preferences = $13`
+         mmr = $11, stats = $12, preferences = $13, provider = $14, provider_id = $15`
       : `username = $1, email = $2, password_hash = $3, avatar = $4, 
          bio = $5, gear = $6, social_media = $7, friends = $8, 
          friend_requests_sent = $9, friend_requests_received = $10, 
-         mmr = $11, stats = $12`;
+         mmr = $11, stats = $12, provider = $13, provider_id = $14`;
     
     const params = hasPreferences.rows.length > 0
       ? [
@@ -201,6 +235,8 @@ export async function updateUser(user) {
           JSON.stringify(user.mmr),
           JSON.stringify(user.stats),
           JSON.stringify(user.preferences || { defaultMode: 'solo' }),
+          user.provider || 'local',
+          user.providerId || null,
           user.id
         ]
       : [
@@ -216,6 +252,8 @@ export async function updateUser(user) {
           user.friendRequests.received,
           JSON.stringify(user.mmr),
           JSON.stringify(user.stats),
+          user.provider || 'local',
+          user.providerId || null,
           user.id
         ];
     
@@ -412,6 +450,8 @@ function rowToUser(row) {
     username: row.username,
     email: row.email,
     passwordHash: row.password_hash,
+    provider: row.provider || 'local',
+    providerId: row.provider_id || null,
     avatar: row.avatar,
     bio: row.bio || '',
     gear: row.gear || '',

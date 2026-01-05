@@ -5,6 +5,8 @@ export class User {
     this.username = data.username;
     this.email = data.email;
     this.passwordHash = data.passwordHash;
+    this.provider = data.provider || 'local'; // 'local', 'google', 'x'
+    this.providerId = data.providerId || null; // ID du provider OAuth
     this.avatar = data.avatar || null; // URL de l'avatar
     this.bio = data.bio || '';
     this.gear = data.gear || ''; // Clavier/équipement utilisé (optionnel, affiché dans les rankings)
