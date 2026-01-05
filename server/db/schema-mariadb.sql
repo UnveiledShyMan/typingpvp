@@ -27,8 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
   provider VARCHAR(50) DEFAULT 'local',
   provider_id VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_users_provider_provider_id (provider, provider_id),
-  UNIQUE KEY unique_provider_provider_id (provider, provider_id)
+  INDEX idx_users_provider_provider_id (provider, provider_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table matches : Stocke les informations des matchs

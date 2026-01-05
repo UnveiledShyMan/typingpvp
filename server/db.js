@@ -24,17 +24,24 @@ export async function createUser(username, email, password = null, provider = 'l
   
   try {
     // MariaDB n'a pas RETURNING, on fait INSERT puis SELECT
+    // Inclure tous les champs nécessaires pour éviter les problèmes avec les valeurs par défaut
     await pool.query(
-      `INSERT INTO users (id, username, email, password_hash, provider, provider_id, avatar, mmr, stats)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, username, email, password_hash, provider, provider_id, avatar, bio, gear, social_media, friends, friend_requests_sent, friend_requests_received, mmr, stats, preferences)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         username,
         email ? email.toLowerCase() : null,
         passwordHash,
-        provider,
-        providerId,
-        avatar,
+        provider || 'local',
+        providerId || null,
+        avatar || null,
+        null, // bio
+        null, // gear
+        JSON.stringify({}), // social_media
+        JSON.stringify([]), // friends
+        JSON.stringify([]), // friend_requests_sent
+        JSON.stringify([]), // friend_requests_received
         JSON.stringify({}), // MMR vide au départ
         JSON.stringify({
           totalMatches: 0,
@@ -43,7 +50,8 @@ export async function createUser(username, email, password = null, provider = 'l
           totalWPM: 0,
           bestWPM: 0,
           averageAccuracy: 0
-        })
+        }),
+        JSON.stringify({ defaultMode: 'solo' }) // preferences
       ]
     );
     
