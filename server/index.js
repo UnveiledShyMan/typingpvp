@@ -233,40 +233,6 @@ if (process.env.SERVE_CLIENT === 'true') {
   });
 }
 
-// Gestion des erreurs Socket.io
-io.engine.on('connection_error', (err) => {
-  console.error('❌ Erreur de connexion Socket.io:', err.req?.url, err.message);
-  console.error('Détails:', {
-    code: err.code,
-    context: err.context,
-    type: err.type,
-    transport: err.req?.headers?.['transport']
-  });
-  
-  // Si c'est une erreur "Transport unknown", logger plus d'infos
-  if (err.message && err.message.includes('Transport unknown')) {
-    console.error('⚠️ Transport inconnu détecté. Requête:', {
-      url: err.req?.url,
-      method: err.req?.method,
-      headers: {
-        'user-agent': err.req?.headers?.['user-agent'],
-        'origin': err.req?.headers?.['origin'],
-        'transport': err.req?.headers?.['transport']
-      }
-    });
-  }
-});
-
-// Logger les tentatives de connexion
-io.engine.on('connection', (req) => {
-  console.log('🔌 Tentative de connexion Socket.io:', {
-    url: req.url,
-    method: req.method,
-    transport: req.headers?.['transport'] || 'polling',
-    origin: req.headers?.['origin']
-  });
-});
-
 // Route de test pour Socket.io (sans connexion)
 app.get('/socket.io/test', (req, res) => {
   res.json({ 
@@ -282,7 +248,17 @@ io.engine.on('connection_error', (err) => {
   if (err.req) {
     console.error('URL:', err.req.url);
     console.error('SID:', err.req._query?.sid);
+    console.error('Transport:', err.req._query?.transport);
   }
+  // Ne pas faire planter le serveur pour une erreur de connexion
+});
+
+// Logger les tentatives de connexion réussies
+io.engine.on('connection', (req) => {
+  console.log('🔌 Connexion Socket.io:', {
+    url: req.url,
+    transport: req._query?.transport || 'polling'
+  });
 });
 
 // Gestion des connexions Socket.io
