@@ -16,9 +16,12 @@
     "build:client": "cd client && npm install && npm run build",
     "migrate": "node server/db/migrate.js",
     "migrate:oauth": "node server/db/migrate.js add_oauth",
+    "migrate:preferences": "node server/db/migrate.js add_preferences",
+    "migrate:discord": "node server/db/migrate.js add_discord_links",
     "setup:db": "node server/db/setup-database.js",
-    "setup": "node setup-plesk.js",
-    "setup:plesk": "node setup-plesk.js"
+    "setup": "npm run install:all && npm run setup:db && npm run build:client",
+    "setup:plesk": "npm run install:all && npm run setup:db && npm run build:client",
+    "postinstall": "cd server && npm install && cd ../client && npm install"
   },
   "keywords": ["typing", "test", "battle", "1v1"],
   "author": "",

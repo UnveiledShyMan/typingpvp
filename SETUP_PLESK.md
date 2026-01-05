@@ -124,7 +124,9 @@ npm run setup
 
 Dans Plesk Node.js, démarrez l'application. Elle devrait maintenant fonctionner !
 
-## 🔧 Commandes Utiles
+## 🔧 Commandes Utiles (UNIQUEMENT npm)
+
+Toutes les commandes sont accessibles via `npm run` :
 
 ```bash
 # Setup complet (dépendances + base de données + build)
@@ -133,8 +135,16 @@ npm run setup
 # Setup uniquement de la base de données
 npm run setup:db
 
+# Installation de toutes les dépendances
+npm run install:all
+
 # Build du client uniquement
-cd client && npm run build
+npm run build:client
+
+# Migrations individuelles (si nécessaire)
+npm run migrate:oauth
+npm run migrate:preferences
+npm run migrate:discord
 
 # Démarrer en développement
 npm run dev
@@ -142,6 +152,8 @@ npm run dev
 # Démarrer en production
 npm start
 ```
+
+**Important** : Sur Plesk, utilisez uniquement les commandes `npm run` ou `npm start`. Ne pas utiliser `node` directement.
 
 ## ⚠️ Dépannage
 
