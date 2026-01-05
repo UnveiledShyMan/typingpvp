@@ -276,18 +276,27 @@ app.get('/socket.io/test', (req, res) => {
   });
 });
 
+// Gestion des erreurs Socket.io
+io.engine.on('connection_error', (err) => {
+  console.error('❌ Erreur de connexion Socket.io:', err.message);
+  if (err.req) {
+    console.error('URL:', err.req.url);
+    console.error('SID:', err.req._query?.sid);
+  }
+});
+
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
-  console.log('✅ User connected:', socket.id, {
-    transport: socket.conn.transport.name,
-    remoteAddress: socket.handshake.address,
-    query: socket.handshake.query,
-    headers: socket.handshake.headers
+  console.log('✅ User connected:', socket.id);
+  
+  // Gérer les déconnexions proprement
+  socket.on('disconnect', (reason) => {
+    console.log('⚠️ User disconnected:', socket.id, 'Reason:', reason);
   });
   
-  // Logger les erreurs de transport
+  // Gérer les erreurs de connexion
   socket.conn.on('error', (err) => {
-    console.error('❌ Erreur de transport pour socket', socket.id, ':', err.message);
+    console.error('❌ Erreur de connexion pour socket', socket.id, ':', err.message);
   });
 
   // Créer une nouvelle room

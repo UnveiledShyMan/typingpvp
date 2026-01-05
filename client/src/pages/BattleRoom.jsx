@@ -109,7 +109,11 @@ export default function BattleRoom() {
     // Sinon créer un nouveau socket
     if (!socketRef.current || !socketRef.current.connected) {
       socketRef.current = io(apiUrl, {
+        transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
+        upgrade: false,
         reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
         forceNew: true // Forcer une nouvelle connexion pour éviter les problèmes
       });
     }
