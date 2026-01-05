@@ -53,8 +53,6 @@ export default function Friends() {
   const connectSocket = () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Utiliser polling pour Plesk
-      upgrade: false, // Empêcher l'upgrade vers WebSocket
       reconnection: true
     });
     
