@@ -440,7 +440,7 @@ export default function Profile({ userId: currentUserId }) {
           {!isEditing && (
             <>
               {/* Stats Cards - Style osu! */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 sm:mb-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 sm:mb-8">
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
               <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
@@ -480,10 +480,10 @@ export default function Profile({ userId: currentUserId }) {
                 Average
               </div>
             </div>
-          </div>
+              </div>
 
-          {/* Language Selector */}
-          <div className="mb-4 sm:mb-6">
+              {/* Language Selector */}
+              <div className="mb-4 sm:mb-6">
             <select
               value={selectedLang}
               onChange={(e) => setSelectedLang(e.target.value)}
@@ -494,15 +494,15 @@ export default function Profile({ userId: currentUserId }) {
                   {lang.toUpperCase()}
                 </option>
               ))}
-            </select>
-          </div>
+              </select>
+              </div>
 
-          {/* Historique des matchs - Deux sections : Solo et Multijoueurs */}
-          {(soloMatches.length > 0 || multiplayerMatches.length > 0) && (
-            <div className="space-y-6">
-              {/* Matchs Solo */}
-              {soloMatches.length > 0 && (
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+              {/* Historique des matchs - Deux sections : Solo et Multijoueurs */}
+              {(soloMatches.length > 0 || multiplayerMatches.length > 0) && (
+                <div className="space-y-6">
+                {/* Matchs Solo */}
+                {soloMatches.length > 0 && (
+                  <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
                   <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
                     <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Solo Matches
@@ -545,13 +545,13 @@ export default function Profile({ userId: currentUserId }) {
                         </div>
                       </div>
                     ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Matchs Multijoueurs */}
-              {multiplayerMatches.length > 0 && (
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+                {/* Matchs Multijoueurs */}
+                {multiplayerMatches.length > 0 && (
+                  <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
                   <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
                     <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Multiplayer Matches
@@ -607,11 +607,11 @@ export default function Profile({ userId: currentUserId }) {
                         </div>
                       </div>
                     ))}
+                    </div>
                   </div>
+                )}
                 </div>
               )}
-            </div>
-          )}
             </>
           )}
         </div>
