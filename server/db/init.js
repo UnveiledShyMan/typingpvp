@@ -1,6 +1,6 @@
-// Script d'initialisation de la base de données
+// Script d'initialisation de la base de données MariaDB
 // Exécute le schéma SQL pour créer les tables
-import pool from './connection.js';
+import pool, { closePool } from './connection.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -9,13 +9,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * Initialise la base de données en exécutant le schéma SQL
+ * Initialise la base de données en exécutant le schéma SQL MariaDB
  */
 async function initDatabase() {
   try {
-    console.log('Connecting to database...');
+    console.log('Connecting to MariaDB database...');
     
-    // Lire le fichier schema.sql
+    // Lire le fichier schema-mariadb.sql
     const schemaPath = join(__dirname, 'schema-mariadb.sql');
     const schema = readFileSync(schemaPath, 'utf8');
     
@@ -23,13 +23,13 @@ async function initDatabase() {
     await pool.query(schema);
     
     console.log('✅ Database schema created successfully');
-    console.log('Tables created: users, matches, user_matches');
+    console.log('Tables created: users, matches, user_matches, discord_links');
     
-    await pool.end();
+    await closePool();
     process.exit(0);
   } catch (error) {
     console.error('❌ Error initializing database:', error);
-    await pool.end();
+    await closePool();
     process.exit(1);
   }
 }

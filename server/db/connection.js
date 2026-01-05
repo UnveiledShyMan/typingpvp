@@ -115,11 +115,13 @@ export async function query(sql, params) {
 
 /**
  * Obtenir une connexion pour les transactions
+ * Retourne un wrapper qui expose toutes les méthodes nécessaires pour les transactions
  */
 export async function getConnection() {
   const conn = await pool.getConnection();
-  // Wrapper pour compatibilité avec PostgreSQL
+  // Wrapper pour compatibilité avec PostgreSQL et MariaDB
   return {
+    // Méthode query pour compatibilité avec l'ancien code
     query: async (sql, params) => {
       if (sql === 'BEGIN') {
         await conn.beginTransaction();
@@ -135,6 +137,20 @@ export async function getConnection() {
       }
       const [rows] = await conn.execute(sql, params);
       return { rows: Array.isArray(rows) ? rows : [rows] };
+    },
+    // Méthodes directes pour les transactions (utilisées par db.js)
+    beginTransaction: async () => {
+      await conn.beginTransaction();
+    },
+    commit: async () => {
+      await conn.commit();
+    },
+    rollback: async () => {
+      await conn.rollback();
+    },
+    execute: async (sql, params) => {
+      const [rows] = await conn.execute(sql, params);
+      return [rows];
     },
     release: () => conn.release()
   };

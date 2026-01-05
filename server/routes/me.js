@@ -52,22 +52,23 @@ router.put('/preferences', authenticateToken, async (req, res) => {
         // La colonne existe, on peut la mettre à jour
         await pool.query(
           `UPDATE users 
-           SET preferences = $1
-           WHERE id = $2`,
+           SET preferences = ?
+           WHERE id = ?`,
           [JSON.stringify(req.user.preferences), req.user.id]
         );
       } else {
         // La colonne n'existe pas, on essaie de l'ajouter
+        // MariaDB : utiliser JSON au lieu de JSONB
         try {
           await pool.query(`
             ALTER TABLE users 
-            ADD COLUMN preferences JSONB DEFAULT '{"defaultMode": "solo"}'
+            ADD COLUMN preferences JSON DEFAULT (JSON_OBJECT('defaultMode', 'solo'))
           `);
           // Puis mettre à jour
           await pool.query(
             `UPDATE users 
-             SET preferences = $1
-             WHERE id = $2`,
+             SET preferences = ?
+             WHERE id = ?`,
             [JSON.stringify(req.user.preferences), req.user.id]
           );
         } catch (alterError) {

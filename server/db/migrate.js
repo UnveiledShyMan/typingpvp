@@ -35,11 +35,8 @@ async function runMigration(migrationName) {
     cleanMigrationName = cleanMigrationName.replace('.sql', '');
   }
   
-  // Essayer d'abord la version MariaDB, puis PostgreSQL en fallback
-  let migrationFile = join(__dirname, 'migrations', `${cleanMigrationName}-mariadb.sql`);
-  if (!existsSync(migrationFile)) {
-    migrationFile = join(__dirname, 'migrations', `${cleanMigrationName}.sql`);
-  }
+  // Chercher le fichier de migration (MariaDB uniquement maintenant)
+  const migrationFile = join(__dirname, 'migrations', `${cleanMigrationName}.sql`);
   
   try {
     console.log(`📄 Lecture de la migration: ${migrationFile}`);

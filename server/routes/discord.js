@@ -21,7 +21,7 @@ router.post('/generate-code', authenticateToken, async (req, res) => {
     
     // Vérifier si un lien existe déjà pour ce Discord ID
     const existingLink = await pool.query(
-      'SELECT * FROM discord_links WHERE discord_id = $1',
+      'SELECT * FROM discord_links WHERE discord_id = ?',
       [discordId]
     );
     
@@ -36,20 +36,20 @@ router.post('/generate-code', authenticateToken, async (req, res) => {
     
     // Supprimer les anciens codes non vérifiés pour cet utilisateur
     await pool.query(
-      'DELETE FROM discord_links WHERE user_id = $1 AND verified = false',
+      'DELETE FROM discord_links WHERE user_id = ? AND verified = false',
       [userId]
     );
     
     // Créer ou mettre à jour le lien
+    // MariaDB : utiliser INSERT ... ON DUPLICATE KEY UPDATE au lieu de ON CONFLICT
     const linkId = nanoid();
     await pool.query(
       `INSERT INTO discord_links (id, user_id, discord_id, discord_username, verification_code, verified)
-       VALUES ($1, $2, $3, $4, $5, false)
-       ON CONFLICT (discord_id) 
-       DO UPDATE SET 
-         user_id = EXCLUDED.user_id,
-         discord_username = EXCLUDED.discord_username,
-         verification_code = EXCLUDED.verification_code,
+       VALUES (?, ?, ?, ?, ?, false)
+       ON DUPLICATE KEY UPDATE 
+         user_id = VALUES(user_id),
+         discord_username = VALUES(discord_username),
+         verification_code = VALUES(verification_code),
          verified = false,
          created_at = CURRENT_TIMESTAMP`,
       [linkId, userId, discordId, discordUsername, verificationCode]
@@ -81,7 +81,7 @@ router.post('/verify-code', async (req, res) => {
     
     // Trouver le lien avec ce code
     const linkResult = await pool.query(
-      'SELECT * FROM discord_links WHERE verification_code = $1 AND discord_id = $2',
+      'SELECT * FROM discord_links WHERE verification_code = ? AND discord_id = ?',
       [verificationCode.toUpperCase(), discordId]
     );
     
@@ -98,19 +98,19 @@ router.post('/verify-code', async (req, res) => {
     
     if (hoursDiff > 24) {
       // Supprimer le code expiré
-      await pool.query('DELETE FROM discord_links WHERE id = $1', [link.id]);
+      await pool.query('DELETE FROM discord_links WHERE id = ?', [link.id]);
       return res.status(400).json({ error: 'Code de vérification expiré. Générez-en un nouveau.' });
     }
     
     // Vérifier le compte
     await pool.query(
-      'UPDATE discord_links SET verified = true, linked_at = CURRENT_TIMESTAMP WHERE id = $1',
+      'UPDATE discord_links SET verified = true, linked_at = CURRENT_TIMESTAMP WHERE id = ?',
       [link.id]
     );
     
     // Récupérer les informations de l'utilisateur pour retourner le rang
     const userResult = await pool.query(
-      'SELECT id, username, mmr FROM users WHERE id = $1',
+      'SELECT id, username, mmr FROM users WHERE id = ?',
       [link.user_id]
     );
     
@@ -149,7 +149,7 @@ router.get('/user/:discordId', async (req, res) => {
       `SELECT dl.*, u.username, u.mmr, u.stats, u.avatar
        FROM discord_links dl
        JOIN users u ON dl.user_id = u.id
-       WHERE dl.discord_id = $1 AND dl.verified = true`,
+       WHERE dl.discord_id = ? AND dl.verified = true`,
       [discordId]
     );
     
@@ -189,7 +189,7 @@ router.delete('/unlink', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     
     await pool.query(
-      'DELETE FROM discord_links WHERE user_id = $1',
+      'DELETE FROM discord_links WHERE user_id = ?',
       [userId]
     );
     

@@ -15,7 +15,7 @@ Exécutez la migration SQL pour créer la table `discord_links` :
 
 ```bash
 cd server/db
-node migrate.js migrations/add_discord_links.sql
+node migrate.js add_discord_links
 ```
 
 ### 2. Configuration du bot Discord

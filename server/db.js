@@ -14,6 +14,9 @@ import bcrypt from 'bcryptjs';
  * @param {string} avatar - URL de l'avatar (optionnel, souvent fourni par OAuth)
  */
 export async function createUser(username, email, password = null, provider = 'local', providerId = null, avatar = null) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:16',message:'createUser entry',data:{username,email,hasPassword:!!password,provider,providerId,avatar},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   const id = nanoid();
   let passwordHash = null;
   
@@ -25,40 +28,63 @@ export async function createUser(username, email, password = null, provider = 'l
   try {
     // MariaDB n'a pas RETURNING, on fait INSERT puis SELECT
     // Inclure tous les champs nécessaires pour éviter les problèmes avec les valeurs par défaut
+    const insertParams = [
+      id,
+      username,
+      email ? email.toLowerCase() : null,
+      passwordHash,
+      provider || 'local',
+      providerId || null,
+      avatar || null,
+      null, // bio
+      null, // gear
+      JSON.stringify({}), // social_media
+      JSON.stringify([]), // friends
+      JSON.stringify([]), // friend_requests_sent
+      JSON.stringify([]), // friend_requests_received
+      JSON.stringify({}), // MMR vide au départ
+      JSON.stringify({
+        totalMatches: 0,
+        wins: 0,
+        losses: 0,
+        totalWPM: 0,
+        bestWPM: 0,
+        averageAccuracy: 0
+      }),
+      JSON.stringify({ defaultMode: 'solo' }) // preferences
+    ];
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:28',message:'before INSERT',data:{id,username,email:email?.toLowerCase(),hasPasswordHash:!!passwordHash,paramsCount:insertParams.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     await pool.query(
       `INSERT INTO users (id, username, email, password_hash, provider, provider_id, avatar, bio, gear, social_media, friends, friend_requests_sent, friend_requests_received, mmr, stats, preferences)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        username,
-        email ? email.toLowerCase() : null,
-        passwordHash,
-        provider || 'local',
-        providerId || null,
-        avatar || null,
-        null, // bio
-        null, // gear
-        JSON.stringify({}), // social_media
-        JSON.stringify([]), // friends
-        JSON.stringify([]), // friend_requests_sent
-        JSON.stringify([]), // friend_requests_received
-        JSON.stringify({}), // MMR vide au départ
-        JSON.stringify({
-          totalMatches: 0,
-          wins: 0,
-          losses: 0,
-          totalWPM: 0,
-          bestWPM: 0,
-          averageAccuracy: 0
-        }),
-        JSON.stringify({ defaultMode: 'solo' }) // preferences
-      ]
+      insertParams
     );
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:58',message:'after INSERT',data:{id,success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     
     // Récupérer l'utilisateur créé
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:61',message:'before SELECT',data:{id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     const result = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
-    return rowToUser(result.rows[0]);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:64',message:'after SELECT',data:{rowsCount:result?.rows?.length,hasFirstRow:!!result?.rows?.[0],firstRowKeys:result?.rows?.[0]?Object.keys(result.rows[0]):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:65',message:'before rowToUser',data:{rowId:result?.rows?.[0]?.id,rowUsername:result?.rows?.[0]?.username,mmrType:typeof result?.rows?.[0]?.mmr,statsType:typeof result?.rows?.[0]?.stats},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    const user = rowToUser(result.rows[0]);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:66',message:'after rowToUser',data:{userId:user?.id,hasUser:!!user,userType:user?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    return user;
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.js:68',message:'createUser catch',data:{errorMessage:error?.message,errorCode:error?.code,errorStack:error?.stack?.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     // MariaDB utilise 1062 pour ER_DUP_ENTRY, PostgreSQL utilise 23505
     // Le wrapper dans connection.js convertit déjà 1062 en 23505, mais on vérifie les deux pour sécurité
     if (error.code === '23505' || error.code === 1062 || error.code === 'ER_DUP_ENTRY') {
@@ -173,12 +199,13 @@ export async function getRankingsByLanguage(language, limit = 100) {
   try {
     // Récupérer tous les utilisateurs et calculer leur MMR pour la langue
     // Inclure les utilisateurs qui n'ont pas de MMR pour cette langue (utiliser 1000 par défaut)
-    // MariaDB : utiliser JSON_EXTRACT au lieu de l'opérateur ->
+    // MariaDB : utiliser JSON_EXTRACT avec une clé dynamique
+    // Note: On construit le chemin JSON avec CONCAT pour éviter les injections SQL
     const result = await pool.query(
       `SELECT 
         id, username, avatar, gear, mmr, stats
        FROM users
-       ORDER BY COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(mmr, CONCAT('$."', ?, '"'))) AS UNSIGNED), 1000) DESC
+       ORDER BY COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(mmr, CONCAT('$.', JSON_QUOTE(?)))) AS UNSIGNED), 1000) DESC
        LIMIT ?`,
       [language, limit]
     );
