@@ -1323,18 +1323,44 @@ export { onlineUsers };
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interfaces pour Plesk
 
+// Logger avant de démarrer le serveur
+console.log('🚀 Tentative de démarrage du serveur HTTP...');
+console.log(`📍 Port: ${PORT}, Host: ${HOST}`);
+
 // Démarrer le serveur avec gestion d'erreur
-httpServer.listen(PORT, HOST, () => {
-  console.log(`✅ Serveur démarré avec succès sur ${HOST}:${PORT}`);
-  console.log(`📡 Socket.io configuré avec polling uniquement (compatible Plesk)`);
-  console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-  console.log(`📦 SERVE_CLIENT: ${process.env.SERVE_CLIENT || 'false'}`);
-}).on('error', (error) => {
-  console.error('❌ Erreur lors du démarrage du serveur:', error);
-  if (error.code === 'EADDRINUSE') {
-    console.error(`⚠️ Le port ${PORT} est déjà utilisé. Vérifiez votre configuration Plesk.`);
-  } else if (error.code === 'EACCES') {
-    console.error(`⚠️ Permission refusée pour le port ${PORT}. Vérifiez les permissions.`);
-  }
+try {
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`✅ Serveur démarré avec succès sur ${HOST}:${PORT}`);
+    console.log(`📡 Socket.io configuré avec polling uniquement (compatible Plesk)`);
+    console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+    console.log(`📦 SERVE_CLIENT: ${process.env.SERVE_CLIENT || 'false'}`);
+    console.log(`✅ Le serveur est prêt à accepter les connexions`);
+  }).on('error', (error) => {
+    console.error('❌ Erreur lors du démarrage du serveur:', error);
+    console.error('Code erreur:', error.code);
+    console.error('Message:', error.message);
+    if (error.code === 'EADDRINUSE') {
+      console.error(`⚠️ Le port ${PORT} est déjà utilisé. Vérifiez votre configuration Plesk.`);
+    } else if (error.code === 'EACCES') {
+      console.error(`⚠️ Permission refusée pour le port ${PORT}. Vérifiez les permissions.`);
+    }
+    process.exit(1);
+  });
+  
+  // Gérer les erreurs du serveur HTTP après démarrage
+  httpServer.on('error', (error) => {
+    console.error('❌ Erreur HTTP serveur:', error);
+    // Ne pas faire planter le serveur, juste logger
+  });
+  
+  // Gérer les erreurs de connexion
+  httpServer.on('clientError', (error, socket) => {
+    console.error('❌ Erreur client HTTP:', error.message);
+    socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+  });
+  
+} catch (error) {
+  console.error('❌ Erreur fatale lors de la configuration du serveur:', error);
+  console.error('Stack:', error.stack);
   process.exit(1);
-});
+}

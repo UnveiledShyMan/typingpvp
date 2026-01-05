@@ -299,10 +299,21 @@ async function checkServerDependencies() {
  */
 async function startServer() {
   // Importer et exécuter le serveur
-  console.log('Démarrage du serveur...');
+  console.log('📡 Démarrage du serveur HTTP et Socket.io...');
   // Pour Plesk, on sert aussi le client depuis le serveur
   process.env.SERVE_CLIENT = 'true';
-  await import('./server/index.js');
+  
+  try {
+    await import('./server/index.js');
+    console.log('✅ Import du serveur réussi');
+    // Attendre un peu pour s'assurer que le serveur démarre
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('✅ Serveur devrait être démarré maintenant');
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'import du serveur:', error);
+    console.error('Stack:', error.stack);
+    throw error;
+  }
 }
 
 /**
