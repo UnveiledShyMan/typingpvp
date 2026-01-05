@@ -238,6 +238,30 @@ app.use('/api/friends', friendsRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/discord', discordRoutes);
 
+// Route de santé pour Socket.io - vérifie que le serveur Socket.io fonctionne
+// IMPORTANT: Cette route doit être AVANT la route catch-all
+app.get('/api/socket-health', (req, res) => {
+  const socketCount = io.sockets.sockets.size;
+  res.json({
+    status: 'ok',
+    socketIo: {
+      connected: true,
+      activeConnections: socketCount,
+      transports: ['polling'],
+      path: '/socket.io/'
+    },
+    cors: {
+      allowedOrigins: allowedSocketOrigins,
+      currentOrigin: req.headers.origin
+    },
+    server: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      clientUrl: process.env.CLIENT_URL || 'not set',
+      port: process.env.PORT || 3001
+    }
+  });
+});
+
 // Servir les fichiers uploadés statiquement
 // Les avatars seront accessibles via /uploads/avatars/filename
 const uploadsPath = join(__dirname, 'uploads');
@@ -310,6 +334,7 @@ if (process.env.SERVE_CLIENT === 'true') {
 
 // Route de test pour Socket.io (sans connexion)
 // Cette route permet de vérifier que Socket.io est accessible
+// IMPORTANT: Cette route doit être AVANT la route catch-all
 app.get('/socket.io/test', (req, res) => {
   res.json({ 
     message: 'Socket.io endpoint is accessible',
@@ -326,29 +351,6 @@ app.get('/socket.io/test', (req, res) => {
   });
 });
 
-// Route de santé pour Socket.io - vérifie que le serveur Socket.io fonctionne
-app.get('/api/socket-health', (req, res) => {
-  const socketCount = io.sockets.sockets.size;
-  res.json({
-    status: 'ok',
-    socketIo: {
-      connected: true,
-      activeConnections: socketCount,
-      transports: ['polling'],
-      path: '/socket.io/'
-    },
-    cors: {
-      allowedOrigins: allowedSocketOrigins,
-      currentOrigin: req.headers.origin
-    },
-    server: {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      clientUrl: process.env.CLIENT_URL || 'not set',
-      port: process.env.PORT || 3001
-    }
-  });
-});
-
 // Gestion des erreurs Socket.io avec logs détaillés
 io.engine.on('connection_error', (err) => {
   console.error('❌ Erreur de connexion Socket.io:', err.message);
@@ -356,8 +358,16 @@ io.engine.on('connection_error', (err) => {
   if (err.req) {
     console.error('URL:', err.req.url);
     console.error('SID:', err.req._query?.sid);
-    console.error('Transport:', err.req._query?.transport);
+    console.error('Transport demandé:', err.req._query?.transport);
     console.error('Origin:', err.req.headers?.origin);
+    console.error('Host:', err.req.headers?.host);
+    
+    // Gérer spécifiquement l'erreur "Transport unknown"
+    if (err.message && err.message.includes('Transport unknown')) {
+      console.error('⚠️ Transport inconnu détecté - Le client essaie d\'utiliser un transport non autorisé');
+      console.error('⚠️ Transports autorisés: polling uniquement');
+      console.error('⚠️ Transport demandé:', err.req._query?.transport || 'non spécifié');
+    }
   }
   if (err.context) {
     console.error('Context:', err.context);

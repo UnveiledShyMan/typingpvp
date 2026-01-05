@@ -86,6 +86,12 @@ export function getSocket(forceNew = false) {
       // Ajouter des options supplémentaires pour la stabilité
       autoConnect: true,
       reconnectionDelayMax: 5000,
+      // Forcer explicitement le transport polling dès le début pour éviter "Transport unknown"
+      // Ne pas laisser Socket.io négocier d'autres transports
+      rememberUpgrade: false, // Ne pas se souvenir des upgrades précédents
+      // S'assurer que seul polling est utilisé
+      transports: ['polling'],
+      upgrade: false,
     });
     
     // Ajouter des listeners pour le debugging
