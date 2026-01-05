@@ -169,10 +169,13 @@ async function main() {
     await checkServerDependencies();
     
     // 2. Builder le client (supprime client/dist/ et rebuild)
-    // En mode non-bloquant pour ne pas bloquer le démarrage du serveur
-    buildClient().catch(err => {
-      console.error('Avertissement: Le build du client a échoué, mais le serveur continue:', err.message);
-    });
+    // ATTENDRE que le build soit terminé avant de démarrer le serveur
+    console.log('Build du client en cours...');
+    const clientBuilt = await buildClient();
+    if (!clientBuilt) {
+      console.error('❌ Le build du client a échoué. Le serveur ne peut pas démarrer sans le client.');
+      process.exit(1);
+    }
     
     // 3. Vérifier et initialiser la base de données
     const dbInitialized = await checkDatabase();
