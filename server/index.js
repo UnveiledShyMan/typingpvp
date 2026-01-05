@@ -27,6 +27,7 @@ const app = express();
 const httpServer = createServer(app);
 
 // Configuration Socket.io - optimisée pour Plesk/Apache
+// Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -36,11 +37,18 @@ const io = new Server(httpServer, {
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  // Timeouts plus courts pour éviter que Plesk tue les connexions
-  pingTimeout: 20000, // 20 secondes
-  pingInterval: 10000, // 10 secondes
+  // Timeouts très courts pour éviter que Plesk tue les connexions
+  // Plesk vérifie les connexions long-running, donc on doit être très agressif
+  pingTimeout: 10000, // 10 secondes (réduit de 20s)
+  pingInterval: 5000, // 5 secondes (réduit de 10s) - heartbeat plus fréquent
   // Permettre les reconnexions rapides
-  connectTimeout: 20000 // 20 secondes
+  connectTimeout: 10000, // 10 secondes (réduit de 20s)
+  // Réduire la taille du buffer pour éviter les timeouts
+  maxHttpBufferSize: 1e6, // 1MB au lieu de la valeur par défaut
+  // Forcer la fermeture des connexions inactives rapidement
+  allowEIO3: true,
+  // Compression désactivée pour réduire la latence
+  compression: false
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
