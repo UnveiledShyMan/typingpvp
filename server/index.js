@@ -1350,13 +1350,41 @@ try {
   // Gérer les erreurs du serveur HTTP après démarrage
   httpServer.on('error', (error) => {
     console.error('❌ Erreur HTTP serveur:', error);
+    console.error('Code:', error.code);
+    console.error('Stack:', error.stack);
     // Ne pas faire planter le serveur, juste logger
   });
   
   // Gérer les erreurs de connexion
   httpServer.on('clientError', (error, socket) => {
     console.error('❌ Erreur client HTTP:', error.message);
+    // Ne pas logger toutes les erreurs client (peut être très verbeux)
+    if (error.code !== 'ECONNRESET' && error.code !== 'EPIPE') {
+      console.error('Code:', error.code);
+    }
     socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+  });
+  
+  // Monitoring de la santé du serveur
+  let requestCount = 0;
+  let errorCount = 0;
+  
+  app.use((req, res, next) => {
+    requestCount++;
+    // Logger toutes les 100 requêtes pour monitoring
+    if (requestCount % 100 === 0) {
+      console.log(`📊 Statistiques serveur: ${requestCount} requêtes, ${errorCount} erreurs`);
+    }
+    next();
+  });
+  
+  // Logger les erreurs de requête
+  app.use((err, req, res, next) => {
+    errorCount++;
+    console.error('❌ Erreur dans une requête:', err.message);
+    console.error('URL:', req.url);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ error: 'Internal server error' });
   });
   
 } catch (error) {
