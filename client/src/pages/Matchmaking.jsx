@@ -164,8 +164,6 @@ export default function Matchmaking() {
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     socketRef.current = io(apiUrl, {
-      transports: ['polling'],
-      upgrade: false,
       reconnection: true
     });
 
