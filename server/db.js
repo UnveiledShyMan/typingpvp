@@ -169,28 +169,61 @@ export async function getRankingsByLanguage(language, limit = 100) {
  */
 export async function updateUser(user) {
   try {
+    // Vérifier si la colonne preferences existe, sinon on l'ignore
+    const hasPreferences = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='users' AND column_name='preferences'
+    `);
+    
+    const updateFields = hasPreferences.rows.length > 0
+      ? `username = $1, email = $2, password_hash = $3, avatar = $4, 
+         bio = $5, gear = $6, social_media = $7, friends = $8, 
+         friend_requests_sent = $9, friend_requests_received = $10, 
+         mmr = $11, stats = $12, preferences = $13`
+      : `username = $1, email = $2, password_hash = $3, avatar = $4, 
+         bio = $5, gear = $6, social_media = $7, friends = $8, 
+         friend_requests_sent = $9, friend_requests_received = $10, 
+         mmr = $11, stats = $12`;
+    
+    const params = hasPreferences.rows.length > 0
+      ? [
+          user.username,
+          user.email,
+          user.passwordHash,
+          user.avatar,
+          user.bio,
+          user.gear,
+          JSON.stringify(user.socialMedia),
+          user.friends,
+          user.friendRequests.sent,
+          user.friendRequests.received,
+          JSON.stringify(user.mmr),
+          JSON.stringify(user.stats),
+          JSON.stringify(user.preferences || { defaultMode: 'solo' }),
+          user.id
+        ]
+      : [
+          user.username,
+          user.email,
+          user.passwordHash,
+          user.avatar,
+          user.bio,
+          user.gear,
+          JSON.stringify(user.socialMedia),
+          user.friends,
+          user.friendRequests.sent,
+          user.friendRequests.received,
+          JSON.stringify(user.mmr),
+          JSON.stringify(user.stats),
+          user.id
+        ];
+    
     await pool.query(
       `UPDATE users 
-       SET username = $1, email = $2, password_hash = $3, avatar = $4, 
-           bio = $5, gear = $6, social_media = $7, friends = $8, 
-           friend_requests_sent = $9, friend_requests_received = $10, 
-           mmr = $11, stats = $12
-       WHERE id = $13`,
-      [
-        user.username,
-        user.email,
-        user.passwordHash,
-        user.avatar,
-        user.bio,
-        user.gear,
-        JSON.stringify(user.socialMedia),
-        user.friends,
-        user.friendRequests.sent,
-        user.friendRequests.received,
-        JSON.stringify(user.mmr),
-        JSON.stringify(user.stats),
-        user.id
-      ]
+       SET ${updateFields}
+       WHERE id = $${params.length}`,
+      params
     );
   } catch (error) {
     console.error('Error updating user:', error);
@@ -360,6 +393,20 @@ function rowToUser(row) {
     };
   }
   
+  let preferences = row.preferences;
+  if (typeof preferences === 'string') {
+    try {
+      preferences = JSON.parse(preferences);
+    } catch (e) {
+      preferences = {};
+    }
+  }
+  if (!preferences || typeof preferences !== 'object') {
+    preferences = {
+      defaultMode: 'solo'
+    };
+  }
+  
   return new User({
     id: row.id,
     username: row.username,
@@ -376,6 +423,7 @@ function rowToUser(row) {
     },
     createdAt: row.created_at,
     mmr: mmr,
-    stats: stats
+    stats: stats,
+    preferences: preferences
   });
 }

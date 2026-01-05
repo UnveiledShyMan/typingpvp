@@ -1,8 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { generateText, languages } from '../data/languages'
 import { generateNumbers } from '../data/numbers'
 import LanguageSelector from '../components/LanguageSelector'
+import ThemeSelector from '../components/ThemeSelector'
+import FontSelector from '../components/FontSelector'
+import SmoothnessSelector from '../components/SmoothnessSelector'
+import WordsIcon from '../components/icons/WordsIcon'
+import NumbersIcon from '../components/icons/NumbersIcon'
+import { getDefaultLanguage } from '../utils/languageDetection'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts'
 
 const TIME_LIMIT = 60; // 60 secondes
@@ -10,7 +16,8 @@ const TIME_LIMIT = 60; // 60 secondes
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Solo() {
-  const [selectedLang, setSelectedLang] = useState('en');
+  // Détecter automatiquement la langue au chargement
+  const [selectedLang, setSelectedLang] = useState(() => getDefaultLanguage());
   const [mode, setMode] = useState('words'); // 'words' or 'numbers'
   const [text, setText] = useState('');
   const [input, setInput] = useState('');
@@ -21,6 +28,7 @@ export default function Solo() {
   const [errors, setErrors] = useState(0);
   const [timeSeries, setTimeSeries] = useState([]); // Pour les graphiques
   const [totalWords, setTotalWords] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
   const intervalRef = useRef(null);
   const textContainerRef = useRef(null);
@@ -28,9 +36,9 @@ export default function Solo() {
 
   useEffect(() => {
     if (mode === 'numbers') {
-      setText(generateNumbers(200));
+      setText(generateNumbers(300));
     } else {
-      setText(generateText(selectedLang, 200)); // Plus de texte pour 60 secondes
+      setText(generateText(selectedLang, 300)); // Plus de texte pour 60 secondes
     }
     setInput('');
     setStartTime(null);
@@ -51,6 +59,27 @@ export default function Solo() {
       inputRef.current.focus();
     }
   }, [finished, text, timeLeft]);
+
+  // Gérer le focus/blur pour l'indicateur visuel - optimisé avec useCallback
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+  }, []);
+
+  // Empêcher le menu contextuel (clic droit) et la sélection du texte - style Monkeytype
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    return false;
+  }, []);
+
+  // Empêcher la sélection du texte avec un clic long ou un glisser-déposer
+  const handleSelectStart = useCallback((e) => {
+    e.preventDefault();
+    return false;
+  }, []);
 
   // Timer pour les 60 secondes
   useEffect(() => {
@@ -109,105 +138,140 @@ export default function Solo() {
     }
   }, [finished, stats.wpm, stats.accuracy, selectedLang, mode]);
 
-  const handleInputChange = (e) => {
+  // Sauvegarder la langue quand elle change - optimisé avec useCallback
+  const handleLanguageChange = useCallback((langCode) => {
+    setSelectedLang(langCode);
+    localStorage.setItem('typingLanguage', langCode);
+  }, []);
+
+  // Ref pour throttler les calculs de stats
+  const statsUpdateRef = useRef(null);
+  const scrollUpdateRef = useRef(null);
+  const lastErrorCountRef = useRef(0);
+
+  const handleInputChange = useCallback((e) => {
     if (finished) return;
     
     const value = e.target.value;
+    
+    // Mise à jour immédiate de l'input pour réduire l'input lag
+    if (value.length <= text.length) {
+      setInput(value);
+    }
     
     if (!startTime && value.length > 0) {
       setStartTime(Date.now());
     }
 
-    // Générer plus de texte si nécessaire
+    // Générer plus de texte si nécessaire (déféré pour ne pas bloquer)
     if (value.length >= text.length - 50) {
-      const additionalText = mode === 'numbers' ? generateNumbers(50) : generateText(selectedLang, 50);
-      setText(text + ' ' + additionalText);
+      requestAnimationFrame(() => {
+        const additionalText = mode === 'numbers' ? generateNumbers(100) : generateText(selectedLang, 100);
+        // Les espaces sont déjà inclus dans le texte généré (avant les mots)
+        setText(prev => prev + additionalText);
+      });
     }
 
     if (value.length <= text.length) {
-      setInput(value);
-      
-      // Calculer les erreurs
-      let errorCount = 0;
-      for (let i = 0; i < value.length; i++) {
-        if (value[i] !== text[i]) {
-          errorCount++;
+      // Calculer les erreurs de manière optimisée (seulement les nouveaux caractères)
+      let errorCount = lastErrorCountRef.current;
+      if (value.length > input.length) {
+        // Nouveau caractère ajouté - vérifier seulement le dernier
+        for (let i = input.length; i < value.length; i++) {
+          if (value[i] !== text[i]) {
+            errorCount++;
+          } else if (i < input.length && input[i] !== text[i]) {
+            // Correction d'une erreur précédente
+            errorCount = Math.max(0, errorCount - 1);
+          }
         }
+      } else if (value.length < input.length) {
+        // Caractère supprimé - recalculer depuis le début (rare)
+        errorCount = 0;
+        for (let i = 0; i < value.length; i++) {
+          if (value[i] !== text[i]) {
+            errorCount++;
+          }
+        }
+        // Réinitialiser les refs lors de la suppression si nécessaire
       }
+      lastErrorCountRef.current = errorCount;
       setErrors(errorCount);
 
-      // Calculer les stats
+      // Calculer les stats de manière throttlée (pas à chaque frappe)
       if (startTime) {
-        const timeElapsed = (TIME_LIMIT - timeLeft) / 60; // en minutes
-        
-        // Calcul du WPM standard : (caractères tapés / 5) / temps en minutes
-        // Cette méthode est plus stable et ne diminue pas quand on fait des erreurs
-        // On compte tous les caractères tapés (y compris les erreurs)
-        const charactersTyped = value.length;
-        const wpm = timeElapsed > 0 ? Math.round((charactersTyped / 5) / timeElapsed) : 0;
-        
-        // Compter les mots pour l'affichage (utilisé pour totalWords)
-        // On compte les mots complétés correctement pour l'affichage final
-        let wordsTyped = 0;
-        const textWords = text.trim().split(/\s+/).filter(w => w.length > 0);
-        let correctChars = 0;
-        
-        // Compter les caractères corrects tapés
-        for (let i = 0; i < Math.min(value.length, text.length); i++) {
-          if (value[i] === text[i]) {
-            correctChars++;
-          }
+        // Annuler le calcul précédent s'il existe
+        if (statsUpdateRef.current) {
+          cancelAnimationFrame(statsUpdateRef.current);
         }
         
-        // Estimer les mots complétés basés sur les caractères corrects
-        // En moyenne, un mot fait 5 caractères, donc on divise par 5
-        wordsTyped = Math.floor(correctChars / 5);
-        const accuracy = value.length > 0 
-          ? Math.round(((value.length - errorCount) / value.length) * 100)
-          : 100;
-        
-        setStats({ 
-          wpm, 
-          accuracy, 
-          time: TIME_LIMIT - timeLeft, 
-          chars: value.length 
-        });
-        setTotalWords(wordsTyped);
-
-        // Enregistrer les stats chaque seconde pour le graphique
-        const currentSecond = TIME_LIMIT - timeLeft;
-        setTimeSeries((prev) => {
-          const existing = prev.findIndex((item) => item.second === currentSecond);
-          const newData = { second: currentSecond, wpm, accuracy };
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = newData;
-            return updated;
-          }
-          return [...prev, newData].sort((a, b) => a.second - b.second);
-        });
-
-        // Auto-scroll pour suivre la position de frappe
-        if (textContainerRef.current) {
-          const container = textContainerRef.current;
-          const currentCharElement = container.querySelector(`span:nth-child(${value.length + 1})`);
-          if (currentCharElement) {
-            const containerRect = container.getBoundingClientRect();
-            const charRect = currentCharElement.getBoundingClientRect();
-            const charTop = charRect.top - containerRect.top + container.scrollTop;
-            const charBottom = charTop + charRect.height;
-            
-            // Scroll si le caractère courant est en dehors de la zone visible
-            if (charTop < container.scrollTop + 50) {
-              container.scrollTop = Math.max(0, charTop - 50);
-            } else if (charBottom > container.scrollTop + container.clientHeight - 50) {
-              container.scrollTop = charBottom - container.clientHeight + 50;
+        // Déférer les calculs de stats pour ne pas bloquer l'input
+        statsUpdateRef.current = requestAnimationFrame(() => {
+          const timeElapsed = (TIME_LIMIT - timeLeft) / 60;
+          
+          // Calcul optimisé des caractères corrects (seulement les nouveaux)
+          let correctChars = 0;
+          const minLen = Math.min(value.length, text.length);
+          for (let i = 0; i < minLen; i++) {
+            if (value[i] === text[i]) {
+              correctChars++;
             }
           }
+          
+          // WPM basé uniquement sur les caractères corrects - empêche le spam du clavier
+          // Un mot = 5 caractères, donc on divise les caractères corrects par 5
+          const wordsTyped = correctChars / 5;
+          const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
+          
+          const accuracy = value.length > 0 
+            ? Math.round(((value.length - errorCount) / value.length) * 100)
+            : 100;
+          
+          setStats({ 
+            wpm, 
+            accuracy, 
+            time: TIME_LIMIT - timeLeft, 
+            chars: value.length 
+          });
+          setTotalWords(Math.floor(wordsTyped));
+
+          // Enregistrer les stats chaque seconde pour le graphique (throttlé)
+          const currentSecond = TIME_LIMIT - timeLeft;
+          setTimeSeries((prev) => {
+            const existing = prev.findIndex((item) => item.second === currentSecond);
+            const newData = { second: currentSecond, wpm, accuracy };
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = newData;
+              return updated;
+            }
+            return [...prev, newData].sort((a, b) => a.second - b.second);
+          });
+        });
+
+        // Scroll simple et fluide : suivre le curseur
+        if (scrollUpdateRef.current) {
+          cancelAnimationFrame(scrollUpdateRef.current);
         }
+        
+        scrollUpdateRef.current = requestAnimationFrame(() => {
+          if (textContainerRef.current) {
+            const container = textContainerRef.current;
+            const currentCharElement = container.querySelector('.char-current');
+            
+            if (currentCharElement) {
+              // Scroll simple : centrer le curseur dans la zone visible
+              currentCharElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'nearest'
+              });
+            }
+          }
+        });
       }
     }
-  };
+  }, [finished, text, startTime, timeLeft, mode, selectedLang, input.length]);
 
   const reset = () => {
     setInput('');
@@ -219,10 +283,11 @@ export default function Solo() {
     setTimeSeries([]);
     setTotalWords(0);
     matchRecordedRef.current = false; // Réinitialiser pour le prochain match
+    lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
     if (mode === 'numbers') {
-      setText(generateNumbers(200));
+      setText(generateNumbers(300));
     } else {
-      setText(generateText(selectedLang, 200));
+      setText(generateText(selectedLang, 300));
     }
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -233,30 +298,43 @@ export default function Solo() {
     }
   };
 
-  const renderText = () => {
+  // Rendu simple caractère par caractère - comme avant
+  const renderText = useMemo(() => {
     return text.split('').map((char, index) => {
       if (index < input.length) {
+        // Caractère déjà tapé
         const isCorrect = input[index] === char;
         return (
-          <span key={index} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
+          <span 
+            key={index} 
+            className={isCorrect ? 'char-correct' : 'char-incorrect'}
+          >
             {char}
           </span>
         );
       } else if (index === input.length) {
+        // Curseur sur ce caractère
         return (
-          <span key={index} className="char-current">
+          <span 
+            key={index} 
+            className="char-current"
+          >
             {char}
           </span>
         );
       } else {
+        // Caractère à venir
         return (
-          <span key={index} className="char-pending">
+          <span 
+            key={index} 
+            className="char-pending"
+          >
             {char}
           </span>
         );
       }
     });
-  };
+  }, [text, input]);
 
   // Préparer les données pour le graphique
   const chartData = timeSeries.map((item) => ({
@@ -274,88 +352,119 @@ export default function Solo() {
     : 100;
 
   return (
-    <div className="solo-container px-6 py-12 flex flex-col items-center">
-      {/* Controls bar - Style minimaliste */}
-      <div className="flex justify-center items-center gap-4 mb-12">
-        <div className="flex gap-2 bg-bg-secondary rounded-lg p-1 border border-border-secondary">
+    <div className="w-full h-full max-w-4xl mx-auto flex flex-col items-center justify-center overflow-hidden py-4 sm:py-8">
+      {/* Controls bar - Style Monkeytype minimaliste et discret avec icônes cohérentes */}
+      <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-3 mb-4 sm:mb-6 w-full">
+        {/* Boutons mode avec icônes */}
+        <div className="flex gap-1">
           <button
             onClick={() => setMode('words')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`p-2 rounded-md transition-all duration-200 ${
               mode === 'words'
-                ? 'bg-accent-primary text-bg-primary'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-accent-primary/20 text-accent-primary opacity-100'
+                : 'bg-bg-secondary/20 text-text-secondary/60 hover:text-text-primary hover:bg-bg-secondary/40 opacity-60 hover:opacity-100'
             }`}
+            aria-label="Words mode"
           >
-            Words
+            <WordsIcon className="w-4 h-4" stroke="currentColor" />
           </button>
           <button
             onClick={() => setMode('numbers')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`p-2 rounded-md transition-all duration-200 ${
               mode === 'numbers'
-                ? 'bg-accent-primary text-bg-primary'
-                : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-accent-primary/20 text-accent-primary opacity-100'
+                : 'bg-bg-secondary/20 text-text-secondary/60 hover:text-text-primary hover:bg-bg-secondary/40 opacity-60 hover:opacity-100'
             }`}
+            aria-label="Numbers mode"
           >
-            Numbers
+            <NumbersIcon className="w-4 h-4" stroke="currentColor" />
           </button>
         </div>
+        {/* Sélecteur de langue - Affiche le code langue (FR, ENG, etc.) */}
         {mode === 'words' && (
-          <LanguageSelector selectedLang={selectedLang} onLanguageChange={setSelectedLang} />
+          <LanguageSelector selectedLang={selectedLang} onLanguageChange={handleLanguageChange} />
         )}
+        {/* Sélecteurs de thème, police et smoothness */}
+        <div className="flex items-center gap-1">
+          <ThemeSelector />
+          <FontSelector />
+          <SmoothnessSelector />
+        </div>
       </div>
 
       {!finished ? (
-          <div className="space-y-10 w-full">
-            {/* Stats - Centré et compact (style Monkeytype) */}
-            <div className="flex justify-center gap-12 text-text-primary">
+          <div className="space-y-4 sm:space-y-6 w-full max-w-3xl flex flex-col items-center">
+            {/* Stats - Style Monkeytype compact avec animation de fondu */}
+            <div className="flex justify-center gap-4 sm:gap-6 text-text-primary animate-fade-in">
               <div className="text-center">
-                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
+                <div className="text-3xl sm:text-4xl font-bold mb-0.5 stats-number">
                   {timeLeft}
                 </div>
-                <div className="text-text-secondary text-xs uppercase tracking-wider">seconds</div>
+                <div className="text-text-secondary/50 text-[10px] uppercase tracking-wider">time</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'JetBrains Mono' }}>{stats.wpm}</div>
-                <div className="text-text-secondary text-xs uppercase tracking-wider">wpm</div>
+                <div className="text-3xl sm:text-4xl font-bold mb-0.5 stats-number">{stats.wpm}</div>
+                <div className="text-text-secondary/50 text-[10px] uppercase tracking-wider">wpm</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'JetBrains Mono' }}>{stats.accuracy}%</div>
-                <div className="text-text-secondary text-xs uppercase tracking-wider">accuracy</div>
+                <div className="text-3xl sm:text-4xl font-bold mb-0.5 stats-number">{stats.accuracy}%</div>
+                <div className="text-text-secondary/50 text-[10px] uppercase tracking-wider">acc</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'JetBrains Mono' }}>{totalWords}</div>
-                <div className="text-text-secondary text-xs uppercase tracking-wider">words</div>
+                <div className="text-3xl sm:text-4xl font-bold mb-0.5 stats-number">{totalWords}</div>
+                <div className="text-text-secondary/50 text-[10px] uppercase tracking-wider">words</div>
               </div>
             </div>
 
-            {/* Text area - Plus grande et centrée */}
+            {/* Text area - Style Monkeytype compact et centré avec indicateur de focus */}
             <div 
               ref={textContainerRef}
-              className="typing-text bg-bg-card p-10 sm:p-12 rounded-xl border border-border-secondary mb-6 w-full" 
-              style={{ minHeight: '220px', maxHeight: '350px', overflowY: 'auto', scrollBehavior: 'smooth' }}
+              onClick={() => inputRef.current?.focus()}
+              onContextMenu={handleContextMenu}
+              onSelectStart={handleSelectStart}
+              onDragStart={(e) => e.preventDefault()}
+              className={`typing-text bg-transparent rounded-lg w-full overflow-y-auto cursor-text relative transition-all duration-300 ${
+                isFocused ? 'typing-area-focused' : 'typing-area-unfocused'
+              }`}
+              style={{ 
+                // Hauteur exacte pour 3 lignes complètes : line-height 1.8 * font-size 1.5rem * 3 lignes
+                // Ajout d'un petit buffer pour s'assurer que la troisième ligne n'est pas coupée
+                // Le line-height inclut déjà l'espace entre les lignes, donc on multiplie par 3
+                height: 'calc(1.5rem * 1.8 * 3)',
+                scrollBehavior: 'smooth',
+                // Assurer que le contenu peut revenir à la ligne
+                width: '100%',
+                maxWidth: '100%',
+                // Masquer la scrollbar mais permettre le scroll
+                overflowY: 'auto',
+                // Pas de padding pour un affichage précis
+                padding: 0
+              }}
             >
-              {renderText()}
+              {renderText}
             </div>
 
-            {/* Input - Style minimaliste mais fonctionnel */}
+            {/* Input invisible - Style Monkeytype (on tape directement sur le texte) */}
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={handleInputChange}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               disabled={finished}
-              className="w-full p-5 bg-bg-secondary/50 border border-border-secondary/50 rounded-lg text-text-primary text-xl focus:outline-none focus:border-accent-primary/50 disabled:opacity-50 placeholder:text-text-secondary/30"
-              placeholder="Start typing..."
+              className="absolute opacity-0 pointer-events-none"
+              placeholder=""
               style={{ fontFamily: 'JetBrains Mono' }}
               autoFocus
             />
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="w-full h-full flex flex-col justify-center space-y-4 sm:space-y-6 overflow-hidden">
             {/* Résultats finaux */}
-            <div className="bg-bg-secondary rounded-lg p-10 border border-text-secondary/20 shadow-lg">
-              <h2 className="text-3xl font-bold text-text-primary mb-8 text-center" style={{ fontFamily: 'Inter' }}>Test Complete</h2>
-              <div className="grid grid-cols-4 gap-8 text-center">
+            <div className="bg-bg-secondary rounded-lg p-6 sm:p-8 border border-text-secondary/20 shadow-lg">
+              <h2 className="text-2xl sm:text-3xl font-bold text-text-primary mb-4 sm:mb-6 text-center" style={{ fontFamily: 'Inter' }}>Test Complete</h2>
+              <div className="grid grid-cols-4 gap-4 sm:gap-6 text-center">
                 <div>
                   <div className="text-3xl font-bold text-text-primary mb-2" style={{ fontFamily: 'JetBrains Mono' }}>
                     {stats.wpm}
@@ -385,9 +494,10 @@ export default function Solo() {
 
             {/* Graphiques */}
             {chartData.length > 0 && (
-              <div className="bg-bg-secondary rounded-lg p-10 border border-text-secondary/10 shadow-lg">
-                <h3 className="text-2xl font-bold text-text-primary mb-8" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>Performance Chart</h3>
-                <ResponsiveContainer width="100%" height={400}>
+              <div className="bg-bg-secondary rounded-lg p-4 sm:p-6 border border-text-secondary/10 shadow-lg flex-1 flex flex-col min-h-0">
+                <h3 className="text-xl sm:text-2xl font-bold text-text-primary mb-4 sm:mb-6" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>Performance Chart</h3>
+                <div className="flex-1 min-h-0">
+                  <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorWpm" x1="0" y1="0" x2="0" y2="1">
@@ -468,13 +578,14 @@ export default function Solo() {
                     />
                   </AreaChart>
                 </ResponsiveContainer>
+                </div>
               </div>
             )}
 
-            <div className="text-center">
+            <div className="text-center pt-2">
               <button
                 onClick={reset}
-                className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-8 rounded transition-colors"
+                className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded transition-colors text-sm sm:text-base"
               >
                 test again
               </button>

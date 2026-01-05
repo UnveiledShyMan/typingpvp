@@ -244,6 +244,7 @@ export const languages = {
 };
 
 // Fonction pour générer un texte aléatoire avec X mots
+// Les espaces sont placés AVANT les mots (sauf le premier) pour éviter les décalages lors du retour à la ligne
 export function generateText(langCode, wordCount = 50) {
   const lang = languages[langCode] || languages.en;
   const words = lang.words;
@@ -251,9 +252,14 @@ export function generateText(langCode, wordCount = 50) {
   
   for (let i = 0; i < wordCount; i++) {
     const randomIndex = Math.floor(Math.random() * words.length);
-    result.push(words[randomIndex]);
+    // Placer l'espace avant le mot (sauf pour le premier mot)
+    if (i === 0) {
+      result.push(words[randomIndex]);
+    } else {
+      result.push(' ' + words[randomIndex]);
+    }
   }
   
-  return result.join(' ');
+  return result.join('');
 }
 

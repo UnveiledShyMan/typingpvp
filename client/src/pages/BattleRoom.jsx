@@ -380,13 +380,13 @@ export default function BattleRoom() {
 
   return (
     <div className="page-container p-4 lg:p-8">
-        <div className="bg-bg-secondary/50 rounded-lg p-6 lg:p-8 border border-text-secondary/10 shadow-lg">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 lg:p-8">
           {/* Layout en deux colonnes : jeu à gauche, chat à droite */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
             {/* Colonne principale : jeu */}
             <div className="min-w-0">
               {/* En-tête sobre */}
-              <div className="mb-6 pb-4 border-b border-text-secondary/10">
+              <div className="mb-6 pb-4">
                 <div className="flex items-center justify-between">
                   <h1 className="text-xl font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
                     Battle #{roomId}
@@ -425,7 +425,7 @@ export default function BattleRoom() {
             <>
               {/* Stats des joueurs - design sobre */}
               <div className="grid md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-bg-primary/50 rounded-lg p-4 border border-text-secondary/10">
+                <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
                   <div className="text-text-primary mb-2 text-sm font-medium">{myPlayer?.name || 'You'}</div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
@@ -442,7 +442,7 @@ export default function BattleRoom() {
                 </div>
                 
                 {opponent && (
-                  <div className="bg-bg-primary/50 rounded-lg p-4 border border-text-secondary/10">
+                  <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
                     <div className="text-text-primary mb-2 text-sm font-medium">{opponent.name}</div>
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.wpm}</div>
@@ -462,7 +462,7 @@ export default function BattleRoom() {
 
               {/* Graphique de progression en temps réel */}
               {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
-                <div className="mb-6 bg-bg-primary/30 rounded-lg p-4 border border-text-secondary/10">
+                <div className="mb-6 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
                   <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress</div>
                   <ResponsiveContainer width="100%" height={150}>
                     <LineChart data={(() => {
@@ -527,7 +527,7 @@ export default function BattleRoom() {
 
               <div 
                 ref={textContainerRef}
-                className="mb-6 typing-text bg-bg-primary/30 p-6 rounded-lg border border-text-secondary/10" 
+                className="mb-6 typing-text bg-bg-primary/30 backdrop-blur-sm p-6 rounded-lg" 
                 style={{ minHeight: '180px', maxHeight: '280px', overflowY: 'auto', scrollBehavior: 'smooth' }}
               >
                 {renderText()}
@@ -539,7 +539,7 @@ export default function BattleRoom() {
                   type="text"
                   value={input}
                   onChange={handleInputChange}
-                  className="w-full p-4 bg-bg-primary/50 border border-text-secondary/10 rounded-lg text-text-primary text-lg focus:outline-none focus:border-accent-primary/50 transition-all"
+                  className="input-modern text-lg"
                   placeholder="Start typing..."
                   style={{ fontFamily: 'JetBrains Mono' }}
                 />
@@ -564,8 +564,8 @@ export default function BattleRoom() {
                   return (
                     <div
                       key={player.id}
-                      className={`bg-bg-primary/50 rounded-lg p-6 border ${
-                        isWinner ? 'border-accent-primary/50' : 'border-text-secondary/10'
+                      className={`bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 ${
+                        isWinner ? 'ring-2 ring-accent-primary/30' : ''
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
@@ -599,7 +599,7 @@ export default function BattleRoom() {
 
               {/* Graphique de fin de partie */}
               {(myTimeSeries.length > 0 || opponentTimeSeries.length > 0) && (
-                <div className="mb-8 bg-bg-primary/30 rounded-lg p-6 border border-text-secondary/10">
+                <div className="mb-8 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6">
                   <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={(() => {
@@ -675,10 +675,10 @@ export default function BattleRoom() {
             </div>
 
             {/* Colonne droite : Chat */}
-            <div className="lg:border-l lg:border-text-secondary/10 lg:pl-6">
-              <div className="bg-bg-primary rounded-lg border border-text-secondary/10 h-full flex flex-col" style={{ minHeight: '500px', maxHeight: 'calc(100vh - 200px)' }}>
+            <div className="lg:pl-6">
+              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg h-full flex flex-col" style={{ minHeight: '500px', maxHeight: 'calc(100vh - 200px)' }}>
                 {/* En-tête du chat */}
-                <div className="p-4 border-b border-text-secondary/10">
+                <div className="p-4">
                   <h3 className="text-text-primary font-semibold" style={{ fontFamily: 'Inter' }}>Chat</h3>
                 </div>
 
@@ -711,14 +711,14 @@ export default function BattleRoom() {
                 </div>
 
                 {/* Input du chat */}
-                <form onSubmit={handleSendChatMessage} className="p-4 border-t border-text-secondary/10">
+                <form onSubmit={handleSendChatMessage} className="p-4">
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       placeholder="Type a message..."
-                      className="flex-1 px-3 py-2 bg-bg-secondary border border-text-secondary/20 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50 transition-colors"
+                      className="flex-1 px-3 py-2 input-modern text-sm"
                       disabled={gameStatus === 'playing'}
                     />
                     <button

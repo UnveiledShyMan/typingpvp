@@ -105,13 +105,14 @@ export default function Competitions() {
   };
 
   return (
-    <div className="page-container p-8">
-      <h1 className="text-4xl font-bold text-text-primary mb-8" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+    <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
+      <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4 sm:mb-6 flex-shrink-0" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
         Competitions
       </h1>
+      <div className="flex-1 min-h-0 overflow-y-auto">
 
       {!user && (
-        <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-8 text-center shadow-lg mb-6">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center mb-6">
           <p className="text-text-secondary text-lg mb-4">Please login to participate in competitions</p>
           <button
             onClick={() => navigate('/')}
@@ -125,7 +126,7 @@ export default function Competitions() {
       <div className="grid md:grid-cols-3 gap-6">
         {/* Create Competition */}
         {user && (
-          <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-6 shadow-lg">
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
             <h2 className="text-xl font-bold text-text-primary mb-4">Create Competition</h2>
             <div className="space-y-4">
               <div>
@@ -133,7 +134,7 @@ export default function Competitions() {
                 <select
                   value={selectedLang}
                   onChange={(e) => setSelectedLang(e.target.value)}
-                  className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-medium"
+                  className="input-modern font-medium"
                 >
                   {Object.entries(languages).map(([code, lang]) => (
                     <option key={code} value={code} className="bg-bg-primary">
@@ -156,7 +157,7 @@ export default function Competitions() {
         <div className={`${user ? 'md:col-span-2' : 'md:col-span-3'}`}>
           <h2 className="text-xl font-bold text-text-primary mb-4">Available Competitions</h2>
           {competitions.length === 0 ? (
-            <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-12 text-center shadow-lg">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-12 text-center">
               <p className="text-text-secondary">No competitions available at the moment</p>
               <p className="text-text-secondary/70 text-sm mt-2">Create one to get started!</p>
             </div>
@@ -165,7 +166,7 @@ export default function Competitions() {
               {competitions.map((comp) => (
                 <div
                   key={comp.id}
-                  className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-4 hover:border-accent-primary/30 transition-colors shadow-lg"
+                  className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-secondary/60 transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -201,6 +202,7 @@ export default function Competitions() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

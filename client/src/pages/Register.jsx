@@ -52,10 +52,10 @@ export default function Register({ onSuccess, onSwitch }) {
       <h1 className="text-4xl font-bold text-text-primary mb-8 text-center" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
         Register
       </h1>
-      <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-8 shadow-lg">
+      <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
+            <div className="bg-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -66,7 +66,7 @@ export default function Register({ onSuccess, onSwitch }) {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+              className="input-modern"
               required
             />
           </div>
@@ -77,7 +77,7 @@ export default function Register({ onSuccess, onSwitch }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+              className="input-modern"
               required
             />
           </div>
@@ -88,7 +88,7 @@ export default function Register({ onSuccess, onSwitch }) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+              className="input-modern"
               required
             />
           </div>
@@ -99,7 +99,7 @@ export default function Register({ onSuccess, onSwitch }) {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+              className="input-modern"
               required
             />
           </div>

@@ -22,10 +22,15 @@ export function generateNumbers(count = 50) {
       }
     }
     
-    numbers.push(number);
+    // Placer l'espace avant le nombre (sauf pour le premier)
+    if (i === 0) {
+      numbers.push(number);
+    } else {
+      numbers.push(' ' + number);
+    }
   }
   
-  return numbers.join(' ');
+  return numbers.join('');
 }
 
 

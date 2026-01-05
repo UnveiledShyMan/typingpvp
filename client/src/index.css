@@ -8,45 +8,155 @@
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
-body {
+:root {
+  --bg-primary: #0a0e1a;
+  --text-primary: #e8ecf3;
+  --accent-primary: #8b5cf6;
+  --typing-font: 'JetBrains Mono', monospace;
+  --typing-transition-duration: 200ms; /* Smoothness par défaut */
+  --cursor-lag-duration: 0ms; /* Délai du curseur - contrôlé par smoothness */
+}
+
+html, body {
   margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0e1a;
+  background: var(--bg-primary);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%);
-  color: #e8ecf3;
-  min-height: 100vh;
+    radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
+  color: var(--text-primary);
+  height: 100vh;
   font-weight: 400;
+  /* Animation de fondu noir et léger au chargement */
+  animation: fadeInBodyDark 0.5s ease-in;
+}
+
+@keyframes fadeInBodyDark {
+  from {
+    opacity: 0;
+    background-color: #000000;
+  }
+  to {
+    opacity: 1;
+    background-color: var(--bg-primary);
+  }
 }
 
 code {
   font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, monospace;
 }
 
-/* Styles pour le texte de dactylo - Style moderne et immersif */
+/* Styles pour le texte de dactylo - Style Monkeytype épuré et compact */
 .typing-text {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 2rem;
-  line-height: 2;
+  font-family: var(--typing-font, 'JetBrains Mono', 'Courier New', monospace);
+  font-size: 1.5rem;
+  line-height: 1.8;
   letter-spacing: 0.02em;
   font-weight: 400;
   word-spacing: 0.25em;
   color: #9ca3b8;
+  background: transparent;
+  text-align: center;
+  /* Prévenir le changement de police */
+  font-display: block;
+  /* Préserver les espaces mais permettre le retour à la ligne automatique */
+  white-space: pre-wrap;
+  /* Empêcher la coupure des mots - les mots entiers passent à la ligne suivante */
+  /* Cela évite les décalages lors de la frappe d'un mot */
+  word-break: normal;
+  word-wrap: normal;
+  overflow-wrap: normal;
+  /* Désactiver les césures pour éviter les coupures de mots */
+  hyphens: none;
+  /* Scroll smooth pour un défilement fluide et intelligent */
+  scroll-behavior: smooth;
+  /* Empêcher la sélection du texte - style Monkeytype */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  /* Empêcher le glisser-déposer */
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  /* Espacement des mots */
+  word-spacing: 0.25em;
+  /* Alignement vertical pour éviter que le texte commence en haut */
+  display: block;
+  /* Pas de padding pour un affichage précis de 3 lignes */
+  padding-top: 0;
+  padding-bottom: 0;
+  /* Stabiliser le layout pour éviter les mouvements - mais pas strict pour permettre le scroll */
+  contain: layout style;
+  /* Forcer la création d'un nouveau contexte de stacking pour éviter les recalculs */
+  isolation: isolate;
+  /* Optimiser le rendu pour éviter les décalages */
+  backface-visibility: hidden;
+  /* Scroll doux et fluide - mais seulement manuel */
+  scroll-behavior: smooth;
+  /* Assurer qu'au moins 3 lignes sont visibles */
+  overflow-y: auto;
+  /* Forcer l'accélération GPU pour un rendu plus stable */
+  transform: translateZ(0);
+  /* Empêcher les reflows inutiles */
+  will-change: contents;
+  /* Fixer la largeur pour éviter les recalculs */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Indicateur de focus pour la zone de frappe - Style subtil et classe */
+.typing-area-focused {
+  /* Pas de bordure ni de contour - style épuré comme avant */
+  box-shadow: none;
+  background: transparent;
+}
+
+.typing-area-unfocused {
+  /* Pas de bordure ni de contour - style épuré comme avant */
+  box-shadow: none;
+  background: transparent;
+}
+
+/* Animation de transition pour le focus - supprimée car pas d'effet visuel */
+.typing-area-focused,
+.typing-area-unfocused {
+  /* Pas de transition nécessaire sans effet visuel */
+}
+
+/* Classe pour les stats - Utilise toujours JetBrains Mono */
+.stats-number {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-display: block;
 }
 
 @media (max-width: 768px) {
   .typing-text {
-    font-size: 1.5rem;
-    line-height: 1.8;
+    font-size: 1.25rem;
+    line-height: 1.6;
     letter-spacing: 0.01em;
   }
 }
 
+
 .char-correct {
   color: #e8ecf3;
+  transition: color var(--typing-transition-duration, 200ms) ease;
+  display: inline;
+  /* Alignement vertical pour éviter les mouvements lors du retour à la ligne */
+  vertical-align: baseline;
+  /* Hauteur de ligne fixe pour éviter les variations */
+  line-height: inherit;
 }
 
 .char-incorrect {
@@ -54,6 +164,14 @@ code {
   background-color: rgba(244, 114, 182, 0.15);
   border-bottom: 2px solid #f472b6;
   text-shadow: 0 0 8px rgba(244, 114, 182, 0.5);
+  transition: color var(--typing-transition-duration, 200ms) ease, 
+              background-color var(--typing-transition-duration, 200ms) ease,
+              border-bottom var(--typing-transition-duration, 200ms) ease;
+  display: inline;
+  /* Alignement vertical pour éviter les mouvements lors du retour à la ligne */
+  vertical-align: baseline;
+  /* Hauteur de ligne fixe pour éviter les variations */
+  line-height: inherit;
 }
 
 .char-current {
@@ -61,10 +179,98 @@ code {
   color: #0a0e1a;
   text-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
   box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+  /* Transitions optimisées avec will-change pour meilleures performances */
+  will-change: background, color, box-shadow, opacity;
+  /* Transitions fluides pour le déplacement du curseur avec retard contrôlable */
+  /* Le curseur apparaît avec un léger retard pour créer un effet de suivi fluide */
+  transition: background calc(var(--cursor-lag-duration, 0ms) + var(--typing-transition-duration, 200ms)) cubic-bezier(0.4, 0, 0.2, 1),
+              color calc(var(--cursor-lag-duration, 0ms) + var(--typing-transition-duration, 200ms)) cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow calc(var(--cursor-lag-duration, 0ms) + var(--typing-transition-duration, 200ms)) cubic-bezier(0.4, 0, 0.2, 1),
+              opacity calc(var(--cursor-lag-duration, 0ms) + var(--typing-transition-duration, 200ms)) cubic-bezier(0.4, 0, 0.2, 1);
+  /* Délai pour créer l'effet de retard du curseur - le curseur suit avec un léger retard */
+  transition-delay: var(--cursor-lag-duration, 0ms);
+  /* Position relative pour les animations */
+  position: relative;
+  display: inline;
+  /* Alignement vertical pour éviter les mouvements lors du retour à la ligne */
+  vertical-align: baseline;
+  /* Hauteur de ligne fixe pour éviter les variations */
+  line-height: inherit;
+  /* Utiliser transform pour les animations (plus performant que position) */
+  transform: translateZ(0);
+  /* Animation de pulsation pour le curseur - désactivée pour éviter les mouvements */
+  /* animation: caretPulse 1s ease-in-out infinite; */
 }
 
+/* Effet de retard pour le curseur - le curseur apparaît progressivement avec un délai */
+.char-current.caret-moving {
+  /* Animation qui fait apparaître le curseur avec un léger retard */
+  animation: cursorLagAppear calc(var(--cursor-lag-duration, 0ms) + var(--typing-transition-duration, 200ms)) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes cursorLagAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Animation de pulsation pour le curseur - désactivée pour éviter les mouvements */
+@keyframes caretPulse {
+  0%, 100% {
+    opacity: 1;
+    /* transform: scale(1); - désactivé pour éviter les mouvements */
+  }
+  50% {
+    opacity: 0.9;
+    /* transform: scale(1.02); - désactivé pour éviter les mouvements */
+  }
+}
+
+/* Animation de glissement pour le curseur lors du déplacement - désactivée pour éviter les mouvements */
+@keyframes caretSlide {
+  from {
+    /* transform: translateX(-3px) scale(0.98); - désactivé pour éviter les mouvements */
+    opacity: 0.6;
+  }
+  50% {
+    /* transform: translateX(-1px) scale(1.01); - désactivé pour éviter les mouvements */
+    opacity: 0.9;
+  }
+  to {
+    /* transform: translateX(0) scale(1); - désactivé pour éviter les mouvements */
+    opacity: 1;
+  }
+}
+
+/* Appliquer l'animation de glissement quand le curseur se déplace - désactivée pour éviter les mouvements */
+.char-current.caret-moving {
+  /* animation: caretSlide var(--typing-transition-duration, 200ms) cubic-bezier(0.4, 0, 0.2, 1), 
+             caretPulse 1s ease-in-out infinite var(--typing-transition-duration, 200ms); */
+  /* Effet de transition fluide - désactivé pour éviter les mouvements */
+  /* will-change: transform, opacity; */
+}
+
+/* Améliorer la transition entre pending et current */
 .char-pending {
   color: #9ca3b8;
+  transition: color var(--typing-transition-duration, 200ms) ease;
+  /* transform et opacity désactivés pour éviter les mouvements */
+  display: inline;
+  /* Alignement vertical pour éviter les mouvements lors du retour à la ligne */
+  vertical-align: baseline;
+  /* Hauteur de ligne fixe pour éviter les variations */
+  line-height: inherit;
+}
+
+/* Transition fluide de pending vers current */
+.char-pending:hover {
+  transform: scale(1.02);
+  opacity: 0.9;
 }
 
 @keyframes blink {
@@ -179,42 +385,44 @@ code {
   animation: float 3s ease-in-out infinite;
 }
 
-/* Centrage responsive pour compenser la sidebar */
-.solo-container {
-  max-width: 1024px;
-  margin-left: auto;
-  margin-right: auto;
+/* Conteneur centré générique pour toutes les pages - Approche moderne avec Flexbox */
+.page-container {
   width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+/* Conteneur pour Solo avec centrage optimal */
+.solo-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
 }
 
 @media (min-width: 1024px) {
   .solo-container {
-    max-width: 1024px;
-    /* Centrer par rapport à l'écran entier : 50vw - moitié largeur contenu - moitié sidebar */
-    margin-left: calc(50vw - 512px - 128px);
-    margin-right: auto;
+    padding: 3rem 2rem;
   }
 }
 
-/* Conteneur centré générique pour toutes les pages */
-.page-container {
-  max-width: 1024px;
-  margin-left: auto;
-  margin-right: auto;
+/* Conteneur de contenu centré avec largeur optimale */
+.content-container {
   width: 100%;
-  animation: fadeIn 0.4s ease-in-out;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
 }
 
 @media (min-width: 1024px) {
-  .page-container {
-    max-width: 1024px;
-    /* Centrer par rapport à l'écran entier : 50vw - moitié largeur contenu - largeur sidebar */
-    margin-left: calc(50vw - 512px - 128px);
-    margin-right: auto;
+  .content-container {
+    padding: 0 2rem;
   }
 }
 
-/* Animation de fondu */
+/* Animations améliorées */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -224,4 +432,246 @@ code {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Animation de fondu pour les transitions entre pages */
+@keyframes fadeInPage {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInPage 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Classes utilitaires pour animations */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.4s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Styles pour les cartes améliorées - Style Monkeytype épuré */
+.card {
+  background: rgba(19, 24, 37, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  background: rgba(19, 24, 37, 0.6);
+  transform: translateY(-1px);
+}
+
+/* Styles pour les boutons améliorés - Style Monkeytype épuré */
+.btn-primary {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  opacity: 0.8;
+}
+
+.btn-secondary {
+  background: rgba(19, 24, 37, 0.5);
+  color: #e8ecf3;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(19, 24, 37, 0.7);
+}
+
+/* Styles pour les inputs améliorés - Style Monkeytype épuré */
+.input-modern {
+  background: rgba(19, 24, 37, 0.3);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: #e8ecf3;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.input-modern:focus {
+  outline: none;
+  background: rgba(19, 24, 37, 0.5);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.input-modern::placeholder {
+  color: rgba(156, 163, 184, 0.4);
+}
+
+/* Styles pour les range inputs - Style moderne */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 6px;
+}
+
+input[type="range"]::-webkit-slider-track {
+  background: rgba(19, 24, 37, 0.5);
+  height: 6px;
+  border-radius: 3px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #8b5cf6;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #7c3aed;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+  transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-track {
+  background: rgba(19, 24, 37, 0.5);
+  height: 6px;
+  border-radius: 3px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  background: #8b5cf6;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: #7c3aed;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+  transform: scale(1.1);
+}
+
+/* Styles pour les color inputs - Style moderne */
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 2px solid rgba(139, 92, 246, 0.3);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 0.375rem;
+}
+
+input[type="color"]:hover {
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+  transform: scale(1.05);
+}
+
+/* Styles pour les checkboxes - Style moderne */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(139, 92, 246, 0.4);
+  border-radius: 0.25rem;
+  background: rgba(19, 24, 37, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+input[type="checkbox"]:checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+input[type="checkbox"]:hover {
+  border-color: rgba(139, 92, 246, 0.8);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
 }

@@ -43,12 +43,12 @@ export default function Modal({ isOpen, onClose, title, children, showCloseButto
       }}
     >
       <div 
-        className="bg-bg-secondary rounded-lg border border-text-secondary/20 shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+        className="bg-bg-secondary/80 backdrop-blur-sm rounded-lg shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* En-tête */}
         {title && (
-          <div className="px-6 py-4 border-b border-text-secondary/10 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
               {title}
             </h2>

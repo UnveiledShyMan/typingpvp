@@ -216,7 +216,8 @@ export default function Profile({ userId: currentUserId }) {
   };
 
   return (
-    <div className="page-container p-6 md:p-8">
+    <div className="h-full w-full overflow-hidden">
+      <div className="w-full h-full max-w-5xl mx-auto overflow-y-auto">
       {/* Header avec avatar et infos principales - Style osu! */}
       <div className="relative mb-8">
         {/* Bannière de fond avec gradient */}
@@ -227,7 +228,7 @@ export default function Profile({ userId: currentUserId }) {
           }}
         ></div>
         
-        <div className="relative bg-bg-secondary rounded-2xl border border-border-secondary p-8 shadow-2xl">
+        <div className="relative bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Avatar large */}
             <div className="relative">
@@ -373,7 +374,7 @@ export default function Profile({ userId: currentUserId }) {
                       value={editForm.avatar}
                       onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
                       placeholder="https://example.com/avatar.jpg"
-                      className="w-full p-3 bg-bg-primary border border-border-secondary rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+                      className="input-modern"
                     />
                   </div>
                   <div>
@@ -398,7 +399,7 @@ export default function Profile({ userId: currentUserId }) {
                       onChange={(e) => setEditForm({ ...editForm, gear: e.target.value })}
                       placeholder="e.g. Custom 60%, Cherry MX Red, etc. (optional)"
                       maxLength={100}
-                      className="w-full p-3 bg-bg-primary border border-border-secondary rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+                      className="input-modern"
                     />
                     <div className="text-text-muted text-xs mt-1">
                       Your keyboard/gear will be shown in rankings (optional)
@@ -477,7 +478,7 @@ export default function Profile({ userId: currentUserId }) {
         <>
           {/* Stats Cards - Style osu! */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary rounded-xl p-6 border border-border-secondary hover:border-accent-primary/30 transition-all shadow-lg hover:shadow-xl">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
               <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
                 {user.stats.totalMatches}
@@ -487,7 +488,7 @@ export default function Profile({ userId: currentUserId }) {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary rounded-xl p-6 border border-border-secondary hover:border-accent-primary/30 transition-all shadow-lg hover:shadow-xl">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Win Rate</div>
               <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: winRate >= 50 ? '#10b981' : '#f472b6' }}>
                 {winRate}%
@@ -497,7 +498,7 @@ export default function Profile({ userId: currentUserId }) {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary rounded-xl p-6 border border-border-secondary hover:border-accent-primary/30 transition-all shadow-lg hover:shadow-xl">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Best WPM</div>
               <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#fbbf24' }}>
                 {user.stats.bestWPM}
@@ -507,7 +508,7 @@ export default function Profile({ userId: currentUserId }) {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-bg-secondary to-bg-tertiary rounded-xl p-6 border border-border-secondary hover:border-accent-primary/30 transition-all shadow-lg hover:shadow-xl">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
               <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Accuracy</div>
               <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#06b6d4' }}>
                 {user.stats.averageAccuracy.toFixed(1)}%
@@ -523,7 +524,7 @@ export default function Profile({ userId: currentUserId }) {
             <select
               value={selectedLang}
               onChange={(e) => setSelectedLang(e.target.value)}
-              className="bg-bg-secondary border border-border-secondary text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:border-accent-primary transition-colors font-medium"
+              className="bg-bg-secondary/40 backdrop-blur-sm text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-secondary/60 transition-colors font-medium"
             >
               {Object.entries(user.mmr || {}).map(([lang]) => (
                 <option key={lang} value={lang} className="bg-bg-primary">
@@ -538,7 +539,7 @@ export default function Profile({ userId: currentUserId }) {
             <div className="space-y-6">
               {/* Matchs Solo */}
               {soloMatches.length > 0 && (
-                <div className="bg-bg-secondary rounded-2xl border border-border-secondary p-6 shadow-xl">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
                   <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
                     <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Solo Matches
@@ -587,7 +588,7 @@ export default function Profile({ userId: currentUserId }) {
 
               {/* Matchs Multijoueurs */}
               {multiplayerMatches.length > 0 && (
-                <div className="bg-bg-secondary rounded-2xl border border-border-secondary p-6 shadow-xl">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
                   <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
                     <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Multiplayer Matches

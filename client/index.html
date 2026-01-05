@@ -2,19 +2,83 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/logo.svg" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-    <meta name="description" content="Competitive typing battles - Test your typing speed, compete with friends, and climb the rankings" />
-    <meta name="theme-color" content="#0a0e1a" />
+    
+    <!-- Meta tags de base -->
+    <meta name="description" content="Competitive typing battles - Test your typing speed, compete with friends, and climb the rankings. Challenge players in 1v1 battles, join competitions, and improve your typing skills." />
+    <meta name="keywords" content="typing, typing test, typing speed, wpm, typing battle, competitive typing, typing game, keyboard, dactylo" />
+    <meta name="author" content="typingpvp.com" />
+    <meta name="theme-color" content="#8b5cf6" />
+    
     <title>typingpvp.com - Competitive Typing Battles</title>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://typingpvp.com/" />
+    <meta property="og:title" content="typingpvp.com - Competitive Typing Battles" />
+    <meta property="og:description" content="Test your typing speed, compete with friends, and climb the rankings. Challenge players in 1v1 battles, join competitions, and improve your typing skills." />
+    <meta property="og:image" content="https://typingpvp.com/logo.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:site_name" content="typingpvp.com" />
+    <meta property="og:locale" content="fr_FR" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://typingpvp.com/" />
+    <meta name="twitter:title" content="typingpvp.com - Competitive Typing Battles" />
+    <meta name="twitter:description" content="Test your typing speed, compete with friends, and climb the rankings. Challenge players in 1v1 battles, join competitions, and improve your typing skills." />
+    <meta name="twitter:image" content="https://typingpvp.com/logo.svg" />
+    
+    <!-- Discord Embed -->
+    <meta name="discord:image" content="https://typingpvp.com/logo.svg" />
     
     <!-- Preconnect pour améliorer les performances de chargement des fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Chargement optimisé des fonts -->
+    <!-- Chargement optimisé des fonts avec font-display: swap pour éviter le FOUC -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* Overlay noir qui couvre tout l'écran pendant le chargement */
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #000000;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.5s ease-out;
+        pointer-events: none;
+      }
+      #loading-overlay.fade-out {
+        opacity: 0;
+      }
+      #loading-overlay.hidden {
+        display: none;
+      }
+      /* Masquer le contenu jusqu'à ce que tout soit chargé */
+      body {
+        background-color: #000000;
+      }
+      body.content-ready {
+        background-color: var(--bg-primary, #0a0e1a);
+      }
+      /* Forcer JetBrains Mono pour les stats dès le début */
+      .stats-number {
+        font-family: 'JetBrains Mono', monospace !important;
+      }
+    </style>
   </head>
   <body>
+    <div id="loading-overlay"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

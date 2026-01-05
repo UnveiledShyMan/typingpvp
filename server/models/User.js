@@ -29,6 +29,9 @@ export class User {
       bestWPM: 0,
       averageAccuracy: 0
     };
+    this.preferences = data.preferences || {
+      defaultMode: 'solo' // 'solo' ou 'sandbox'
+    };
   }
 
   getMMR(language = 'en') {

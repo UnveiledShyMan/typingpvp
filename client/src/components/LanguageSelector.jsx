@@ -1,7 +1,21 @@
 import { memo, useState, useRef, useEffect } from 'react'
 import { languages } from '../data/languages'
 
-// Emoji flags pour chaque langue (ou codes de langue)
+// Codes de langue à afficher
+const languageCodes = {
+  en: 'ENG',
+  fr: 'FR',
+  es: 'ES',
+  de: 'DE',
+  it: 'IT',
+  pt: 'PT',
+  ru: 'RU',
+  ja: 'JA',
+  zh: 'ZH',
+  ko: 'KO'
+};
+
+// Emoji flags pour chaque langue (pour le dropdown)
 const languageFlags = {
   en: '🇺🇸',
   fr: '🇫🇷',
@@ -20,6 +34,15 @@ const LanguageSelector = memo(function LanguageSelector({ selectedLang, onLangua
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Fermer le dropdown si on clique en dehors
   useEffect(() => {
@@ -40,8 +63,20 @@ const LanguageSelector = memo(function LanguageSelector({ selectedLang, onLangua
     }
   }, [isOpen]);
 
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setIsOpen(false);
+    }, 150);
+  };
+
   const selectedLanguage = languages[selectedLang];
-  const selectedFlag = languageFlags[selectedLang] || '🌐';
+  const selectedCode = languageCodes[selectedLang] || selectedLang.toUpperCase();
 
   const handleSelect = (code) => {
     onLanguageChange(code);
@@ -49,35 +84,31 @@ const LanguageSelector = memo(function LanguageSelector({ selectedLang, onLangua
   };
 
   return (
-    <div className="relative">
-      {/* Bouton du sélecteur */}
+    <div 
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Bouton du sélecteur - Affiche le code langue (FR, ENG, etc.) */}
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-bg-secondary hover:bg-bg-tertiary border border-border-secondary hover:border-accent-primary/50 text-text-primary px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 min-w-[140px] justify-between focus:outline-none focus:ring-2 focus:ring-accent-primary/50"
+        className="px-3 py-1.5 bg-bg-secondary/20 hover:bg-bg-secondary/40 text-text-secondary/70 hover:text-text-primary rounded text-xs font-medium transition-all duration-200 opacity-60 hover:opacity-100"
+        aria-label="Select language"
       >
-        <span className="flex items-center gap-2">
-          <span className="text-lg">{selectedFlag}</span>
-          <span>{selectedLanguage?.name || selectedLang}</span>
-        </span>
-        <svg
-          className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <span className="font-mono">{selectedCode}</span>
       </button>
 
-      {/* Dropdown menu */}
+      {/* Dropdown menu - Style cohérent avec les autres sélecteurs */}
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute top-full left-0 mt-2 bg-bg-secondary border border-border-secondary rounded-lg shadow-xl z-50 min-w-[180px] overflow-hidden animate-fade-in"
+          className="absolute top-full right-0 mt-2 bg-bg-secondary/90 backdrop-blur-md rounded-lg shadow-xl z-50 min-w-[180px] overflow-hidden animate-fade-in"
           style={{
             animation: 'fadeIn 0.2s ease-out'
           }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <div className="py-1 max-h-[300px] overflow-y-auto custom-scrollbar">
             {Object.entries(languages).map(([code, lang]) => {
@@ -88,13 +119,13 @@ const LanguageSelector = memo(function LanguageSelector({ selectedLang, onLangua
                 <button
                   key={code}
                   onClick={() => handleSelect(code)}
-                  className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-all duration-150 ${
+                  className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-all duration-150 text-sm ${
                     isSelected
-                      ? 'bg-accent-primary/20 text-accent-primary border-l-2 border-accent-primary'
-                      : 'text-text-primary hover:bg-bg-tertiary hover:text-accent-primary'
+                      ? 'bg-accent-primary/20 text-accent-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-primary/20'
                   }`}
                 >
-                  <span className="text-lg">{flag}</span>
+                  <span className="text-base">{flag}</span>
                   <span className="font-medium flex-1">{lang.name}</span>
                   {isSelected && (
                     <svg

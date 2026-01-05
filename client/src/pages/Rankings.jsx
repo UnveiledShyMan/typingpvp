@@ -32,16 +32,19 @@ export default function Rankings() {
   };
 
   return (
-    <div className="page-container p-8">
-      <h1 className="text-4xl font-bold text-text-primary mb-8 animate-slide-up" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
-        Rankings
-      </h1>
+    <div className="h-full w-full flex flex-col overflow-hidden">
+      <div className="mb-4 sm:mb-6 flex-shrink-0">
+        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-1 animate-slide-up" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+          Rankings
+        </h1>
+        <p className="text-text-secondary/70 text-xs sm:text-sm">Compete with the best typists</p>
+      </div>
 
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-6 flex-shrink-0">
           <select
             value={selectedLang}
             onChange={(e) => setSelectedLang(e.target.value)}
-            className="bg-bg-secondary border border-text-secondary/20 text-text-primary px-4 py-3 rounded-lg focus:outline-none focus:border-accent-primary transition-colors font-medium"
+            className="bg-bg-secondary/40 backdrop-blur-sm border-none text-text-primary px-4 py-3 rounded-lg focus:outline-none focus:bg-bg-secondary/60 transition-all duration-200 font-medium"
           >
             {Object.entries(languages).map(([code, lang]) => (
               <option key={code} value={code} className="bg-bg-secondary">
@@ -52,12 +55,15 @@ export default function Rankings() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-text-secondary">Loading...</div>
+          <div className="text-center py-16 text-text-secondary">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent-primary"></div>
+            <p className="mt-4">Loading rankings...</p>
+          </div>
         ) : (
-          <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 overflow-hidden shadow-lg animate-slide-up">
-            <div className="overflow-x-auto">
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg overflow-hidden animate-slide-up flex-1 min-h-0 flex flex-col">
+            <div className="overflow-auto flex-1">
               <table className="w-full">
-                <thead className="bg-bg-primary border-b border-text-secondary/20">
+                <thead className="bg-bg-primary/40">
                   <tr>
                     <th className="px-6 py-4 text-left text-text-secondary text-xs font-semibold uppercase tracking-wider">Rank</th>
                     <th className="px-6 py-4 text-left text-text-secondary text-xs font-semibold uppercase tracking-wider">Player</th>
@@ -72,7 +78,7 @@ export default function Rankings() {
                   {rankings.map((player, index) => (
                     <tr
                       key={player.id}
-                      className="border-b border-text-secondary/10 hover:bg-bg-primary/50 transition-all duration-200 cursor-pointer group"
+                      className="hover:bg-bg-primary/30 transition-all duration-200 cursor-pointer group"
                       onClick={() => {
                         if (onProfileClick) {
                           onProfileClick(player.id);

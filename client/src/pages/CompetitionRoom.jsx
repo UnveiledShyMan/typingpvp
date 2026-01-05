@@ -214,7 +214,7 @@ export default function CompetitionRoom() {
 
   return (
     <div className="page-container p-8" style={{ maxWidth: 'min(1280px, calc(100vw - 320px))' }}>
-      <div className="bg-bg-secondary rounded-lg p-10 border border-border-primary shadow-lg relative overflow-hidden">
+      <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-10 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent-primary rounded-full blur-3xl animate-pulse-subtle"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-secondary rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '1s' }}></div>
@@ -252,7 +252,7 @@ export default function CompetitionRoom() {
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Zone de frappe */}
               <div className="lg:col-span-2">
-                <div className="bg-bg-card rounded-lg p-6 border border-border-secondary mb-4">
+                <div className="bg-bg-card/40 backdrop-blur-sm rounded-lg p-6 mb-4">
                   <div className="flex gap-6 text-text-primary mb-4">
                     <div>
                       <div className="text-2xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
@@ -276,7 +276,7 @@ export default function CompetitionRoom() {
 
                 <div 
                   ref={textContainerRef}
-                  className="typing-text bg-bg-card rounded-lg p-6 border border-border-secondary min-h-[200px] max-h-[300px] overflow-y-auto mb-4 text-lg leading-relaxed"
+                  className="typing-text bg-bg-card/40 backdrop-blur-sm rounded-lg p-6 min-h-[200px] max-h-[300px] overflow-y-auto mb-4 text-lg leading-relaxed"
                   style={{ scrollBehavior: 'smooth' }}
                 >
                   {renderText()}
@@ -287,7 +287,7 @@ export default function CompetitionRoom() {
                   type="text"
                   value={input}
                   onChange={handleInputChange}
-                  className="w-full p-4 bg-bg-card border border-border-secondary rounded-lg text-text-primary focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all text-lg"
+                  className="input-modern text-lg"
                   placeholder="Start typing..."
                   autoFocus
                 />
@@ -295,16 +295,16 @@ export default function CompetitionRoom() {
 
               {/* Classement */}
               <div className="lg:col-span-1">
-                <div className="bg-bg-card rounded-lg p-4 border border-border-secondary sticky top-4">
+                <div className="bg-bg-card/40 backdrop-blur-sm rounded-lg p-4 sticky top-4">
                   <h2 className="text-lg font-bold text-text-primary mb-4">Leaderboard</h2>
                   <div className="space-y-2 max-h-[600px] overflow-y-auto">
                     {leaderboard.slice(0, 20).map((player, index) => (
                       <div
                         key={player.id}
-                        className={`p-3 rounded-lg border ${
+                        className={`p-3 rounded-lg ${
                           player.name === username
-                            ? 'bg-accent-primary/10 border-accent-primary/30'
-                            : 'bg-bg-secondary border-text-secondary/20'
+                            ? 'bg-accent-primary/10 ring-2 ring-accent-primary/30'
+                            : 'bg-bg-secondary/40 backdrop-blur-sm'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
@@ -332,15 +332,15 @@ export default function CompetitionRoom() {
           {gameStatus === 'finished' && (
             <div className="text-center py-12">
               <h2 className="text-3xl font-bold text-text-primary mb-8">Competition Finished!</h2>
-              <div className="bg-bg-primary rounded-lg p-6 border border-text-secondary/20 max-w-2xl mx-auto">
+              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 max-w-2xl mx-auto">
                 <div className="space-y-3">
                   {leaderboard.slice(0, 10).map((player, index) => (
                     <div
                       key={player.id}
-                      className={`p-4 rounded-lg border flex items-center justify-between ${
+                      className={`p-4 rounded-lg flex items-center justify-between ${
                         player.name === username
-                          ? 'bg-accent-primary/10 border-accent-primary/30'
-                          : 'bg-bg-secondary border-text-secondary/20'
+                          ? 'bg-accent-primary/10 ring-2 ring-accent-primary/30'
+                          : 'bg-bg-secondary/40 backdrop-blur-sm'
                       }`}
                     >
                       <div className="flex items-center gap-4">

@@ -221,8 +221,8 @@ export default function Matchmaking() {
   const userMMR = user ? (user.mmr[selectedLang] || 1000) : 1000;
 
   return (
-    <div className="page-container p-8">
-      <h1 className="text-4xl font-bold text-text-primary mb-8" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+    <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
+      <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4 sm:mb-6 flex-shrink-0" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
         Matchmaking
       </h1>
 
@@ -242,7 +242,7 @@ export default function Matchmaking() {
             onChange={(e) => setGuestUsername(e.target.value)}
             placeholder="Username"
             maxLength={20}
-            className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
+            className="input-modern"
             onKeyPress={(e) => {
               if (e.key === 'Enter' && guestUsername.trim()) {
                 handleGuestJoin();
@@ -276,7 +276,7 @@ export default function Matchmaking() {
         showCloseButton={false}
       >
         <div className="space-y-4">
-          <div className="bg-text-error/10 border border-text-error/30 rounded-lg p-4">
+          <div className="bg-text-error/10 rounded-lg p-4">
             <p className="text-text-primary text-sm leading-relaxed">
               <strong className="text-text-error">Important:</strong> You are playing as a guest. 
               Your progression, statistics, and match history will <strong>not be saved</strong>.
@@ -305,9 +305,10 @@ export default function Matchmaking() {
         </div>
       </Modal>
 
+      <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="space-y-6">
         {/* Language Selector */}
-        <div className="bg-bg-secondary rounded-lg border border-text-secondary/10 p-6 shadow-lg">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
           <label className="block text-text-primary mb-3 text-sm font-medium">Language</label>
           <select
             value={selectedLang}
@@ -341,9 +342,9 @@ export default function Matchmaking() {
 
         {/* Queue Status */}
         {isInQueue ? (
-          <div className="bg-bg-secondary rounded-lg border border-accent-primary/30 p-8 text-center shadow-lg battle-glow">
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center battle-glow">
             <div className="mb-6">
-              <div className="inline-flex items-center gap-3 px-4 py-2 bg-bg-primary/50 rounded-full border border-accent-primary/20 mb-4">
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-bg-primary/40 backdrop-blur-sm rounded-full mb-4">
                 <div className="w-3 h-3 rounded-full bg-accent-primary animate-pulse"></div>
                 <span className="text-text-primary font-medium">Searching for opponent...</span>
               </div>
@@ -382,6 +383,7 @@ export default function Matchmaking() {
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   )

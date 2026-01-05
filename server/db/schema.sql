@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     "bestWPM": 0,
     "averageAccuracy": 0
   }',
+  preferences JSONB DEFAULT '{"defaultMode": "solo"}',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

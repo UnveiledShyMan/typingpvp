@@ -1,11 +1,18 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
 import Footer from '../components/Footer'
-import AppSidebar from '../components/AppSidebar'
+import LogoIcon from '../components/icons/LogoIcon'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
-import MenuIcon from '../components/icons/MenuIcon'
+import KeyboardIcon from '../components/icons/KeyboardIcon'
+import SwordIcon from '../components/icons/SwordIcon'
+import TrophyIcon from '../components/icons/TrophyIcon'
+import CompetitionIcon from '../components/icons/CompetitionIcon'
+import MatchmakingIcon from '../components/icons/MatchmakingIcon'
+import FriendsIcon from '../components/icons/FriendsIcon'
+import SoloDropdown from '../components/SoloDropdown'
 
 // Lazy loading des composants de pages pour améliorer les performances et réduire le bundle initial
 const Solo = lazy(() => import('./Solo'))
+const Sandbox = lazy(() => import('./Sandbox'))
 const Battle = lazy(() => import('./Battle'))
 const Rankings = lazy(() => import('./Rankings'))
 const Profile = lazy(() => import('./Profile'))
@@ -26,11 +33,32 @@ export default function MainPage() {
   const [activeSection, setActiveSection] = useState('solo');
   const [showAuth, setShowAuth] = useState(null); // 'login' | 'register' | null
   const [user, setUser] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // État du menu mobile
+  const [showSandbox, setShowSandbox] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser();
+    
+    // Charger la préférence depuis localStorage si pas d'utilisateur connecté
+    const savedMode = localStorage.getItem('defaultMode');
+    if (!user && savedMode === 'sandbox') {
+      setShowSandbox(true);
+      setActiveSection('sandbox');
+    }
   }, []);
+
+  // Charger la préférence de mode par défaut quand l'utilisateur est chargé
+  useEffect(() => {
+    if (user && user.preferences && user.preferences.defaultMode === 'sandbox') {
+      setShowSandbox(true);
+      setActiveSection('sandbox');
+    } else if (user && (!user.preferences || user.preferences.defaultMode === 'solo')) {
+      // S'assurer que showSandbox est false si la préférence est 'solo'
+      setShowSandbox(false);
+      if (activeSection === 'sandbox') {
+        setActiveSection('solo');
+      }
+    }
+  }, [user]);
 
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('token');
@@ -50,16 +78,60 @@ export default function MainPage() {
     }
   };
 
+  // Sauvegarder la préférence de mode
+  const saveModePreference = async (mode) => {
+    if (!user) {
+      // Si pas d'utilisateur, sauvegarder dans localStorage
+      localStorage.setItem('defaultMode', mode);
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    try {
+      const response = await fetch(`${API_URL}/api/me/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          preferences: {
+            defaultMode: mode
+          }
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUser(prev => ({
+          ...prev,
+          preferences: data.preferences
+        }));
+      }
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+    }
+  };
+
   const handleAuthSuccess = () => {
     setShowAuth(null);
     fetchCurrentUser();
   };
 
-  // Fonction pour changer de section et fermer le menu mobile
-  const handleSectionChange = (section) => {
-    setActiveSection(section);
-    setSidebarOpen(false);
-  };
+  // Sections de navigation
+  const baseSections = [
+    { id: 'solo', label: 'Solo', Icon: KeyboardIcon },
+    { id: 'battle', label: '1v1', Icon: SwordIcon },
+    { id: 'rankings', label: 'Rankings', Icon: TrophyIcon },
+    { id: 'competitions', label: 'Competitions', Icon: CompetitionIcon },
+    { id: 'matchmaking', label: 'Matchmaking', Icon: MatchmakingIcon },
+  ];
+  
+  const sections = user 
+    ? [...baseSections, { id: 'friends', label: 'Friends', Icon: FriendsIcon }]
+    : baseSections;
 
   if (showAuth === 'login') {
     return (
@@ -78,85 +150,271 @@ export default function MainPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary flex">
-      {/* Overlay pour mobile (ferme le menu quand on clique dessus) */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <AppSidebar 
-        activeSection={activeSection}
-        onSectionChange={handleSectionChange}
-        user={user}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col lg:ml-64">
-        {/* Header compact avec menu hamburger pour mobile */}
-        <header className="h-16 bg-bg-primary/40 backdrop-blur-md z-30 flex items-center justify-between px-4 lg:px-6">
-          {/* Menu hamburger pour mobile */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 text-text-secondary hover:text-text-primary transition-colors"
-            aria-label="Toggle menu"
-          >
-            <MenuIcon className="w-6 h-6" stroke="currentColor" />
-          </button>
-
-          <div className="flex items-center gap-3 ml-auto">
-            {user ? (
-              <button
-                onClick={() => setActiveSection('profile')}
-                className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
+    <div className="h-screen bg-bg-primary flex flex-col overflow-hidden">
+      {/* Header avec navigation horizontale */}
+      <header 
+        className="w-full bg-bg-primary/60 backdrop-blur-md z-30"
+        style={{
+          background: 'rgba(10, 14, 26, 0.6)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)'
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo et titre */}
+            <button
+              onClick={() => {
+                setShowSandbox(false);
+                setActiveSection('solo');
+                saveModePreference('solo');
+              }}
+              className="flex items-center gap-3 cursor-pointer group"
+            >
+              <LogoIcon 
+                className="w-8 h-8 text-text-primary/80 group-hover:text-accent-primary transition-all duration-200" 
+                stroke="currentColor"
+              />
+              <h1 
+                className="text-xl font-bold text-text-primary/90 group-hover:text-accent-primary transition-all duration-200"
+                style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}
               >
-                <span className="text-text-secondary text-sm group-hover:text-text-primary transition-colors hidden sm:inline">Welcome,</span>
-                <span className="text-text-primary font-medium">{user.username}</span>
-                <div className="w-10 h-10 rounded-lg bg-bg-primary/30 overflow-hidden flex items-center justify-center backdrop-blur-sm transition-opacity group-hover:opacity-80">
-                  {user.avatar ? (
-                    <img
-                      src={user.avatar}
-                      alt={user.username}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <LogoIconSmall 
-                      className="w-6 h-6 text-accent-primary" 
-                      stroke="currentColor"
-                    />
-                  )}
-                </div>
-              </button>
-            ) : (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowAuth('login')}
-                  className="text-text-secondary hover:text-text-primary transition-colors text-sm font-medium px-3 py-1.5"
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => setShowAuth('register')}
-                  className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-                >
-                  Register
-                </button>
-              </div>
-            )}
-          </div>
-        </header>
+                typingpvp.com
+              </h1>
+            </button>
 
-        {/* Main content avec lazy loading et animation */}
-        <main className="flex-1 overflow-y-auto">
+            {/* Navigation horizontale */}
+            <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
+              {sections.map((section) => {
+                const Icon = section.Icon;
+                const isActive = activeSection === section.id;
+                
+                // Menu déroulant spécial pour Solo
+                if (section.id === 'solo') {
+                  const displayLabel = showSandbox ? 'Sandbox' : 'Solo';
+                  return (
+                    <SoloDropdown
+                      key={section.id}
+                      isSandboxMode={showSandbox}
+                      onSandboxClick={() => {
+                        setShowSandbox(true);
+                        setActiveSection('sandbox');
+                        saveModePreference('sandbox');
+                      }}
+                      onSoloClick={() => {
+                        setShowSandbox(false);
+                        setActiveSection('solo');
+                        saveModePreference('solo');
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          setShowSandbox(false);
+                          setActiveSection('solo');
+                          saveModePreference('solo');
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          (isActive && !showSandbox) || showSandbox
+                            ? 'text-accent-primary'
+                            : 'text-text-secondary/70 hover:text-text-primary/90'
+                        }`}
+                      >
+                        <Icon 
+                          className="w-4 h-4 transition-all duration-200" 
+                          stroke={(isActive && !showSandbox) || showSandbox ? '#8b5cf6' : 'currentColor'}
+                          style={{ opacity: (isActive && !showSandbox) || showSandbox ? 1 : 0.7 }}
+                        />
+                        <span className={(isActive && !showSandbox) || showSandbox ? 'font-semibold' : 'font-medium'}>{displayLabel}</span>
+                        <svg
+                          className="w-3 h-3 transition-transform opacity-50"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </SoloDropdown>
+                  );
+                }
+                
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? 'text-accent-primary'
+                        : 'text-text-secondary/70 hover:text-text-primary/90'
+                    }`}
+                  >
+                    <Icon 
+                      className="w-4 h-4 transition-all duration-200" 
+                      stroke={isActive ? '#8b5cf6' : 'currentColor'}
+                      style={{ opacity: isActive ? 1 : 0.7 }}
+                    />
+                    <span className={isActive ? 'font-semibold' : 'font-medium'}>{section.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* User section / Auth buttons */}
+            <div className="flex items-center gap-3">
+              {user ? (
+                <>
+                  {/* Profile button dans la nav pour mobile */}
+                  <button
+                    onClick={() => setActiveSection('profile')}
+                    className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary/70 hover:text-text-primary/90 transition-all"
+                  >
+                    <div className="w-6 h-6 rounded bg-bg-primary/30 overflow-hidden flex items-center justify-center">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.username}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <LogoIconSmall 
+                          className="w-4 h-4 text-accent-primary/80" 
+                          stroke="currentColor"
+                        />
+                      )}
+                    </div>
+                  </button>
+                  
+                  {/* Desktop user display */}
+                  <button
+                    onClick={() => setActiveSection('profile')}
+                    className="hidden md:flex items-center gap-3 hover:opacity-80 transition-opacity group"
+                  >
+                    <span className="text-text-secondary text-sm group-hover:text-text-primary transition-colors">Welcome,</span>
+                    <span className="text-text-primary font-medium">{user.username}</span>
+                    <div className="w-10 h-10 rounded-lg bg-bg-primary/30 overflow-hidden flex items-center justify-center backdrop-blur-sm transition-opacity group-hover:opacity-80">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.username}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <LogoIconSmall 
+                          className="w-6 h-6 text-accent-primary" 
+                          stroke="currentColor"
+                        />
+                      )}
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowAuth('login')}
+                    className="text-text-secondary hover:text-text-primary transition-colors text-sm font-medium px-3 py-1.5"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => setShowAuth('register')}
+                    className="bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation mobile (menu déroulant) */}
+          <div className="md:hidden pb-4 overflow-x-auto">
+            <nav className="flex items-center gap-1">
+              {sections.map((section) => {
+                const Icon = section.Icon;
+                const isActive = activeSection === section.id;
+                
+                // Menu déroulant spécial pour Solo sur mobile aussi
+                if (section.id === 'solo') {
+                  const displayLabel = showSandbox ? 'Sandbox' : 'Solo';
+                  return (
+                    <SoloDropdown
+                      key={section.id}
+                      isSandboxMode={showSandbox}
+                      onSandboxClick={() => {
+                        setShowSandbox(true);
+                        setActiveSection('sandbox');
+                        saveModePreference('sandbox');
+                      }}
+                      onSoloClick={() => {
+                        setShowSandbox(false);
+                        setActiveSection('solo');
+                        saveModePreference('solo');
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          setShowSandbox(false);
+                          setActiveSection('solo');
+                          saveModePreference('solo');
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                          (isActive && !showSandbox) || showSandbox
+                            ? 'text-accent-primary'
+                            : 'text-text-secondary/70 hover:text-text-primary/90'
+                        }`}
+                      >
+                        <Icon 
+                          className="w-4 h-4 transition-all duration-200" 
+                          stroke={(isActive && !showSandbox) || showSandbox ? '#8b5cf6' : 'currentColor'}
+                          style={{ opacity: (isActive && !showSandbox) || showSandbox ? 1 : 0.7 }}
+                        />
+                        <span className={(isActive && !showSandbox) || showSandbox ? 'font-semibold' : 'font-medium'}>{displayLabel}</span>
+                        <svg
+                          className="w-2.5 h-2.5 transition-transform opacity-60"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </SoloDropdown>
+                  );
+                }
+                
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                      isActive
+                        ? 'text-accent-primary'
+                        : 'text-text-secondary/70 hover:text-text-primary/90'
+                    }`}
+                  >
+                    <Icon 
+                      className="w-4 h-4 transition-all duration-200" 
+                      stroke={isActive ? '#8b5cf6' : 'currentColor'}
+                      style={{ opacity: isActive ? 1 : 0.7 }}
+                    />
+                    <span className={isActive ? 'font-semibold' : 'font-medium'}>{section.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content avec lazy loading et animation - Parfaitement centré, non scrollable */}
+      <main className="flex-1 overflow-hidden">
+        <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Suspense fallback={<LoadingSpinner />}>
-            <div key={activeSection}>
-              {activeSection === 'solo' && <Solo />}
+            <div key={`${activeSection}-${showSandbox}`} className="h-full overflow-hidden animate-fade-in">
+              {activeSection === 'solo' && !showSandbox && <Solo />}
+              {activeSection === 'sandbox' && showSandbox && <Sandbox />}
               {activeSection === 'battle' && <Battle />}
               {activeSection === 'rankings' && <Rankings />}
               {activeSection === 'competitions' && <Competitions />}
@@ -165,11 +423,11 @@ export default function MainPage() {
               {activeSection === 'profile' && user && <Profile userId={user.id} />}
             </div>
           </Suspense>
-        </main>
+        </div>
+      </main>
 
-        {/* Footer */}
-        <Footer />
-      </div>
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }

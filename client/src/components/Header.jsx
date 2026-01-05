@@ -39,7 +39,7 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 right-0 left-64 h-16 bg-bg-secondary/80 backdrop-blur-sm border-b border-text-secondary/10 px-6 flex items-center justify-end z-40">
+    <header className="fixed top-0 right-0 left-64 h-16 bg-bg-secondary/60 backdrop-blur-sm px-6 flex items-center justify-end z-40">
       {user ? (
         <div className="relative">
           <button
@@ -50,10 +50,10 @@ export default function Header() {
               <img
                 src={user.avatar}
                 alt={user.username}
-                className="w-10 h-10 rounded-full object-cover border-2 border-text-secondary/30"
+                className="w-10 h-10 rounded-full object-cover"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold border-2 border-text-secondary/30">
+              <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold">
                 {user.username[0].toUpperCase()}
               </div>
             )}
@@ -66,7 +66,7 @@ export default function Header() {
                 className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary border border-text-secondary/20 rounded-lg shadow-xl z-50 py-2">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/80 backdrop-blur-sm rounded-lg shadow-xl z-50 py-2">
                 <Link
                   to={`/profile/${user.id}`}
                   className="block px-4 py-2 text-text-primary hover:bg-bg-primary transition-colors"

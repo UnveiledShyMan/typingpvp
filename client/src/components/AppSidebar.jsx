@@ -31,9 +31,9 @@ export default function AppSidebar({ activeSection, onSectionChange, user, isOpe
       lg:translate-x-0
     `}
     style={{
-      background: 'linear-gradient(to right, rgba(10, 14, 26, 0.4) 0%, rgba(10, 14, 26, 0) 100%)',
-      backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)'
+      background: 'rgba(10, 14, 26, 0.6)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)'
     }}
     >
       {/* Logo et titre avec bouton fermer pour mobile - Transparent et minimaliste */}

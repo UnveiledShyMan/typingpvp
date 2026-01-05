@@ -105,11 +105,15 @@ export default function Battle() {
   };
 
   return (
-    <div className="page-container p-8">
-        <div className="bg-bg-secondary rounded-lg p-10 border border-text-secondary/10 shadow-lg">
-          <h1 className="text-4xl font-bold text-text-primary mb-10 text-center" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>1v1</h1>
+    <div className="h-full w-full flex items-center justify-center overflow-hidden">
+      <div className="w-full max-w-2xl mx-auto">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8 lg:p-10">
+          <div className="mb-6 text-center">
+            <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>1v1 Battle</h1>
+            <p className="text-text-secondary/70 text-xs sm:text-sm">Challenge a friend or join a room</p>
+          </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {!user && (
               <div>
                 <label className="block text-text-primary mb-2 text-sm">Your name</label>
@@ -117,35 +121,35 @@ export default function Battle() {
                   type="text"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded text-text-primary focus:outline-none focus:border-accent-primary"
+                  className="input-modern"
                   placeholder="Enter your name"
                 />
               </div>
             )}
             {user && (
-              <div className="p-4 bg-bg-primary rounded border border-text-secondary/20">
+              <div className="p-4 bg-bg-primary/30 backdrop-blur-sm rounded-lg">
                 <p className="text-text-secondary text-sm mb-1">Playing as</p>
-                <p className="text-text-primary font-semibold">{user.username}</p>
+                <p className="text-text-primary font-semibold text-lg">{user.username}</p>
               </div>
             )}
 
-            <div className="border-t border-text-secondary/20 pt-6">
+            <div className="pt-6 mt-6 border-t border-text-secondary/5">
               <h2 className="text-xl font-semibold text-text-primary mb-4">Create room</h2>
               <button
                 onClick={handleCreateRoom}
-                className="w-full bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-6 rounded transition-colors"
+                className="btn-primary w-full"
               >
-                create room
+                Create Room
               </button>
               {createdRoomId && (
-                <div className="mt-4 p-4 bg-bg-primary rounded border border-text-secondary/20">
+                <div className="mt-4 p-4 bg-bg-primary/30 backdrop-blur-sm rounded-lg">
                   <p className="text-text-primary mb-2 text-sm">Room created!</p>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={createdRoomId}
                       readOnly
-                      className="flex-1 p-2 bg-bg-secondary border border-text-secondary/20 rounded text-text-primary font-mono text-sm"
+                      className="flex-1 p-2 bg-bg-secondary/40 backdrop-blur-sm border-none rounded-lg text-text-primary font-mono text-sm"
                     />
                     <button
                       onClick={copyRoomId}
@@ -161,7 +165,7 @@ export default function Battle() {
               )}
             </div>
 
-            <div className="border-t border-text-secondary/20 pt-6">
+            <div className="pt-6 mt-6 border-t border-text-secondary/5">
               <h2 className="text-xl font-semibold text-text-primary mb-4">Join room</h2>
               <div className="space-y-4">
                 <div>
@@ -170,20 +174,21 @@ export default function Battle() {
                     type="text"
                     value={roomId}
                     onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                    className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded text-text-primary font-mono focus:outline-none focus:border-accent-primary uppercase"
+                    className="input-modern font-mono uppercase"
                     placeholder="Enter room ID"
                   />
                 </div>
                 <button
                   onClick={handleJoinRoom}
-                  className="w-full bg-accent-primary hover:bg-accent-hover text-bg-primary font-semibold py-3 px-6 rounded transition-colors"
+                  className="btn-primary w-full"
                 >
-                  join
+                  Join Room
                 </button>
               </div>
             </div>
           </div>
         </div>
+      </div>
     </div>
   )
 }

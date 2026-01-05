@@ -27,6 +27,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
     },
     mmr: user.mmr,
     stats: user.stats,
+    preferences: user.preferences || {
+      defaultMode: 'solo'
+    },
     createdAt: user.createdAt
   });
 });
