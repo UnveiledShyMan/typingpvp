@@ -102,6 +102,35 @@ cd ../server
 npm start
 ```
 
+### Déploiement sur Plesk
+
+1. **Configuration dans Plesk Node.js** :
+   - **Fichier de démarrage** : `app.js` (à la racine du projet)
+   - **Port** : Laissé vide ou défini automatiquement par Plesk
+   - **Mode d'exécution** : `production`
+
+2. **Variables d'environnement dans Plesk** :
+   ```
+   DB_HOST=votre_host_mariadb
+   DB_PORT=3306
+   DB_NAME=votre_nom_db
+   DB_USER=votre_user_db
+   DB_PASSWORD=votre_mot_de_passe
+   JWT_SECRET=votre_secret_jwt
+   CLIENT_URL=https://typingpvp.com
+   NODE_ENV=production
+   ```
+   ⚠️ **Important** : Ne définissez PAS `SERVE_CLIENT` manuellement, il est défini automatiquement par `app.js`.
+
+3. **Build du client** :
+   - Assurez-vous que le dossier `client/dist` existe après le build
+   - Le serveur vérifie automatiquement sa présence au démarrage
+
+4. **Vérification** :
+   - Consultez les logs dans Plesk pour vérifier que le serveur démarre correctement
+   - Vérifiez que le message `✅ Serveur démarré avec succès` apparaît dans les logs
+   - En cas d'erreur 502, vérifiez les logs pour identifier le problème
+
 ## 📚 Documentation
 
 - [STRUCTURE.md](./STRUCTURE.md) - Structure détaillée du projet

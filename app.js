@@ -426,6 +426,26 @@ async function main() {
   }
 }
 
-// Lancer l'application
-main();
+// Lancer l'application avec gestion d'erreur globale
+main().catch((error) => {
+  console.error('❌ Erreur fatale non gérée:', error);
+  console.error('Stack trace:', error.stack);
+  process.exit(1);
+});
+
+// Gestion des erreurs non capturées
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  // Ne pas quitter le processus en production, juste logger
+  if (process.env.NODE_ENV === 'production') {
+    console.error('⚠️ Le serveur continue de fonctionner malgré l\'erreur');
+  }
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.error('Stack trace:', error.stack);
+  // En production, on peut vouloir redémarrer le serveur
+  process.exit(1);
+});
 

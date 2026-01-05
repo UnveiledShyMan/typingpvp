@@ -1194,7 +1194,20 @@ io.on('connection', (socket) => {
 export { onlineUsers };
 
 const PORT = process.env.PORT || 3001;
-const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interfaces pour PulseHeberg
+const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interfaces pour Plesk
+
+// Démarrer le serveur avec gestion d'erreur
 httpServer.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
+  console.log(`✅ Serveur démarré avec succès sur ${HOST}:${PORT}`);
+  console.log(`📡 Socket.io configuré avec polling uniquement (compatible Plesk)`);
+  console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+  console.log(`📦 SERVE_CLIENT: ${process.env.SERVE_CLIENT || 'false'}`);
+}).on('error', (error) => {
+  console.error('❌ Erreur lors du démarrage du serveur:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`⚠️ Le port ${PORT} est déjà utilisé. Vérifiez votre configuration Plesk.`);
+  } else if (error.code === 'EACCES') {
+    console.error(`⚠️ Permission refusée pour le port ${PORT}. Vérifiez les permissions.`);
+  }
+  process.exit(1);
 });
