@@ -326,7 +326,7 @@ io.on('connection', (socket) => {
     const user1 = await getUserById(player1.userId);
     const user2 = await getUserById(player2.userId);
     
-    if (!user1 || !user2) return;
+    if (!user1 || !user2) return {};
     
     const language = room.language || 'en';
     const mmr1 = user1.getMMR(language);
