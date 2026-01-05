@@ -2,7 +2,46 @@
 // Gère une instance unique de socket pour éviter les connexions multiples
 import { io } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+/**
+ * Détermine l'URL de l'API pour les connexions Socket.io
+ * En production, si VITE_API_URL n'est pas défini, on utilise le même domaine
+ * En développement, on utilise localhost:3001 par défaut
+ */
+function getApiUrl() {
+  // Si VITE_API_URL est défini explicitement, l'utiliser
+  if (import.meta.env.VITE_API_URL) {
+    const url = import.meta.env.VITE_API_URL;
+    console.log('🔧 Utilisation de VITE_API_URL:', url);
+    return url;
+  }
+  
+  // En production (quand on est sur un domaine réel, pas localhost)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    // Utiliser le même domaine que le client
+    // En production avec Plesk, le serveur backend est généralement sur le même domaine
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    
+    // Construire l'URL
+    let url;
+    if (port && port !== '80' && port !== '443' && port !== '') {
+      url = `${protocol}//${hostname}:${port}`;
+    } else {
+      url = `${protocol}//${hostname}`;
+    }
+    
+    console.log('🔧 URL API détectée automatiquement (production):', url);
+    return url;
+  }
+  
+  // En développement, utiliser localhost:3001 par défaut
+  const devUrl = 'http://localhost:3001';
+  console.log('🔧 URL API (développement):', devUrl);
+  return devUrl;
+}
+
+const API_URL = getApiUrl();
 
 // Instance unique de socket (singleton)
 let socketInstance = null;
@@ -36,23 +75,47 @@ export function getSocket(forceNew = false) {
   
   // Si aucune instance n'existe ou si elle n'est pas connectée, en créer une
   if (!socketInstance || !socketInstance.connected) {
-    console.log('🔌 Création d\'une nouvelle connexion socket');
+    console.log('🔌 Création d\'une nouvelle connexion socket vers:', API_URL);
     socketInstance = io(API_URL, {
       ...SOCKET_CONFIG,
-      forceNew: forceNew
+      forceNew: forceNew,
+      // Ajouter le path explicitement pour éviter les problèmes de routage
+      path: '/socket.io/',
+      // Timeouts plus longs en production pour éviter les erreurs 400
+      timeout: 20000,
+      // Ajouter des options supplémentaires pour la stabilité
+      autoConnect: true,
+      reconnectionDelayMax: 5000,
     });
     
     // Ajouter des listeners pour le debugging
     socketInstance.on('connect', () => {
-      console.log('✅ Socket connecté:', socketInstance.id);
+      console.log('✅ Socket connecté:', socketInstance.id, 'URL:', API_URL);
     });
     
     socketInstance.on('disconnect', (reason) => {
       console.log('⚠️ Socket déconnecté:', reason);
+      // Ne pas réinitialiser socketInstance ici car la reconnexion automatique va essayer
     });
     
     socketInstance.on('connect_error', (error) => {
       console.error('❌ Erreur de connexion socket:', error.message);
+      console.error('URL tentée:', API_URL);
+      console.error('Type d\'erreur:', error.type);
+      // Si l'erreur persiste, on peut essayer de réinitialiser après plusieurs tentatives
+    });
+    
+    // Logger les tentatives de reconnexion
+    socketInstance.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`🔄 Tentative de reconnexion #${attemptNumber}`);
+    });
+    
+    socketInstance.on('reconnect', (attemptNumber) => {
+      console.log(`✅ Reconnexion réussie après ${attemptNumber} tentatives`);
+    });
+    
+    socketInstance.on('reconnect_failed', () => {
+      console.error('❌ Échec de toutes les tentatives de reconnexion');
     });
   }
   

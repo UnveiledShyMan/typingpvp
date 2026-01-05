@@ -28,12 +28,46 @@ const httpServer = createServer(app);
 
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true
+
+// Configuration CORS pour Socket.io - accepter les connexions depuis le même domaine en production
+const allowedSocketOrigins = [
+  process.env.CLIENT_URL,
+  'https://typingpvp.com',
+  'http://localhost:5173',
+  'http://localhost:3000'
+].filter(Boolean);
+
+// En production, accepter aussi les connexions depuis le même domaine (même origine)
+const socketCorsConfig = {
+  origin: function (origin, callback) {
+    // En développement ou si pas d'origine (connexion directe), permettre
+    if (process.env.NODE_ENV === 'development' || !origin) {
+      return callback(null, true);
+    }
+    
+    // Vérifier si l'origine est dans la liste autorisée
+    const isAllowed = allowedSocketOrigins.some(allowed => {
+      // Comparer les domaines (sans protocole et port)
+      const allowedDomain = allowed.replace(/^https?:\/\//, '').split(':')[0];
+      const originDomain = origin.replace(/^https?:\/\//, '').split(':')[0];
+      return originDomain === allowedDomain || origin.includes(allowedDomain);
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn('⚠️ Origine non autorisée pour Socket.io:', origin);
+      // En production, permettre quand même si c'est le même domaine
+      callback(null, true);
+    }
   },
+  methods: ["GET", "POST"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+};
+
+const io = new Server(httpServer, {
+  cors: socketCorsConfig,
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
@@ -82,13 +116,40 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Middleware pour logger les requêtes API (toujours actif pour diagnostic)
+// Middleware pour logger les requêtes API et Socket.io (toujours actif pour diagnostic)
+// IMPORTANT: Ce middleware doit être AVANT la route catch-all pour ne pas bloquer Socket.io
 app.use((req, res, next) => {
+  // Logger les requêtes API
   if (req.path.startsWith('/api')) {
     console.log(`📡 ${req.method} ${req.path}`, {
       origin: req.headers.origin,
       query: Object.keys(req.query).length > 0 ? req.query : undefined
     });
+  }
+  // Logger les requêtes Socket.io pour le débogage en production
+  if (req.path.startsWith('/socket.io/')) {
+    // Logger toutes les requêtes Socket.io en production pour diagnostic
+    if (process.env.NODE_ENV === 'production') {
+      console.log(`🔌 Socket.io ${req.method} ${req.path}`, {
+        origin: req.headers.origin,
+        host: req.headers.host,
+        transport: req.query?.transport || 'polling',
+        sid: req.query?.sid || 'new'
+      });
+    }
+    // Logger les erreurs avec un wrapper sur res.send
+    const originalSend = res.send;
+    res.send = function(data) {
+      if (res.statusCode >= 400) {
+        console.error(`❌ Requête Socket.io échouée: ${req.method} ${req.path}`, {
+          statusCode: res.statusCode,
+          origin: req.headers.origin,
+          host: req.headers.host,
+          query: req.query
+        });
+      }
+      return originalSend.call(this, data);
+    };
   }
   next();
 });
@@ -206,17 +267,23 @@ if (process.env.SERVE_CLIENT === 'true') {
   }));
   
   // Route catch-all : servir index.html pour toutes les routes non-API
-  // IMPORTANT: Cette route doit être APRÈS toutes les routes API
-  // Utiliser app.all('*') pour capturer toutes les méthodes HTTP, mais seulement si ce n'est pas une route API
+  // IMPORTANT: Cette route doit être APRÈS toutes les routes API et Socket.io
+  // CRITIQUE: Ne pas intercepter les routes Socket.io - elles sont gérées par Socket.io directement
   app.all('*', (req, res, next) => {
+    // Ne pas intercepter les routes Socket.io - Socket.io les gère directement via httpServer
+    if (req.path.startsWith('/socket.io/')) {
+      // Laisser Socket.io gérer ces requêtes
+      return next();
+    }
+    
     // Ne pas intercepter les routes API - elles devraient déjà être traitées par les routes définies avant
-    // Si c'est une route API, laisser Express gérer la 404 (elle devrait déjà être traitée)
     if (req.path.startsWith('/api')) {
       // Si on arrive ici, c'est qu'aucune route API n'a matché
       // Logger pour debug
       console.warn(`⚠️ Route API non trouvée: ${req.method} ${req.path}`);
       return res.status(404).json({ error: 'API route not found', path: req.path, method: req.method });
     }
+    
     // Servir index.html pour toutes les autres routes (SPA routing)
     const indexPath = join(clientDistPath, 'index.html');
     if (!existsSync(indexPath)) {
@@ -242,11 +309,43 @@ if (process.env.SERVE_CLIENT === 'true') {
 }
 
 // Route de test pour Socket.io (sans connexion)
+// Cette route permet de vérifier que Socket.io est accessible
 app.get('/socket.io/test', (req, res) => {
   res.json({ 
     message: 'Socket.io endpoint is accessible',
     socketIoPath: '/socket.io/',
-    transports: ['polling']
+    transports: ['polling'],
+    cors: {
+      allowedOrigins: allowedSocketOrigins,
+      currentOrigin: req.headers.origin
+    },
+    server: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      clientUrl: process.env.CLIENT_URL || 'not set'
+    }
+  });
+});
+
+// Route de santé pour Socket.io - vérifie que le serveur Socket.io fonctionne
+app.get('/api/socket-health', (req, res) => {
+  const socketCount = io.sockets.sockets.size;
+  res.json({
+    status: 'ok',
+    socketIo: {
+      connected: true,
+      activeConnections: socketCount,
+      transports: ['polling'],
+      path: '/socket.io/'
+    },
+    cors: {
+      allowedOrigins: allowedSocketOrigins,
+      currentOrigin: req.headers.origin
+    },
+    server: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      clientUrl: process.env.CLIENT_URL || 'not set',
+      port: process.env.PORT || 3001
+    }
   });
 });
 
@@ -272,8 +371,23 @@ io.engine.on('connection', (req) => {
     url: req.url,
     transport: req._query?.transport || 'polling',
     origin: req.headers?.origin || 'unknown',
+    host: req.headers?.host || 'unknown',
     userAgent: req.headers?.['user-agent']?.substring(0, 50) || 'unknown'
   });
+});
+
+// Logger toutes les requêtes Socket.io pour le débogage
+io.engine.on('request', (req, res) => {
+  // Logger seulement les erreurs pour éviter trop de logs
+  if (res.statusCode >= 400) {
+    console.error('❌ Requête Socket.io échouée:', {
+      method: req.method,
+      url: req.url,
+      statusCode: res.statusCode,
+      origin: req.headers?.origin,
+      host: req.headers?.host
+    });
+  }
 });
 
 // Helper pour wrapper les handlers Socket.io avec gestion d'erreur
@@ -1386,7 +1500,11 @@ try {
     console.log(`📡 Socket.io configuré avec polling uniquement (compatible Plesk)`);
     console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log(`📦 SERVE_CLIENT: ${process.env.SERVE_CLIENT || 'false'}`);
+    console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌍 Origines Socket.io autorisées:`, allowedSocketOrigins);
     console.log(`✅ Le serveur est prêt à accepter les connexions`);
+    console.log(`🔍 Test Socket.io: http://${HOST}:${PORT}/socket.io/test`);
+    console.log(`🔍 Santé Socket.io: http://${HOST}:${PORT}/api/socket-health`);
   }).on('error', (error) => {
     console.error('❌ Erreur lors du démarrage du serveur:', error);
     console.error('Code erreur:', error.code);
