@@ -312,6 +312,54 @@ export async function getUserMatches(userId, limit = 50, type = undefined) {
 function rowToUser(row) {
   if (!row) return null;
   
+  // Parser mmr et stats si ce sont des strings JSON (PostgreSQL JSONB retourne déjà des objets)
+  // Mais parfois ils peuvent être des strings, donc on parse si nécessaire
+  let mmr = row.mmr;
+  if (typeof mmr === 'string') {
+    try {
+      mmr = JSON.parse(mmr);
+    } catch (e) {
+      mmr = {};
+    }
+  }
+  if (!mmr || typeof mmr !== 'object') mmr = {};
+  
+  let stats = row.stats;
+  if (typeof stats === 'string') {
+    try {
+      stats = JSON.parse(stats);
+    } catch (e) {
+      stats = {};
+    }
+  }
+  if (!stats || typeof stats !== 'object') {
+    stats = {
+      totalMatches: 0,
+      wins: 0,
+      losses: 0,
+      totalWPM: 0,
+      bestWPM: 0,
+      averageAccuracy: 0
+    };
+  }
+  
+  let socialMedia = row.social_media;
+  if (typeof socialMedia === 'string') {
+    try {
+      socialMedia = JSON.parse(socialMedia);
+    } catch (e) {
+      socialMedia = {};
+    }
+  }
+  if (!socialMedia || typeof socialMedia !== 'object') {
+    socialMedia = {
+      twitter: '',
+      github: '',
+      discord: '',
+      website: ''
+    };
+  }
+  
   return new User({
     id: row.id,
     username: row.username,
@@ -320,26 +368,14 @@ function rowToUser(row) {
     avatar: row.avatar,
     bio: row.bio || '',
     gear: row.gear || '',
-    socialMedia: row.social_media || {
-      twitter: '',
-      github: '',
-      discord: '',
-      website: ''
-    },
+    socialMedia: socialMedia,
     friends: row.friends || [],
     friendRequests: {
       sent: row.friend_requests_sent || [],
       received: row.friend_requests_received || []
     },
     createdAt: row.created_at,
-    mmr: row.mmr || {},
-    stats: row.stats || {
-      totalMatches: 0,
-      wins: 0,
-      losses: 0,
-      totalWPM: 0,
-      bestWPM: 0,
-      averageAccuracy: 0
-    }
+    mmr: mmr,
+    stats: stats
   });
 }
