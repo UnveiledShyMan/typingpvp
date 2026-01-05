@@ -304,14 +304,15 @@ io.on('connection', (socket) => {
   });
 
   // Fonction pour mettre à jour MMR et stats après un match
+  // Retourne un objet avec les changements d'ELO pour chaque joueur
   async function updateMatchResults(room) {
-    if (room.players.length !== 2) return;
+    if (room.players.length !== 2) return {};
     
     const [player1, player2] = room.players;
     const result1 = room.results[player1.id];
     const result2 = room.results[player2.id];
     
-    if (!result1 || !result2 || !player1.userId || !player2.userId) return;
+    if (!result1 || !result2 || !player1.userId || !player2.userId) return {};
     
     // Déterminer le gagnant (meilleur WPM, en cas d'égalité meilleure accuracy)
     let player1Won = false;
