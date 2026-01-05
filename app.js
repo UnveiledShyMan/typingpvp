@@ -170,19 +170,41 @@ async function main() {
     
     // 2. Builder le client (supprime client/dist/ et rebuild)
     // ATTENDRE que le build soit terminé avant de démarrer le serveur
-    console.log('Build du client en cours...');
+    console.log('📦 Build du client en cours...');
     try {
       const clientBuilt = await buildClient();
       if (!clientBuilt) {
         console.error('❌ Le build du client a échoué.');
         console.error('⚠️ Le serveur va démarrer quand même, mais le client ne sera pas accessible.');
         console.error('⚠️ Vérifiez les logs ci-dessus pour voir l\'erreur de build.');
-        // Ne pas arrêter le serveur - permettre de démarrer même sans client pour diagnostiquer
+        
+        // Vérifier si client/dist existe malgré l'échec
+        const clientDistPath = join(__dirname, 'client', 'dist');
+        if (existsSync(clientDistPath)) {
+          console.log('✅ Le dossier client/dist existe malgré l\'erreur de build.');
+        } else {
+          console.error('❌ Le dossier client/dist n\'existe pas. Le client ne sera pas accessible.');
+        }
+      } else {
+        // Vérifier que client/dist existe après le build réussi
+        const clientDistPath = join(__dirname, 'client', 'dist');
+        if (existsSync(clientDistPath)) {
+          console.log('✅ Build du client réussi, dossier client/dist vérifié.');
+        } else {
+          console.error('⚠️ Build réussi mais client/dist n\'existe pas. Il y a peut-être un problème.');
+        }
       }
     } catch (buildError) {
       console.error('❌ Erreur lors du build du client:', buildError);
       console.error('⚠️ Le serveur va démarrer quand même pour permettre le diagnostic.');
-      // Ne pas arrêter le serveur - permettre de démarrer même sans client pour diagnostiquer
+      
+      // Vérifier si client/dist existe malgré l'erreur
+      const clientDistPath = join(__dirname, 'client', 'dist');
+      if (existsSync(clientDistPath)) {
+        console.log('✅ Le dossier client/dist existe malgré l\'erreur.');
+      } else {
+        console.error('❌ Le dossier client/dist n\'existe pas.');
+      }
     }
     
     // 3. Vérifier et initialiser la base de données
