@@ -29,38 +29,15 @@ const __dirname = dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configuration Socket.io - optimisée pour Plesk/Apache
-// Plesk tue les connexions long-running, donc on utilise des timeouts très courts
-
-// Configuration Socket.io - version simple qui fonctionnait ce matin (3404b51)
-// Retour à la configuration simple qui fonctionnait avant les modifications
-// CORS simple : accepter CLIENT_URL ou localhost, et typingpvp.com en production
-const socketCorsOrigin = process.env.CLIENT_URL || 
-  (process.env.NODE_ENV === 'production' ? 'https://typingpvp.com' : 'http://localhost:5173');
-
+// Configuration Socket.io simple
 const io = new Server(httpServer, {
   cors: {
-    origin: socketCorsOrigin,
+    origin: process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? 'https://typingpvp.com' : 'http://localhost:5173'),
     methods: ["GET", "POST"],
     credentials: true
   },
-  // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
-  allowUpgrades: false,
-  // Timeouts augmentés pour permettre au reverse proxy de fonctionner correctement
-  // pingTimeout: temps max entre un ping et sa réponse (si dépassé, session expirée)
-  // IMPORTANT: En production avec reverse proxy, augmenter encore plus pour éviter les sessions expirées
-  pingTimeout: 120000, // 120 secondes (2 minutes) pour les reverse proxies très lents
-  // pingInterval: temps entre chaque ping envoyé par le serveur
-  pingInterval: 25000, // 25 secondes (moins fréquent pour réduire la charge, mais assez pour maintenir la connexion)
-  // connectTimeout: temps max pour établir une connexion initiale
-  connectTimeout: 60000, // 60 secondes (augmenté pour les connexions lentes)
-  // Améliorer la gestion des sessions expirées
-  allowEIO3: false, // Désactiver Engine.IO v3 pour éviter les problèmes
-  // Augmenter les timeouts pour les requêtes polling longues
-  httpCompression: false, // Désactiver la compression pour réduire la latence
-  // Améliorer la gestion des reconnexions
-  maxHttpBufferSize: 1e6 // 1MB pour les messages
+  allowUpgrades: false
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -94,23 +71,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Middleware pour logger les requêtes API uniquement
-// IMPORTANT: Ignorer complètement les requêtes Socket.io - Socket.io les gère directement
-// Ne pas ajouter de middleware qui pourrait ralentir les requêtes Socket.io
+// Middleware pour logger les requêtes API
 app.use((req, res, next) => {
-  // Ignorer complètement les requêtes Socket.io - laisser Socket.io les gérer directement
-  // Gérer aussi /api/socket.io au cas où le client essaierait de s'y connecter
-  // (bien que le client devrait utiliser /socket.io/ directement)
-  if (req.path.startsWith('/socket.io/') || req.path.startsWith('/api/socket.io/')) {
-    return next(); // Passer immédiatement sans aucune modification
-  }
-  
-  // Logger les requêtes API seulement (pas Socket.io)
   if (req.path.startsWith('/api')) {
-    console.log(`📡 ${req.method} ${req.path}`, {
-      origin: req.headers.origin,
-      query: Object.keys(req.query).length > 0 ? req.query : undefined
-    });
+    console.log(`📡 ${req.method} ${req.path}`);
   }
   next();
 });
@@ -291,175 +255,12 @@ if (process.env.SERVE_CLIENT === 'true') {
   });
 }
 
-// Route de test pour Socket.io (sans connexion)
-// IMPORTANT: Ne pas utiliser /socket.io/test car Socket.io intercepte toutes les requêtes /socket.io/*
-// Utiliser /api/socket-test à la place
-app.get('/api/socket-test', (req, res) => {
-  const socketCount = io.sockets.sockets.size;
-  res.json({ 
-    message: 'Socket.io endpoint is accessible',
-    socketIoPath: '/socket.io/',
-    transports: ['polling'],
-    activeConnections: socketCount,
-    server: {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      clientUrl: process.env.CLIENT_URL || 'not set',
-      port: process.env.PORT || 3001
-    },
-    note: 'To test Socket.IO connection, use the client application. Direct browser access to /socket.io/ will not work as it requires specific Socket.IO protocol parameters.'
-  });
-});
-
-// Gestion des erreurs Socket.io - logs détaillés pour diagnostic
-io.engine.on('connection_error', (err) => {
-  console.error('❌ Erreur Socket.io:', err.message);
-  console.error('Code:', err.code);
-  if (err.req) {
-    console.error('Transport:', err.req._query?.transport || 'non spécifié');
-    console.error('Origin:', err.req.headers?.origin);
-    console.error('URL:', err.req.url);
-  }
-});
-
-// Logger toutes les requêtes Socket.io pour diagnostic
-// IMPORTANT: Logger toutes les requêtes pour diagnostiquer les problèmes 400/502
-io.engine.on('request', (req, res) => {
-  const sid = req.query?.sid || 'new';
-  const isError = res.statusCode >= 400;
-  
-  // Logger toutes les requêtes (pas seulement en production) pour debug
-  if (isError || process.env.NODE_ENV === 'production') {
-    console.log(`🔌 Socket.io ${req.method} ${req.url}`, {
-      statusCode: res.statusCode,
-      origin: req.headers.origin,
-      transport: req.query?.transport,
-      sid: sid,
-      timestamp: new Date().toISOString()
-    });
-  }
-  
-  // Logger les erreurs avec plus de détails
-  if (isError) {
-    console.error(`❌ Erreur Socket.io ${req.method} ${req.url}:`, res.statusCode);
-    console.error('Headers:', {
-      origin: req.headers.origin,
-      host: req.headers.host,
-      'user-agent': req.headers['user-agent']?.substring(0, 50),
-      'x-forwarded-for': req.headers['x-forwarded-for']
-    });
-    console.error('Query:', req.query);
-    
-    // Si c'est une erreur 400 avec un sid (session), c'est probablement une session expirée
-    if (res.statusCode === 400 && req.query?.sid) {
-      console.error('⚠️ Erreur 400: Session invalide ou expirée pour sid:', req.query.sid);
-      
-      // Vérifier si la session existe réellement
-      try {
-        const session = io.engine.clients.get(req.query.sid);
-        if (!session) {
-          console.error('❌ Session non trouvée dans le serveur - Session expirée ou serveur redémarré');
-          console.error('💡 Cause probable: Le serveur a redémarré, la session a expiré (timeout), ou le reverse proxy a mis trop de temps à router la requête');
-          console.error('💡 Solutions possibles:');
-          console.error('   - Vérifier que le serveur Node.js ne redémarre pas fréquemment');
-          console.error('   - Augmenter les timeouts du reverse proxy (nginx/Apache) pour Socket.IO');
-          console.error('   - Vérifier les logs système pour voir si le processus Node.js crash');
-        } else {
-          console.error('✅ Session trouvée mais requête rejetée - Problème de validation côté serveur');
-          console.error('💡 Peut être dû à un problème de synchronisation ou de headers');
-        }
-      } catch (error) {
-        console.error('❌ Erreur lors de la vérification de session:', error.message);
-      }
-      
-      // Log supplémentaire pour diagnostiquer
-      console.error('💡 Le client devrait automatiquement créer une nouvelle session');
-      console.error('💡 Statistiques Socket.IO:', {
-        totalClients: io.engine.clients.size,
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Si c'est une erreur 502, c'est probablement un problème de reverse proxy
-    if (res.statusCode === 502) {
-      console.error('⚠️ Erreur 502: Problème de reverse proxy ou serveur Node.js inaccessible');
-      console.error('💡 Vérifiez que le serveur Node.js est bien démarré et que le reverse proxy peut y accéder');
-      console.error('💡 Vérifiez les timeouts du reverse proxy (doivent être >= 120s)');
-    }
-  }
-  
-  // Gérer les erreurs de session expirée de manière plus gracieuse
-  res.on('error', (error) => {
-    console.error('❌ Erreur de réponse Socket.io:', error.message);
-    console.error('URL:', req.url);
-    console.error('SID:', sid);
-  });
-});
-
-// Helper pour wrapper les handlers Socket.io avec gestion d'erreur
-function safeHandler(handler) {
-  return function(...args) {
-    try {
-      return handler.apply(this, args);
-    } catch (error) {
-      console.error('❌ Erreur dans handler Socket.io:', error);
-      console.error('Stack:', error.stack);
-      // Ne pas faire planter le serveur, juste logger
-      if (args[0] && typeof args[0].emit === 'function') {
-        try {
-          args[0].emit('error', { message: 'Internal server error' });
-        } catch (emitError) {
-          console.error('❌ Impossible d\'émettre l\'erreur:', emitError);
-        }
-      }
-    }
-  };
-}
 
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
-  // Monitoring des connexions Socket.io
-  socketConnectionCount++;
-  console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
-  console.log(`📍 Socket transport: ${socket.conn.transport.name}, readyState: ${socket.conn.readyState}`);
+  console.log(`✅ User connected: ${socket.id}`);
   
-  // Heartbeat pour maintenir la connexion active (aligné avec pingInterval)
-  // Note: Socket.IO gère déjà son propre heartbeat, mais on peut ajouter un ping custom si nécessaire
-  const heartbeatInterval = setInterval(() => {
-    if (socket.connected) {
-      socket.emit('ping', { timestamp: Date.now() });
-    } else {
-      clearInterval(heartbeatInterval);
-    }
-  }, 25000); // Ping toutes les 25 secondes (aligné avec pingInterval serveur)
-  
-  // Nettoyer l'intervalle à la déconnexion
-  socket.on('disconnect', safeHandler((reason) => {
-    clearInterval(heartbeatInterval);
-    socketDisconnectionCount++;
-    console.log(`⚠️ User disconnected: ${socket.id}, Reason: ${reason} (Total: ${socketDisconnectionCount})`);
-  }));
-  
-  // Gérer les erreurs de connexion avec plus de détails
-  socket.conn.on('error', (err) => {
-    console.error('❌ Erreur de connexion pour socket', socket.id, ':', err.message);
-    console.error('Type:', err.type);
-    if (err.description) {
-      console.error('Description:', err.description);
-    }
-    // Si c'est une erreur de transport, ne pas faire planter le socket
-    // Socket.IO gérera automatiquement la reconnexion
-  });
-  
-  // Gérer les erreurs dans les handlers Socket.io
-  socket.on('error', (err) => {
-    console.error('❌ Erreur Socket.io pour socket', socket.id, ':', err.message);
-    if (err.stack) {
-      console.error('Stack:', err.stack);
-    }
-  });
-  
-  // Gérer les déconnexions avec plus de détails
-  socket.conn.on('close', (reason) => {
+  socket.on('disconnect', (reason) => {
     console.log(`⚠️ Socket ${socket.id} connection closed:`, reason);
   });
   
@@ -469,7 +270,7 @@ io.on('connection', (socket) => {
   });
 
   // Créer une nouvelle room
-  socket.on('create-room', safeHandler((data) => {
+  socket.on('create-room', (data) => {
     const roomId = nanoid(8);
     const text = getRandomText();
     
@@ -488,7 +289,7 @@ io.on('connection', (socket) => {
     
     socket.emit('room-created', { roomId, text });
     console.log(`Room created: ${roomId}`);
-  }));
+  });
 
   // Helper pour trouver un joueur existant dans une room (pour reconnexions)
   function findExistingPlayer(room, userId, playerName) {
@@ -500,7 +301,7 @@ io.on('connection', (socket) => {
   }
 
   // Rejoindre une room
-  socket.on('join-room', safeHandler((data) => {
+  socket.on('join-room', (data) => {
     const { roomId, playerName, userId } = data;
     console.log(`🔌 Tentative de rejoindre la room ${roomId} par ${playerName} (${userId || 'guest'})`);
     
@@ -642,10 +443,10 @@ io.on('connection', (socket) => {
     
     // État inattendu
     socket.emit('error', { message: 'Room is not available' });
-  }));
+  });
 
   // Démarrer la partie
-  socket.on('start-game', safeHandler((data) => {
+  socket.on('start-game', (data) => {
     const { roomId, language = 'en', mode = 'timer', timerDuration = 60, difficulty = 'medium' } = data;
     const room = rooms.get(roomId);
     
@@ -682,7 +483,7 @@ io.on('connection', (socket) => {
     });
     
     console.log(`Game started in room ${roomId}`);
-  }));
+  });
 
   // Mettre à jour la progression
   // NOTE: Ce handler est appelé très fréquemment (à chaque frappe)
@@ -1502,24 +1303,11 @@ export { onlineUsers };
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interfaces pour Plesk
 
-// Logger avant de démarrer le serveur
-console.log('🚀 Tentative de démarrage du serveur HTTP...');
-console.log(`📍 Port: ${PORT}, Host: ${HOST}`);
-console.log(`⚠️ Si vous avez plusieurs applications Node.js sur ce serveur, vérifiez que les ports sont différents`);
-
-// Démarrer le serveur avec gestion d'erreur
-// Logger le démarrage pour détecter les redémarrages de Passenger
-console.log('🚀 Démarrage du serveur à:', new Date().toISOString());
-console.log('📊 Process ID:', process.pid);
-console.log('🔧 Node.js version:', process.version);
-console.log('🌍 NODE_ENV:', process.env.NODE_ENV || 'development');
+// Démarrer le serveur
 
 try {
   httpServer.listen(PORT, HOST, () => {
     console.log(`✅ Serveur démarré sur ${HOST}:${PORT}`);
-    console.log(`📡 Socket.io configuré (polling uniquement)`);
-    console.log(`⏰ Timestamp démarrage: ${new Date().toISOString()}`);
-    console.log(`🔑 Process PID: ${process.pid}`);
   }).on('error', (error) => {
     console.error('❌ Erreur lors du démarrage du serveur:', error);
     console.error('Code erreur:', error.code);
@@ -1550,38 +1338,10 @@ try {
     socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
   });
   
-  // Monitoring de la santé du serveur
-let requestCount = 0;
-let errorCount = 0;
-let socketConnectionCount = 0;
-let socketDisconnectionCount = 0;
-
-app.use((req, res, next) => {
-  requestCount++;
-  // Logger toutes les 100 requêtes pour monitoring
-  if (requestCount % 100 === 0) {
-    console.log(`📊 Statistiques serveur: ${requestCount} requêtes, ${errorCount} erreurs`);
-    console.log(`📡 Socket.io: ${socketConnectionCount} connexions, ${socketDisconnectionCount} déconnexions`);
-  }
-  next();
-});
-
 // Logger les erreurs de requête
 app.use((err, req, res, next) => {
-  errorCount++;
-  console.error('❌ Erreur dans une requête:', err.message);
-  console.error('URL:', req.url);
-  if (err.stack && process.env.NODE_ENV !== 'production') {
-    console.error('Stack:', err.stack);
-  }
+  console.error('❌ Erreur:', err.message);
   res.status(500).json({ error: 'Internal server error' });
-});
-
-// Monitoring Socket.io
-io.engine.on('connection_error', (err) => {
-  console.error('❌ Erreur de connexion Socket.io:', err.message);
-  console.error('Code:', err.code);
-  console.error('Context:', err.context);
 });
 
 } catch (error) {
