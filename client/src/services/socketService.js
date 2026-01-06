@@ -14,15 +14,24 @@ if (API_URL.endsWith('/api')) {
   API_URL = API_URL.slice(0, -5); // Enlever '/api/'
 }
 
+// Logger l'URL utilisée pour Socket.IO (uniquement en développement)
+if (import.meta.env.DEV) {
+  console.log('🔌 Socket.IO URL:', API_URL);
+  console.log('🔌 Socket.IO path:', '/socket.io/');
+}
+
 /**
  * Crée une nouvelle instance de socket
  * Configuration optimisée pour production avec polling forcé et meilleure gestion des erreurs
  */
 export function createSocket() {
+  // Forcer explicitement le path Socket.IO pour éviter toute confusion
   const socket = io(API_URL, {
     // Forcer polling pour éviter les problèmes avec Plesk/Apache
     transports: ['polling'],
     upgrade: false,
+    // IMPORTANT: Forcer explicitement le path Socket.IO pour éviter /api/socket.io
+    path: '/socket.io/',
     // Configuration de reconnexion améliorée
     reconnection: true,
     reconnectionDelay: 1000,
@@ -34,9 +43,16 @@ export function createSocket() {
     forceNew: false, // Réutiliser les connexions existantes
     // Désactiver Engine.IO v3 pour éviter les problèmes
     allowEIO3: false
-    // Note: Le path Socket.IO par défaut est /socket.io/, pas besoin de le spécifier
-    // sauf si vous utilisez un path personnalisé côté serveur
   });
+  
+  // Logger la configuration pour debug
+  if (import.meta.env.DEV) {
+    console.log('🔌 Socket.IO créé avec:', {
+      url: API_URL,
+      path: '/socket.io/',
+      socketId: socket.id || 'connecting...'
+    });
+  }
 
   // Gestion simplifiée des erreurs - éviter les boucles infinies
   // Socket.IO gère déjà la reconnexion automatique, on ne doit pas forcer de reconnexion manuelle
