@@ -115,6 +115,7 @@ export default function BattleRoom() {
       // On nettoie juste les listeners spécifiques à cette room
       if (socketRef.current) {
         cleanupSocket(socketRef.current, [
+          'matchmaking-match-found', // Pour les rooms matchmaking
           'room-joined',
           'player-joined',
           'player-left',
@@ -139,6 +140,27 @@ export default function BattleRoom() {
     listenersSetupRef.current = true;
 
     // Configurer tous les listeners socket
+    
+    // LISTENER SPÉCIAL : Pour les rooms matchmaking, écouter matchmaking-match-found
+    // Les joueurs sont déjà dans la room (ajoutés par createMatchmakingRoom), pas besoin de join-room
+    // Cet événement est envoyé juste après la création de la room matchmaking
+    socket.on('matchmaking-match-found', (data) => {
+      // Vérifier que c'est bien la room actuelle
+      if (data.roomId !== roomId) {
+        console.warn('⚠️ matchmaking-match-found reçu pour une autre room:', data.roomId, 'actuelle:', roomId);
+        return;
+      }
+      console.log('✅ Matchmaking match found:', data);
+      setText(data.text);
+      setPlayers(data.players);
+      setGameStatus('waiting');
+      if (data.chatMessages) {
+        setChatMessages(data.chatMessages);
+      }
+      // Marquer comme ayant rejoint pour éviter d'appeler join-room
+      hasJoinedRoomRef.current = true;
+    });
+
     socket.on('room-joined', (data) => {
       console.log('✅ Room joined:', data);
       setText(data.text);
@@ -440,15 +462,39 @@ export default function BattleRoom() {
   }, []); // Exécuter une seule fois
 
   // Joindre la room une fois que le playerName est défini
+  // IMPORTANT : Pour les rooms matchmaking, ne PAS appeler join-room car les joueurs sont déjà dans la room
   useEffect(() => {
     // Attendre que le nom soit défini et que le socket soit prêt
     if (!playerName || !socketRef.current || hasJoinedRoomRef.current) {
       return;
     }
 
+    // CAS SPÉCIAL : Rooms matchmaking
+    // Les joueurs sont déjà dans la room (créée par createMatchmakingRoom)
+    // On attend l'événement matchmaking-match-found
+    // Mais si l'événement est déjà passé ou perdu, on peut appeler join-room pour se synchroniser
+    if (matchmaking) {
+      console.log('🎮 Room matchmaking détectée - En attente de matchmaking-match-found...');
+      
+      // Attendre un peu pour voir si matchmaking-match-found arrive
+      // Si après 1 seconde on n'a toujours pas reçu l'événement, appeler join-room (reconnexion)
+      const timeoutId = setTimeout(() => {
+        if (!hasJoinedRoomRef.current && socket.connected) {
+          console.log('⏱️ matchmaking-match-found non reçu après 1s - Tentative de synchronisation via join-room');
+          socket.emit('join-room', { 
+            roomId, 
+            playerName,
+            userId: userId || currentUser?.id || null
+          });
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+
     const socket = socketRef.current;
 
-    // Fonction pour joindre la room
+    // CAS NORMAL : Room 1v1 manuelle - doit appeler join-room
     const handleJoinRoom = () => {
       // Éviter de joindre plusieurs fois
       if (hasJoinedRoomRef.current) return;
@@ -486,7 +532,7 @@ export default function BattleRoom() {
     return () => {
       hasJoinedRoomRef.current = false;
     };
-  }, [roomId, playerName, userId, currentUser?.id, navigate]); // Dépendances pour rejoindre la room
+  }, [roomId, playerName, userId, currentUser?.id, navigate, matchmaking]); // Dépendances pour rejoindre la room
 
   // Nettoyage des intervalles et timeouts
   useEffect(() => {

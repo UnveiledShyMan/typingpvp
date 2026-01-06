@@ -17,8 +17,8 @@ export function createSocket() {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     reconnectionAttempts: Infinity, // Essayer indéfiniment de se reconnecter
-    // Timeouts alignés avec le serveur
-    timeout: 45000, // 45 secondes pour la connexion initiale
+    // Timeouts alignés avec le serveur (augmentés pour les connexions lentes)
+    timeout: 60000, // 60 secondes pour la connexion initiale
     // Améliorer la gestion des erreurs
     forceNew: false, // Réutiliser les connexions existantes
     // Désactiver Engine.IO v3 pour éviter les problèmes
@@ -34,6 +34,32 @@ export function createSocket() {
         type: error.type,
         description: error.description
       });
+    }
+    
+    // Si c'est une erreur 400 (session invalide), forcer une reconnexion
+    if (error.message.includes('400') || error.message.includes('Bad Request')) {
+      console.warn('⚠️ Erreur 400 détectée - Session invalide, forcer reconnexion...');
+      // Forcer une nouvelle connexion en réinitialisant le socket
+      setTimeout(() => {
+        if (!socket.connected) {
+          socket.disconnect();
+          socket.connect();
+        }
+      }, 1000);
+    }
+  });
+  
+  // Intercepter les erreurs au niveau du socket lui-même
+  // Certaines erreurs HTTP peuvent ne pas déclencher connect_error
+  socket.on('error', (error) => {
+    console.error('❌ Socket.IO socket error:', error);
+    // Si erreur 400, forcer reconnexion
+    if (error && (error.toString().includes('400') || error.toString().includes('Bad Request'))) {
+      console.warn('⚠️ Erreur 400 détectée dans le socket - Forcer reconnexion...');
+      if (!socket.connected) {
+        socket.disconnect();
+        socket.connect();
+      }
     }
   });
 
@@ -70,6 +96,20 @@ export function getSocket(forceNew = false) {
   if (forceNew && socketInstance) {
     socketInstance.disconnect();
     socketInstance = null;
+  }
+  
+  // Si le socket existe mais n'est pas connecté, vérifier s'il a une erreur persistante
+  if (socketInstance && !socketInstance.connected) {
+    // Attendre un peu pour voir si la reconnexion automatique fonctionne
+    // Si après 5 secondes il n'est toujours pas connecté, recréer le socket
+    setTimeout(() => {
+      if (socketInstance && !socketInstance.connected) {
+        console.warn('⚠️ Socket non connecté après 5s - Recréation du socket...');
+        socketInstance.disconnect();
+        socketInstance = null;
+        socketInstance = createSocket();
+      }
+    }, 5000);
   }
   
   if (!socketInstance || !socketInstance.connected) {

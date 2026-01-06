@@ -20,15 +20,16 @@
 
 ### 1. Configuration Serveur (`server/index.js`)
 
-#### Timeouts Augmentés
-- **pingTimeout**: 20000ms → 60000ms (60 secondes)
+#### Timeouts Augmentés (Version Finale)
+- **pingTimeout**: 20000ms → **90000ms** (90 secondes)
   - Temps maximum entre un ping et sa réponse
-  - Augmenté pour permettre au reverse proxy de fonctionner correctement
-- **pingInterval**: 10000ms → 25000ms (25 secondes)
+  - Encore augmenté pour les reverse proxies très lents
+- **pingInterval**: 10000ms → **30000ms** (30 secondes)
   - Temps entre chaque ping envoyé par le serveur
-  - Moins fréquent mais plus stable
-- **connectTimeout**: 20000ms → 45000ms (45 secondes)
+  - Réduit la charge réseau et améliore la stabilité
+- **connectTimeout**: 20000ms → **60000ms** (60 secondes)
   - Temps maximum pour établir une connexion initiale
+  - Aligné avec le timeout client
 
 #### Améliorations Supplémentaires
 - `allowEIO3: false` - Désactivation d'Engine.IO v3 pour éviter les problèmes de compatibilité
@@ -52,6 +53,9 @@
 - Logs détaillés pour toutes les erreurs de connexion
 - Logs des reconnexions réussies
 - Gestion gracieuse des échecs de reconnexion
+- **Détection automatique des erreurs 400** : Force une reconnexion immédiate quand une session invalide est détectée
+- **Interception des erreurs de transport** : Gère les erreurs HTTP 400 qui ne déclenchent pas automatiquement une reconnexion
+- **Recréation automatique du socket** : Si le socket reste déconnecté plus de 5 secondes, il est recréé automatiquement
 
 ### 3. Composant Matchmaking (`client/src/pages/Matchmaking.jsx`)
 

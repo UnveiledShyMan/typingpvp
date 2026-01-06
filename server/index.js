@@ -19,6 +19,9 @@ import matchesRoutes from './routes/matches.js';
 import discordRoutes from './routes/discord.js';
 import { getUserById, recordMatch, updateUser } from './db.js';
 import { calculateNewMMR } from './utils/elo.js';
+import { MatchmakingQueue } from './utils/matchmakingQueue.js';
+// Système ELO amélioré disponible (optionnel - voir OPTIMIZATION_PLAN.md)
+// import { calculateNewMMR } from './utils/eloImproved.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,11 +49,11 @@ const io = new Server(httpServer, {
   allowUpgrades: false,
   // Timeouts augmentés pour permettre au reverse proxy de fonctionner correctement
   // pingTimeout: temps max entre un ping et sa réponse (si dépassé, session expirée)
-  pingTimeout: 60000, // 60 secondes (augmenté pour le reverse proxy)
+  pingTimeout: 90000, // 90 secondes (encore augmenté pour les reverse proxies lents)
   // pingInterval: temps entre chaque ping envoyé par le serveur
-  pingInterval: 25000, // 25 secondes (moins fréquent mais plus stable)
+  pingInterval: 30000, // 30 secondes (augmenté pour réduire la charge)
   // connectTimeout: temps max pour établir une connexion initiale
-  connectTimeout: 45000, // 45 secondes
+  connectTimeout: 60000, // 60 secondes (augmenté pour les connexions lentes)
   // Améliorer la gestion des sessions expirées
   allowEIO3: false, // Désactiver Engine.IO v3 pour éviter les problèmes
   // Augmenter les timeouts pour les requêtes polling longues
@@ -114,9 +117,10 @@ app.use((req, res, next) => {
 const rooms = new Map();
 const players = new Map();
 
-// Système de matchmaking (queues séparées pour ranked et unrated)
-const rankedMatchmakingQueue = new Map(); // Map<socketId, { userId, username, mmr, language, socketId, joinedAt }>
-const unratedMatchmakingQueue = new Map(); // Map<socketId, { userId, username, mmr, language, socketId, joinedAt }>
+// Une seule queue optimisée pour tous les types (ranked/unrated)
+// La queue gère elle-même la séparation par langue et type
+// Utilise le système de buckets MMR pour O(1) recherche au lieu de O(n)
+const matchmakingQueue = new MatchmakingQueue();
 
 // Système de compétitions (mass multiplayer)
 const competitions = new Map(); // Map<competitionId, { id, text, players, status, startTime, results, language, maxPlayers }>
@@ -334,6 +338,14 @@ io.engine.on('request', (req, res) => {
     if (res.statusCode === 400 && req.query?.sid) {
       console.error('⚠️ Session invalide ou expirée pour sid:', req.query.sid);
       console.error('💡 Le client devrait se reconnecter automatiquement');
+      
+      // Vérifier si la session existe réellement
+      const session = io.engine.clients.get(req.query.sid);
+      if (!session) {
+        console.error('❌ Session non trouvée dans le serveur - Session expirée ou invalide');
+      } else {
+        console.log('✅ Session trouvée mais requête rejetée - Problème de validation');
+      }
     }
     
     // Si c'est une erreur 502, c'est probablement un problème de reverse proxy
@@ -469,19 +481,36 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // CAS SPÉCIAL : Rooms de matchmaking (logique complexe nécessaire)
-    if (room.matchmaking && userId) {
+    // CAS SPÉCIAL : Rooms de matchmaking
+    // Pour les rooms matchmaking, join-room est utilisé SEULEMENT pour les reconnexions
+    // Les nouveaux joueurs arrivent via matchmaking-match-found (déjà dans la room)
+    if (room.matchmaking) {
       const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
-        // Reconnexion dans une room matchmaking
+        // RECONNEXION : Le joueur existe déjà dans la room matchmaking
         existingPlayer.id = socket.id;
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
         socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
         if (room.status === 'finished' && room.results) {
           socket.emit('game-finished', { results: room.results, players: room.players, eloChanges: room.eloChanges || {} });
+        } else if (room.status === 'playing') {
+          // Si la partie est en cours, renvoyer l'état actuel
+          socket.emit('game-started', { 
+            startTime: room.startTime, 
+            text: room.text,
+            mode: room.mode,
+            timerDuration: room.timerDuration,
+            difficulty: room.difficulty
+          });
         }
         console.log(`Player ${playerName} reconnected to matchmaking room ${roomId}`);
+        return;
+      } else {
+        // NOUVEAU JOUEUR tentant de rejoindre une room matchmaking
+        // Cela ne devrait pas arriver normalement, mais on refuse pour éviter les problèmes
+        console.warn(`⚠️ Tentative de rejoindre une room matchmaking par un joueur non autorisé: ${playerName}`);
+        socket.emit('error', { message: 'Cannot join matchmaking room. Players are already assigned.' });
         return;
       }
     }
@@ -893,17 +922,14 @@ io.on('connection', (socket) => {
     console.log(`Unrated match recorded: ${player1.name} vs ${player2.name}, Winner: ${player1Won ? player1.name : player2.name}`);
   }
 
-  // MATCHMAKING SYSTEM
+  // MATCHMAKING SYSTEM - Optimisé avec buckets MMR
   // Rejoindre la queue de matchmaking
   socket.on('join-matchmaking', async (data) => {
     const { userId, username, language = 'en', mmr = 1000, ranked = true } = data;
-    
-    // Sélectionner la bonne queue
-    const queue = ranked ? rankedMatchmakingQueue : unratedMatchmakingQueue;
     const queueName = ranked ? 'ranked' : 'unrated';
     
-    // Vérifier si déjà dans une queue (ranked ou unrated)
-    if (rankedMatchmakingQueue.has(socket.id) || unratedMatchmakingQueue.has(socket.id)) {
+    // Vérifier si déjà dans la queue
+    if (matchmakingQueue.hasPlayer(socket.id)) {
       socket.emit('matchmaking-error', { message: 'Already in queue' });
       return;
     }
@@ -914,8 +940,8 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Ajouter à la queue appropriée
-    queue.set(socket.id, {
+    // Préparer les données du joueur
+    const playerData = {
       userId: userId || null,
       username: username || null, // Pour les guests (unrated uniquement)
       mmr: parseInt(mmr) || 1000,
@@ -923,54 +949,44 @@ io.on('connection', (socket) => {
       socketId: socket.id,
       joinedAt: Date.now(),
       ranked
-    });
+    };
+    
+    // Ajouter à la queue optimisée (système de buckets)
+    const added = matchmakingQueue.addPlayer(language, queueName, socket.id, playerData);
+    
+    if (!added) {
+      socket.emit('matchmaking-error', { message: 'Failed to join queue' });
+      return;
+    }
     
     socket.emit('matchmaking-joined', { language, mmr, ranked });
-    console.log(`Player ${userId || username || 'guest'} joined ${queueName} matchmaking queue (${language}, MMR: ${mmr})`);
+    console.log(`Player ${userId || username || 'guest'} joined ${queueName} matchmaking queue (${language}, MMR: ${mmr}) - Queue size: ${matchmakingQueue.getQueueSizeFor(language, queueName)}`);
     
-    // Chercher un match
+    // Chercher un match (optimisé avec buckets)
     findMatch(socket.id, language, mmr, ranked);
   });
 
   // Quitter la queue de matchmaking
   socket.on('leave-matchmaking', () => {
-    let left = false;
-    if (rankedMatchmakingQueue.has(socket.id)) {
-      rankedMatchmakingQueue.delete(socket.id);
-      left = true;
-    }
-    if (unratedMatchmakingQueue.has(socket.id)) {
-      unratedMatchmakingQueue.delete(socket.id);
-      left = true;
-    }
+    const left = matchmakingQueue.removePlayer(socket.id);
     if (left) {
       socket.emit('matchmaking-left');
-      console.log(`Player left matchmaking queue: ${socket.id}`);
+      console.log(`Player left matchmaking queue: ${socket.id} - Queue size: ${matchmakingQueue.getQueueSize()}`);
     }
   });
 
-  // Fonction pour trouver un match
+  // Fonction pour trouver un match (optimisée avec buckets MMR)
   function findMatch(socketId, language, mmr, ranked) {
-    const queue = ranked ? rankedMatchmakingQueue : unratedMatchmakingQueue;
-    const player = queue.get(socketId);
+    const queueName = ranked ? 'ranked' : 'unrated';
+    const player = matchmakingQueue.getPlayer(socketId);
     if (!player) return;
     
     // Pour ranked : chercher un adversaire avec un MMR similaire (±200)
-    // Pour unrated : chercher n'importe quel adversaire avec la même langue
-    const MMR_RANGE = ranked ? 200 : Infinity;
-    let bestMatch = null;
-    let bestMMRDiff = Infinity;
+    // Pour unrated : chercher avec une plage plus large (±500) pour trouver plus facilement
+    const MMR_RANGE = ranked ? 200 : 500;
     
-    for (const [otherSocketId, otherPlayer] of queue.entries()) {
-      if (otherSocketId === socketId) continue;
-      if (otherPlayer.language !== language) continue;
-      
-      const mmrDiff = Math.abs(otherPlayer.mmr - mmr);
-      if (mmrDiff <= MMR_RANGE && mmrDiff < bestMMRDiff) {
-        bestMatch = { socketId: otherSocketId, player: otherPlayer };
-        bestMMRDiff = mmrDiff;
-      }
-    }
+    // Utiliser le système de buckets optimisé (O(1) au lieu de O(n))
+    const bestMatch = matchmakingQueue.findMatch(socketId, MMR_RANGE);
     
     // Si un match est trouvé, créer une room
     if (bestMatch) {
@@ -980,10 +996,9 @@ io.on('connection', (socket) => {
 
   // Créer une room depuis le matchmaking
   async function createMatchmakingRoom(socketId1, player1, socketId2, player2, language, ranked = true) {
-    // Retirer les joueurs de la queue appropriée
-    const queue = ranked ? rankedMatchmakingQueue : unratedMatchmakingQueue;
-    queue.delete(socketId1);
-    queue.delete(socketId2);
+    // Retirer les joueurs de la queue optimisée
+    matchmakingQueue.removePlayer(socketId1);
+    matchmakingQueue.removePlayer(socketId2);
     
     // Récupérer les noms d'utilisateurs
     const user1 = player1.userId ? await getUserById(player1.userId) : null;
@@ -1352,14 +1367,11 @@ io.on('connection', (socket) => {
 
   // Déconnexion
   socket.on('disconnect', () => {
-    // Retirer de la queue de matchmaking (ranked ou unrated)
-    if (rankedMatchmakingQueue.has(socket.id)) {
-      rankedMatchmakingQueue.delete(socket.id);
-      console.log(`Player ${socket.id} removed from ranked matchmaking queue`);
-    }
-    if (unratedMatchmakingQueue.has(socket.id)) {
-      unratedMatchmakingQueue.delete(socket.id);
-      console.log(`Player ${socket.id} removed from unrated matchmaking queue`);
+    // Retirer de la queue de matchmaking optimisée
+    const wasInQueue = matchmakingQueue.hasPlayer(socket.id);
+    if (wasInQueue) {
+      matchmakingQueue.removePlayer(socket.id);
+      console.log(`Player ${socket.id} removed from matchmaking queue - Queue size: ${matchmakingQueue.getQueueSize()}`);
     }
     
     const playerData = players.get(socket.id);
