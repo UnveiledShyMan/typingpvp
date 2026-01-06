@@ -131,13 +131,38 @@ export default function BattleRoom() {
   }, []); // Exécuter une seule fois au montage
 
   // Configurer les listeners socket une seule fois
+  // IMPORTANT: Nettoyer les anciens listeners avant d'ajouter les nouveaux pour éviter les doublons
   useEffect(() => {
-    if (!socketRef.current || listenersSetupRef.current) {
+    if (!socketRef.current) {
       return;
     }
 
     const socket = socketRef.current;
+    
+    // Si les listeners ont déjà été configurés, ne pas les reconfigurer
+    // Mais nettoyer d'abord pour éviter les doublons
+    if (listenersSetupRef.current) {
+      return;
+    }
+    
     listenersSetupRef.current = true;
+    
+    // Nettoyer les anciens listeners pour éviter les doublons
+    const eventsToClean = [
+      'matchmaking-match-found',
+      'room-joined',
+      'player-joined',
+      'player-left',
+      'game-started',
+      'opponent-update',
+      'opponent-finished',
+      'game-finished',
+      'chat-message',
+      'error',
+      'disconnect',
+      'reconnect'
+    ];
+    eventsToClean.forEach(event => socket.off(event));
 
     // Configurer tous les listeners socket
     
@@ -479,9 +504,9 @@ export default function BattleRoom() {
       // Attendre un peu pour voir si matchmaking-match-found arrive
       // Si après 1 seconde on n'a toujours pas reçu l'événement, appeler join-room (reconnexion)
       const timeoutId = setTimeout(() => {
-        if (!hasJoinedRoomRef.current && socket.connected) {
+        if (!hasJoinedRoomRef.current && socketRef.current && socketRef.current.connected) {
           console.log('⏱️ matchmaking-match-found non reçu après 1s - Tentative de synchronisation via join-room');
-          socket.emit('join-room', { 
+          socketRef.current.emit('join-room', { 
             roomId, 
             playerName,
             userId: userId || currentUser?.id || null
@@ -599,23 +624,42 @@ export default function BattleRoom() {
   };
 
   const handleStartGame = () => {
-    if (players.length === 2 && socketRef.current) {
+    try {
+      // Vérifications de base
+      if (players.length !== 2) {
+        toast.warning('Waiting for opponent...');
+        return;
+      }
+      
+      if (!socketRef.current) {
+        toast.error('Socket not initialized. Please refresh the page.');
+        return;
+      }
+      
       // Vérifier que le socket est connecté avant d'émettre
       if (!socketRef.current.connected) {
         toast.error('Not connected to server. Please wait...');
-        // Attendre la reconnexion
+        // Attendre la reconnexion avec un timeout
+        const timeout = setTimeout(() => {
+          toast.error('Connection timeout. Please try again.');
+        }, 10000);
+        
         socketRef.current.once('connect', () => {
-          socketRef.current.emit('start-game', { 
-            roomId, 
-            language: selectedLanguage,
-            mode: battleMode,
-            timerDuration: battleMode === 'timer' ? timerDuration : null,
-            difficulty: battleMode === 'phrases' ? phraseDifficulty : null
-          });
+          clearTimeout(timeout);
+          if (socketRef.current && socketRef.current.connected) {
+            socketRef.current.emit('start-game', { 
+              roomId, 
+              language: selectedLanguage,
+              mode: battleMode,
+              timerDuration: battleMode === 'timer' ? timerDuration : null,
+              difficulty: battleMode === 'phrases' ? phraseDifficulty : null
+            });
+          }
         });
         return;
       }
       
+      // Émettre l'événement
       socketRef.current.emit('start-game', { 
         roomId, 
         language: selectedLanguage,
@@ -623,6 +667,9 @@ export default function BattleRoom() {
         timerDuration: battleMode === 'timer' ? timerDuration : null,
         difficulty: battleMode === 'phrases' ? phraseDifficulty : null
       });
+    } catch (error) {
+      console.error('Error in handleStartGame:', error);
+      toast.error('An error occurred. Please try again.');
     }
   };
 

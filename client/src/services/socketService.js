@@ -25,62 +25,28 @@ export function createSocket() {
     allowEIO3: false
   });
 
-  // Gestion améliorée des erreurs de connexion
+  // Gestion simplifiée des erreurs - éviter les boucles infinies
+  // Socket.IO gère déjà la reconnexion automatique, on ne doit pas forcer de reconnexion manuelle
   socket.on('connect_error', (error) => {
-    console.error('❌ Socket.IO connection error:', error.message);
-    // Ne pas logger les erreurs de type "xhr poll error" trop fréquemment
-    if (!error.message.includes('xhr poll error')) {
-      console.error('Connection error details:', {
-        type: error.type,
-        description: error.description
-      });
+    // Ne logger que les erreurs significatives (pas les erreurs de polling normales)
+    if (!error.message.includes('xhr poll error') && !error.message.includes('transport close')) {
+      console.error('❌ Socket.IO connection error:', error.message);
     }
-    
-    // Si c'est une erreur 400 (session invalide), forcer une reconnexion
-    if (error.message.includes('400') || error.message.includes('Bad Request')) {
-      console.warn('⚠️ Erreur 400 détectée - Session invalide, forcer reconnexion...');
-      // Forcer une nouvelle connexion en réinitialisant le socket
-      setTimeout(() => {
-        if (!socket.connected) {
-          socket.disconnect();
-          socket.connect();
-        }
-      }, 1000);
-    }
-  });
-  
-  // Intercepter les erreurs au niveau du socket lui-même
-  // Certaines erreurs HTTP peuvent ne pas déclencher connect_error
-  socket.on('error', (error) => {
-    console.error('❌ Socket.IO socket error:', error);
-    // Si erreur 400, forcer reconnexion
-    if (error && (error.toString().includes('400') || error.toString().includes('Bad Request'))) {
-      console.warn('⚠️ Erreur 400 détectée dans le socket - Forcer reconnexion...');
-      if (!socket.connected) {
-        socket.disconnect();
-        socket.connect();
-      }
-    }
+    // Ne PAS forcer de reconnexion manuelle - laisser Socket.IO gérer
   });
 
   // Logger les reconnexions réussies
   socket.on('reconnect', (attemptNumber) => {
-    console.log(`✅ Socket.IO reconnected after ${attemptNumber} attempt(s)`);
+    if (attemptNumber > 1) {
+      console.log(`✅ Socket.IO reconnected after ${attemptNumber} attempt(s)`);
+    }
   });
 
-  // Logger les tentatives de reconnexion
+  // Logger les tentatives de reconnexion (seulement après la première)
   socket.on('reconnect_attempt', (attemptNumber) => {
-    console.log(`🔄 Socket.IO reconnection attempt ${attemptNumber}`);
-  });
-
-  // Logger les échecs de reconnexion
-  socket.on('reconnect_error', (error) => {
-    console.error('❌ Socket.IO reconnection error:', error.message);
-  });
-
-  // Logger les échecs définitifs de reconnexion
-  socket.on('reconnect_failed', () => {
-    console.error('❌ Socket.IO reconnection failed after all attempts');
+    if (attemptNumber > 3) {
+      console.log(`🔄 Socket.IO reconnection attempt ${attemptNumber}`);
+    }
   });
 
   return socket;
@@ -93,26 +59,16 @@ export function createSocket() {
 let socketInstance = null;
 
 export function getSocket(forceNew = false) {
+  // Si on force une nouvelle connexion, déconnecter l'ancienne
   if (forceNew && socketInstance) {
+    socketInstance.removeAllListeners(); // Nettoyer tous les listeners avant de déconnecter
     socketInstance.disconnect();
     socketInstance = null;
   }
   
-  // Si le socket existe mais n'est pas connecté, vérifier s'il a une erreur persistante
-  if (socketInstance && !socketInstance.connected) {
-    // Attendre un peu pour voir si la reconnexion automatique fonctionne
-    // Si après 5 secondes il n'est toujours pas connecté, recréer le socket
-    setTimeout(() => {
-      if (socketInstance && !socketInstance.connected) {
-        console.warn('⚠️ Socket non connecté après 5s - Recréation du socket...');
-        socketInstance.disconnect();
-        socketInstance = null;
-        socketInstance = createSocket();
-      }
-    }, 5000);
-  }
-  
-  if (!socketInstance || !socketInstance.connected) {
+  // Créer le socket s'il n'existe pas
+  // Ne PAS recréer s'il existe déjà mais n'est pas connecté - laisser Socket.IO gérer la reconnexion
+  if (!socketInstance) {
     socketInstance = createSocket();
   }
   
@@ -160,3 +116,4 @@ export default {
   cleanupSocket,
   isSocketConnected,
 };
+

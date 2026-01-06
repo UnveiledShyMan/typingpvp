@@ -51,104 +51,145 @@ export default function Matchmaking() {
   };
 
   const handleJoinQueue = () => {
-    // Pour ranked, exiger un utilisateur connecté
-    if (matchType === 'ranked' && !user) {
-      toast.error('You must be logged in to play ranked matches');
-      return;
-    }
-    
-    // Si pas d'utilisateur et unrated, demander un pseudo pour joueur invité
-    if (!user && matchType === 'unrated') {
-      setShowGuestModal(true);
-      return;
-    }
-
-    // Utiliser le service centralisé de socket au lieu de créer une nouvelle instance
-    socketRef.current = getSocket(false);
-    const socket = socketRef.current;
-    const mmr = user ? (user.mmr[selectedLang] || 1000) : 1000;
-
-    // Fonction pour joindre le matchmaking (appelée après connexion)
-    const joinMatchmaking = () => {
-      if (socket.connected) {
-        socket.emit('join-matchmaking', {
-          userId: user ? user.id : null,
-          username: user ? user.username : null,
-          language: selectedLang,
-          mmr: mmr,
-          ranked: matchType === 'ranked'
-        });
-      } else {
-        // Attendre que le socket soit connecté
-        socket.once('connect', joinMatchmaking);
+    try {
+      // Pour ranked, exiger un utilisateur connecté
+      if (matchType === 'ranked' && !user) {
+        toast.error('You must be logged in to play ranked matches');
+        return;
       }
-    };
-
-    // Joindre immédiatement si déjà connecté, sinon attendre la connexion
-    joinMatchmaking();
-
-    socket.on('matchmaking-joined', () => {
-      setIsInQueue(true);
-      queueStartTimeRef.current = Date.now();
       
-      // Timer pour afficher le temps d'attente
-      intervalRef.current = setInterval(() => {
-        if (queueStartTimeRef.current) {
-          setQueueTime(Math.floor((Date.now() - queueStartTimeRef.current) / 1000));
+      // Si pas d'utilisateur et unrated, demander un pseudo pour joueur invité
+      if (!user && matchType === 'unrated') {
+        setShowGuestModal(true);
+        return;
+      }
+
+      // Utiliser le service centralisé de socket au lieu de créer une nouvelle instance
+      socketRef.current = getSocket(false);
+      const socket = socketRef.current;
+      
+      if (!socket) {
+        toast.error('Failed to initialize socket. Please refresh the page.');
+        return;
+      }
+      
+      // Nettoyer les anciens listeners pour éviter les doublons
+      socket.off('matchmaking-joined');
+      socket.off('matchmaking-match-found');
+      socket.off('matchmaking-error');
+      
+      const mmr = user ? (user.mmr[selectedLang] || 1000) : 1000;
+
+      // Fonction pour joindre le matchmaking (appelée après connexion)
+      const joinMatchmaking = () => {
+        if (!socket) return;
+        
+        if (socket.connected) {
+          socket.emit('join-matchmaking', {
+            userId: user ? user.id : null,
+            username: user ? user.username : null,
+            language: selectedLang,
+            mmr: mmr,
+            ranked: matchType === 'ranked'
+          });
+        } else {
+          // Attendre que le socket soit connecté avec un timeout
+          const timeout = setTimeout(() => {
+            toast.error('Connection timeout. Please try again.');
+          }, 10000);
+          
+          socket.once('connect', () => {
+            clearTimeout(timeout);
+            if (socket && socket.connected) {
+              socket.emit('join-matchmaking', {
+                userId: user ? user.id : null,
+                username: user ? user.username : null,
+                language: selectedLang,
+                mmr: mmr,
+                ranked: matchType === 'ranked'
+              });
+            }
+          });
         }
-      }, 1000);
-    });
+      };
 
-    socket.on('matchmaking-match-found', (data) => {
-      setIsInQueue(false);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      
-      // NE PAS déconnecter le socket ici - le laisser ouvert pour que BattleRoom puisse l'utiliser
-      // Ne pas appeler socket.disconnect() pour permettre la transition vers BattleRoom
-      
-      // Rediriger vers la battle room
-      navigate(`/battle/${data.roomId}`, { 
-        state: { 
-          playerName: user ? user.username : guestUsername,
-          userId: user ? user.id : null,
-          isCreator: false,
-          matchmaking: true,
-          ranked: data.ranked !== undefined ? data.ranked : matchType === 'ranked',
-          existingSocket: true, // Indicateur pour BattleRoom
-          isGuest: !user // Indicateur pour joueur invité
-        } 
+      // Configurer les listeners UNE SEULE FOIS avant de joindre
+      socket.on('matchmaking-joined', () => {
+        setIsInQueue(true);
+        queueStartTimeRef.current = Date.now();
+        
+        // Timer pour afficher le temps d'attente
+        intervalRef.current = setInterval(() => {
+          if (queueStartTimeRef.current) {
+            setQueueTime(Math.floor((Date.now() - queueStartTimeRef.current) / 1000));
+          }
+        }, 1000);
       });
-    });
 
-    socket.on('matchmaking-error', (error) => {
-      toast.error(error.message);
-      setIsInQueue(false);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    });
+      socket.on('matchmaking-match-found', (data) => {
+        setIsInQueue(false);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        
+        // Rediriger vers la battle room
+        navigate(`/battle/${data.roomId}`, { 
+          state: { 
+            playerName: user ? user.username : guestUsername,
+            userId: user ? user.id : null,
+            isCreator: false,
+            matchmaking: true,
+            ranked: data.ranked !== undefined ? data.ranked : matchType === 'ranked',
+            existingSocket: true, // Indicateur pour BattleRoom
+            isGuest: !user // Indicateur pour joueur invité
+          } 
+        });
+      });
+
+      socket.on('matchmaking-error', (error) => {
+        toast.error(error.message || 'An error occurred');
+        setIsInQueue(false);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      });
+
+      // Joindre immédiatement si déjà connecté, sinon attendre la connexion
+      joinMatchmaking();
+    } catch (error) {
+      console.error('Error in handleJoinQueue:', error);
+      toast.error('An error occurred. Please try again.');
+    }
   };
 
   const handleLeaveQueue = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('leave-matchmaking');
-      // Ne pas déconnecter le socket, juste nettoyer les listeners
-      // Le socket peut être utilisé par d'autres composants
-      cleanupSocket(socketRef.current, [
-        'matchmaking-joined',
-        'matchmaking-match-found',
-        'matchmaking-error'
-      ]);
-    }
-    setIsInQueue(false);
-    setQueueTime(0);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    try {
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('leave-matchmaking');
+        // Nettoyer les listeners spécifiques au matchmaking
+        cleanupSocket(socketRef.current, [
+          'matchmaking-joined',
+          'matchmaking-match-found',
+          'matchmaking-error'
+        ]);
+      }
+      setIsInQueue(false);
+      setQueueTime(0);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error in handleLeaveQueue:', error);
+      // Même en cas d'erreur, nettoyer l'état local
+      setIsInQueue(false);
+      setQueueTime(0);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     }
   };
 
@@ -175,6 +216,11 @@ export default function Matchmaking() {
     // Utiliser le service centralisé de socket au lieu de créer une nouvelle instance
     socketRef.current = getSocket(false);
     const socket = socketRef.current;
+    
+    // Nettoyer les anciens listeners pour éviter les doublons
+    socket.off('matchmaking-joined');
+    socket.off('matchmaking-match-found');
+    socket.off('matchmaking-error');
 
     // Fonction pour joindre le matchmaking en tant que guest (appelée après connexion)
     const joinMatchmakingAsGuest = () => {
@@ -192,9 +238,7 @@ export default function Matchmaking() {
       }
     };
 
-    // Joindre immédiatement si déjà connecté, sinon attendre la connexion
-    joinMatchmakingAsGuest();
-
+    // Configurer les listeners UNE SEULE FOIS avant de joindre
     socket.on('matchmaking-joined', () => {
       setIsInQueue(true);
       queueStartTimeRef.current = Date.now();
@@ -234,6 +278,9 @@ export default function Matchmaking() {
         intervalRef.current = null;
       }
     });
+
+    // Joindre immédiatement si déjà connecté, sinon attendre la connexion
+    joinMatchmakingAsGuest();
   };
 
   const userMMR = user ? (user.mmr[selectedLang] || 1000) : 1000;

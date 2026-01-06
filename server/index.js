@@ -977,9 +977,11 @@ io.on('connection', (socket) => {
 
   // Fonction pour trouver un match (optimisée avec buckets MMR)
   function findMatch(socketId, language, mmr, ranked) {
-    const queueName = ranked ? 'ranked' : 'unrated';
     const player = matchmakingQueue.getPlayer(socketId);
-    if (!player) return;
+    if (!player) {
+      console.warn(`⚠️ Player not found in queue: ${socketId}`);
+      return;
+    }
     
     // Pour ranked : chercher un adversaire avec un MMR similaire (±200)
     // Pour unrated : chercher avec une plage plus large (±500) pour trouver plus facilement
@@ -991,6 +993,9 @@ io.on('connection', (socket) => {
     // Si un match est trouvé, créer une room
     if (bestMatch) {
       createMatchmakingRoom(socketId, player, bestMatch.socketId, bestMatch.player, language, ranked);
+    } else {
+      // Pas de match trouvé immédiatement, mais le joueur reste dans la queue
+      // Le matchmaking sera réessayé quand un autre joueur rejoint
     }
   }
 
