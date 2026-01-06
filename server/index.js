@@ -29,10 +29,11 @@ const httpServer = createServer(app);
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 
-// Configuration Socket.io - exactement comme la version qui fonctionnait (3404b51)
+// Configuration Socket.io - accepter toutes les origines en production
+// Le reverse proxy peut modifier les headers, donc on accepte tout pour éviter les erreurs 400
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.NODE_ENV === 'production' ? true : (process.env.CLIENT_URL || "http://localhost:5173"),
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -74,40 +75,20 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Middleware pour logger les requêtes API et Socket.io (toujours actif pour diagnostic)
-// IMPORTANT: Ce middleware doit être AVANT la route catch-all pour ne pas bloquer Socket.io
+// Middleware pour logger les requêtes API uniquement
+// IMPORTANT: Ignorer complètement les requêtes Socket.io - Socket.io les gère directement
 app.use((req, res, next) => {
-  // Logger les requêtes API
+  // Ignorer les requêtes Socket.io - laisser Socket.io les gérer directement
+  if (req.path.startsWith('/socket.io/')) {
+    return next(); // Passer immédiatement sans modification
+  }
+  
+  // Logger les requêtes API seulement
   if (req.path.startsWith('/api')) {
     console.log(`📡 ${req.method} ${req.path}`, {
       origin: req.headers.origin,
       query: Object.keys(req.query).length > 0 ? req.query : undefined
     });
-  }
-  // Logger les requêtes Socket.io pour le débogage en production
-  if (req.path.startsWith('/socket.io/')) {
-    // Logger toutes les requêtes Socket.io en production pour diagnostic
-    if (process.env.NODE_ENV === 'production') {
-      console.log(`🔌 Socket.io ${req.method} ${req.path}`, {
-        origin: req.headers.origin,
-        host: req.headers.host,
-        transport: req.query?.transport || 'polling',
-        sid: req.query?.sid || 'new'
-      });
-    }
-    // Logger les erreurs avec un wrapper sur res.send
-    const originalSend = res.send;
-    res.send = function(data) {
-      if (res.statusCode >= 400) {
-        console.error(`❌ Requête Socket.io échouée: ${req.method} ${req.path}`, {
-          statusCode: res.statusCode,
-          origin: req.headers.origin,
-          host: req.headers.host,
-          query: req.query
-        });
-      }
-      return originalSend.call(this, data);
-    };
   }
   next();
 });
@@ -308,10 +289,16 @@ io.engine.on('connection_error', (err) => {
   }
 });
 
-// Logger simplifié - seulement les erreurs
+// Logger détaillé pour diagnostiquer les erreurs 400
 io.engine.on('request', (req, res) => {
   if (res.statusCode >= 400) {
     console.error('❌ Erreur Socket.io:', req.method, req.url, res.statusCode);
+    console.error('Headers:', {
+      origin: req.headers.origin,
+      host: req.headers.host,
+      'user-agent': req.headers['user-agent']?.substring(0, 50)
+    });
+    console.error('Query:', req.query);
   }
 });
 
