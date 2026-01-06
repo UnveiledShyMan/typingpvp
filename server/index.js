@@ -29,16 +29,13 @@ const httpServer = createServer(app);
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 
-// Configuration CORS Socket.io - version simple qui fonctionnait
-const socketCorsConfig = {
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
-  methods: ["GET", "POST"],
-  credentials: true
-};
-
-// Configuration Socket.io - version simple qui fonctionnait
+// Configuration Socket.io - exactement comme la version qui fonctionnait (3404b51)
 const io = new Server(httpServer, {
-  cors: socketCorsConfig,
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true
+  },
   transports: ['polling'],
   allowUpgrades: false,
   pingTimeout: 20000,

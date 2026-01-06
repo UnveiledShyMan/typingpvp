@@ -40,8 +40,6 @@ export function getSocket(forceNew = false) {
     socketInstance = io(API_URL, {
       ...SOCKET_CONFIG,
       forceNew: forceNew,
-      path: '/socket.io/',
-      timeout: 20000,
       autoConnect: true
     });
     
