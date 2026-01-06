@@ -236,37 +236,9 @@ export default function Profile({ userId: currentUserId, username: currentUserna
     }
   };
 
-  const isOwnProfile = currentUserFromContext && user && currentUserFromContext.id === user.id;
-
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col overflow-hidden">
-        <div className="w-full h-full max-w-5xl mx-auto flex-1 min-h-0 overflow-y-auto profile-scroll p-6">
-          <ProfileSkeleton />
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="text-text-primary">User not found</div>
-      </div>
-    );
-  }
-
-  // Vérifier que user.mmr existe et est un objet valide
-  const userMmr = user?.mmr && typeof user.mmr === 'object' ? user.mmr : {};
-  const currentUserMmr = userMmr[selectedLang] || 1000;
-  
-  const rankInfo = getRankFromMMR(currentUserMmr);
-  const winRate = user?.stats?.totalMatches > 0
-    ? ((user.stats.wins / user.stats.totalMatches) * 100).toFixed(1)
-    : 0;
-  
-  // Calculer les stats par langue à partir des matchs
-  // Ajout de vérifications de sécurité pour éviter les erreurs lors du premier rendu
+  // CRITIQUE : Tous les hooks (useMemo, useCallback) doivent être appelés AVANT les early returns
+  // pour maintenir un ordre constant des hooks entre les renders et éviter l'erreur React #310
+  // Calculer les stats par langue - Toujours appelé, même si user est null
   const calculateLanguageStats = useMemo(() => {
     // Vérifier que les arrays existent et sont valides
     if (!soloMatches || !multiplayerMatches) return null;
@@ -298,8 +270,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
     };
   }, [soloMatches, multiplayerMatches, selectedLang]);
   
-  // Calculer la progression ELO pour le graphique
-  // Ajout de vérifications de sécurité pour éviter les erreurs lors du premier rendu
+  // Calculer la progression ELO - Toujours appelé, même si user est null
   const eloProgressionData = useMemo(() => {
     // Vérifier que les arrays existent et sont valides
     if (!soloMatches || !multiplayerMatches) return [];
@@ -359,6 +330,35 @@ export default function Profile({ userId: currentUserId, username: currentUserna
     
     return progression;
   }, [soloMatches, multiplayerMatches, selectedLang, user]);
+
+  const isOwnProfile = currentUserFromContext && user && currentUserFromContext.id === user.id;
+
+  if (loading) {
+    return (
+      <div className="h-full w-full flex flex-col overflow-hidden">
+        <div className="w-full h-full max-w-5xl mx-auto flex-1 min-h-0 overflow-y-auto profile-scroll p-6">
+          <ProfileSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="text-text-primary">User not found</div>
+      </div>
+    );
+  }
+
+  // Maintenant que user est garanti d'exister, on peut calculer les valeurs dérivées
+  const userMmr = user.mmr && typeof user.mmr === 'object' ? user.mmr : {};
+  const currentUserMmr = userMmr[selectedLang] || 1000;
+  
+  const rankInfo = getRankFromMMR(currentUserMmr);
+  const winRate = user.stats?.totalMatches > 0
+    ? ((user.stats.wins / user.stats.totalMatches) * 100).toFixed(1)
+    : 0;
 
   const socialMedia = user.socialMedia || {
     twitter: '',
