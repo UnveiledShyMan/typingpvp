@@ -98,11 +98,18 @@ export default function Matchmaking() {
   }, []);
 
   const fetchCurrentUser = async () => {
+    // Ne pas appeler l'API si pas de token (évite les erreurs 401 inutiles)
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    
     try {
       const userData = await authService.getCurrentUser();
       setUser(userData);
     } catch (error) {
-      // Erreur gérée par apiService
+      // Erreur gérée par apiService (token invalide/expiré)
       setUser(null);
     }
   };

@@ -39,11 +39,14 @@ async function request(endpoint, options = {}, retryCount = 0) {
     if (!response.ok) {
       // Token expiré ou invalide - déconnexion automatique
       if (response.status === 401) {
+        const hadToken = !!localStorage.getItem('token');
         localStorage.removeItem('token');
         if (logoutHandler) {
           logoutHandler();
         }
-        if (errorHandler) {
+        // Afficher un toast seulement si l'utilisateur avait un token (session expirée)
+        // Sinon, c'est juste qu'il n'est pas connecté (pas d'erreur à afficher)
+        if (errorHandler && hadToken) {
           errorHandler('Session expirée. Veuillez vous reconnecter.', 'error');
         }
         throw new Error('Unauthorized - Session expirée');
