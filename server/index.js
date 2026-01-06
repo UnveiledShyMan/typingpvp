@@ -29,19 +29,21 @@ const httpServer = createServer(app);
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 
-// Configuration Socket.io - accepter toutes les origines en production
-// Le reverse proxy peut modifier les headers, donc on accepte tout pour éviter les erreurs 400
+// Configuration Socket.io - version simple qui fonctionnait (3404b51)
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? true : (process.env.CLIENT_URL || "http://localhost:5173"),
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true
   },
+  // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  pingTimeout: 20000,
-  pingInterval: 10000,
-  connectTimeout: 20000
+  // Timeouts plus courts pour éviter que Plesk tue les connexions
+  pingTimeout: 20000, // 20 secondes
+  pingInterval: 10000, // 10 secondes
+  // Permettre les reconnexions rapides
+  connectTimeout: 20000 // 20 secondes
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
