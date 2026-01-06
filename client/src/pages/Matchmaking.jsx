@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { io } from 'socket.io-client'
 import { languages } from '../data/languages'
 import Modal from '../components/Modal'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
-import { API_URL } from '../config/api.js'
+import { getSocket, cleanupSocket } from '../services/socketService'
 
 export default function Matchmaking() {
   const [selectedLang, setSelectedLang] = useState('en');
@@ -25,8 +24,15 @@ export default function Matchmaking() {
   useEffect(() => {
     fetchCurrentUser();
     return () => {
+      // Nettoyer les listeners mais ne pas déconnecter le socket
+      // car il peut être utilisé par BattleRoom après le matchmaking
       if (socketRef.current) {
-        socketRef.current.disconnect();
+        cleanupSocket(socketRef.current, [
+          'connect',
+          'matchmaking-joined',
+          'matchmaking-match-found',
+          'matchmaking-error'
+        ]);
       }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -57,31 +63,29 @@ export default function Matchmaking() {
       return;
     }
 
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-
-    const apiUrl = API_URL;
-    socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-      upgrade: false,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
-    });
-
+    // Utiliser le service centralisé de socket au lieu de créer une nouvelle instance
+    socketRef.current = getSocket(false);
     const socket = socketRef.current;
     const mmr = user ? (user.mmr[selectedLang] || 1000) : 1000;
 
-    socket.on('connect', () => {
-      socket.emit('join-matchmaking', {
-        userId: user ? user.id : null,
-        username: user ? user.username : null,
-        language: selectedLang,
-        mmr: mmr,
-        ranked: matchType === 'ranked'
-      });
-    });
+    // Fonction pour joindre le matchmaking (appelée après connexion)
+    const joinMatchmaking = () => {
+      if (socket.connected) {
+        socket.emit('join-matchmaking', {
+          userId: user ? user.id : null,
+          username: user ? user.username : null,
+          language: selectedLang,
+          mmr: mmr,
+          ranked: matchType === 'ranked'
+        });
+      } else {
+        // Attendre que le socket soit connecté
+        socket.once('connect', joinMatchmaking);
+      }
+    };
+
+    // Joindre immédiatement si déjà connecté, sinon attendre la connexion
+    joinMatchmaking();
 
     socket.on('matchmaking-joined', () => {
       setIsInQueue(true);
@@ -132,8 +136,13 @@ export default function Matchmaking() {
   const handleLeaveQueue = () => {
     if (socketRef.current) {
       socketRef.current.emit('leave-matchmaking');
-      socketRef.current.disconnect();
-      socketRef.current = null;
+      // Ne pas déconnecter le socket, juste nettoyer les listeners
+      // Le socket peut être utilisé par d'autres composants
+      cleanupSocket(socketRef.current, [
+        'matchmaking-joined',
+        'matchmaking-match-found',
+        'matchmaking-error'
+      ]);
     }
     setIsInQueue(false);
     setQueueTime(0);
@@ -163,30 +172,28 @@ export default function Matchmaking() {
   const handleConfirmGuestJoin = () => {
     setShowGuestWarning(false);
 
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-
-    const apiUrl = API_URL;
-    socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-      upgrade: false,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
-    });
-
+    // Utiliser le service centralisé de socket au lieu de créer une nouvelle instance
+    socketRef.current = getSocket(false);
     const socket = socketRef.current;
 
-    socket.on('connect', () => {
-      socket.emit('join-matchmaking', {
-        userId: null, // Pas d'userId pour les guests
-        username: guestUsername.trim(),
-        language: selectedLang,
-        mmr: 1000, // MMR par défaut pour les guests
-        ranked: false // Les guests ne peuvent jouer qu'en unrated
-      });
-    });
+    // Fonction pour joindre le matchmaking en tant que guest (appelée après connexion)
+    const joinMatchmakingAsGuest = () => {
+      if (socket.connected) {
+        socket.emit('join-matchmaking', {
+          userId: null, // Pas d'userId pour les guests
+          username: guestUsername.trim(),
+          language: selectedLang,
+          mmr: 1000, // MMR par défaut pour les guests
+          ranked: false // Les guests ne peuvent jouer qu'en unrated
+        });
+      } else {
+        // Attendre que le socket soit connecté
+        socket.once('connect', joinMatchmakingAsGuest);
+      }
+    };
+
+    // Joindre immédiatement si déjà connecté, sinon attendre la connexion
+    joinMatchmakingAsGuest();
 
     socket.on('matchmaking-joined', () => {
       setIsInQueue(true);

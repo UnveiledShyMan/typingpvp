@@ -44,11 +44,19 @@ const io = new Server(httpServer, {
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  // Timeouts plus courts pour éviter que Plesk tue les connexions
-  pingTimeout: 20000, // 20 secondes
-  pingInterval: 10000, // 10 secondes
-  // Permettre les reconnexions rapides
-  connectTimeout: 20000 // 20 secondes
+  // Timeouts augmentés pour permettre au reverse proxy de fonctionner correctement
+  // pingTimeout: temps max entre un ping et sa réponse (si dépassé, session expirée)
+  pingTimeout: 60000, // 60 secondes (augmenté pour le reverse proxy)
+  // pingInterval: temps entre chaque ping envoyé par le serveur
+  pingInterval: 25000, // 25 secondes (moins fréquent mais plus stable)
+  // connectTimeout: temps max pour établir une connexion initiale
+  connectTimeout: 45000, // 45 secondes
+  // Améliorer la gestion des sessions expirées
+  allowEIO3: false, // Désactiver Engine.IO v3 pour éviter les problèmes
+  // Augmenter les timeouts pour les requêtes polling longues
+  httpCompression: false, // Désactiver la compression pour réduire la latence
+  // Améliorer la gestion des reconnexions
+  maxHttpBufferSize: 1e6 // 1MB pour les messages
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -312,7 +320,7 @@ io.engine.on('request', (req, res) => {
     });
   }
   
-  // Logger les erreurs
+  // Logger les erreurs avec plus de détails
   if (res.statusCode >= 400) {
     console.error(`❌ Erreur Socket.io ${req.method} ${req.url}:`, res.statusCode);
     console.error('Headers:', {
@@ -321,7 +329,23 @@ io.engine.on('request', (req, res) => {
       'user-agent': req.headers['user-agent']?.substring(0, 50)
     });
     console.error('Query:', req.query);
+    
+    // Si c'est une erreur 400 avec un sid (session), c'est probablement une session expirée
+    if (res.statusCode === 400 && req.query?.sid) {
+      console.error('⚠️ Session invalide ou expirée pour sid:', req.query.sid);
+      console.error('💡 Le client devrait se reconnecter automatiquement');
+    }
+    
+    // Si c'est une erreur 502, c'est probablement un problème de reverse proxy
+    if (res.statusCode === 502) {
+      console.error('⚠️ Erreur 502: Problème de reverse proxy ou serveur Node.js inaccessible');
+    }
   }
+  
+  // Gérer les erreurs de session expirée de manière plus gracieuse
+  res.on('error', (error) => {
+    console.error('❌ Erreur de réponse Socket.io:', error.message);
+  });
 });
 
 // Helper pour wrapper les handlers Socket.io avec gestion d'erreur
@@ -349,15 +373,17 @@ io.on('connection', (socket) => {
   // Monitoring des connexions Socket.io
   socketConnectionCount++;
   console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
+  console.log(`📍 Socket transport: ${socket.conn.transport.name}, readyState: ${socket.conn.readyState}`);
   
-  // Heartbeat pour maintenir la connexion active
+  // Heartbeat pour maintenir la connexion active (aligné avec pingInterval)
+  // Note: Socket.IO gère déjà son propre heartbeat, mais on peut ajouter un ping custom si nécessaire
   const heartbeatInterval = setInterval(() => {
     if (socket.connected) {
       socket.emit('ping', { timestamp: Date.now() });
     } else {
       clearInterval(heartbeatInterval);
     }
-  }, 10000); // Ping toutes les 10 secondes
+  }, 25000); // Ping toutes les 25 secondes (aligné avec pingInterval serveur)
   
   // Nettoyer l'intervalle à la déconnexion
   socket.on('disconnect', safeHandler((reason) => {
@@ -373,6 +399,8 @@ io.on('connection', (socket) => {
     if (err.description) {
       console.error('Description:', err.description);
     }
+    // Si c'est une erreur de transport, ne pas faire planter le socket
+    // Socket.IO gérera automatiquement la reconnexion
   });
   
   // Gérer les erreurs dans les handlers Socket.io
@@ -381,6 +409,16 @@ io.on('connection', (socket) => {
     if (err.stack) {
       console.error('Stack:', err.stack);
     }
+  });
+  
+  // Gérer les déconnexions avec plus de détails
+  socket.conn.on('close', (reason) => {
+    console.log(`⚠️ Socket ${socket.id} connection closed:`, reason);
+  });
+  
+  // Gérer les reconnexions (si le transport se reconnecte)
+  socket.conn.on('upgrade', () => {
+    console.log(`⬆️ Socket ${socket.id} transport upgraded`);
   });
 
   // Créer une nouvelle room
@@ -405,200 +443,141 @@ io.on('connection', (socket) => {
     console.log(`Room created: ${roomId}`);
   }));
 
+  // Helper pour trouver un joueur existant dans une room (pour reconnexions)
+  function findExistingPlayer(room, userId, playerName) {
+    return room.players.find(p => {
+      if (userId && p.userId) return p.userId === userId;
+      if (!userId && !p.userId) return p.name === playerName;
+      return false;
+    });
+  }
+
   // Rejoindre une room
   socket.on('join-room', safeHandler((data) => {
     const { roomId, playerName, userId } = data;
     console.log(`🔌 Tentative de rejoindre la room ${roomId} par ${playerName} (${userId || 'guest'})`);
     
+    // Validation basique
     if (!roomId) {
-      console.error('❌ join-room appelé sans roomId');
       socket.emit('error', { message: 'Room ID is required' });
       return;
     }
     
     const room = rooms.get(roomId);
-    
     if (!room) {
-      console.error(`❌ Room ${roomId} not found`);
       socket.emit('error', { message: 'Room not found' });
       return;
     }
     
-    console.log(`✅ Room ${roomId} trouvée, statut: ${room.status}, joueurs: ${room.players.length}`);
-    
-    // Pour les rooms de matchmaking, vérifier si le joueur fait déjà partie de la room
+    // CAS SPÉCIAL : Rooms de matchmaking (logique complexe nécessaire)
     if (room.matchmaking && userId) {
-      const existingPlayer = room.players.find(p => p.userId === userId);
+      const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
-        // Le joueur fait déjà partie de la room (matchmaking), mettre à jour son socket.id
+        // Reconnexion dans une room matchmaking
         existingPlayer.id = socket.id;
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
-        
-        // Si la partie est terminée, envoyer aussi les résultats
-        if (room.status === 'finished') {
-          socket.emit('room-joined', { 
-            roomId, 
-            text: room.text, 
-            players: room.players,
-            chatMessages: room.chatMessages || []
-          });
-          // Envoyer les résultats si disponibles
-          if (room.results && Object.keys(room.results).length > 0) {
-            socket.emit('game-finished', { 
-              results: room.results, 
-              players: room.players,
-              eloChanges: room.eloChanges || {}
-            });
-          }
-        } else {
-          socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        if (room.status === 'finished' && room.results) {
+          socket.emit('game-finished', { results: room.results, players: room.players, eloChanges: room.eloChanges || {} });
         }
         console.log(`Player ${playerName} reconnected to matchmaking room ${roomId}`);
         return;
       }
     }
     
-    // Si la room est terminée, permettre de rejoindre pour voir les résultats
-    if (room.status === 'finished') {
-      // Vérifier si le joueur était déjà dans la room (reconnexion)
-      // Chercher par userId d'abord, puis par nom si pas de userId
-      const existingPlayer = room.players.find(p => {
-        if (userId && p.userId) {
-          return p.userId === userId;
-        }
-        if (!userId && !p.userId) {
-          return p.name === playerName;
-        }
-        return false;
-      });
-      
+    // CAS SIMPLE : Room normale (non-matchmaking) en attente
+    // C'est le cas principal pour les duels 1v1 simples
+    if (!room.matchmaking && room.status === 'waiting') {
+      // Vérifier si déjà dans la room (reconnexion)
+      const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
-        // Reconnexion : mettre à jour le socket.id
         existingPlayer.id = socket.id;
-        if (existingPlayer.disconnected !== undefined) {
-          existingPlayer.disconnected = false; // Marquer comme reconnecté
-        }
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
-        socket.emit('room-joined', { 
-          roomId, 
-          text: room.text, 
-          players: room.players,
-          chatMessages: room.chatMessages || []
-        });
-        // Envoyer les résultats
-        if (room.results && Object.keys(room.results).length > 0) {
-          socket.emit('game-finished', { 
-            results: room.results, 
-            players: room.players,
-            eloChanges: room.eloChanges || {}
-          });
-        }
-        console.log(`Player ${playerName} (${userId || 'guest'}) reconnected to finished room ${roomId}`);
+        socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        console.log(`Player ${playerName} reconnected to room ${roomId}`);
         return;
       }
       
-      // Nouveau joueur qui veut voir les résultats (permission de lecture seule)
-      // Permettre à n'importe qui de voir les résultats d'une room finished
+      // Vérifier si la room est pleine (max 2 joueurs pour 1v1)
+      if (room.players.length >= 2) {
+        socket.emit('error', { message: 'Room is full' });
+        return;
+      }
+      
+      // Ajouter le joueur (cas simple)
+      const player = {
+        id: socket.id,
+        userId: userId || null,
+        name: playerName || `Player ${room.players.length + 1}`,
+        progress: 0,
+        wpm: 0,
+        accuracy: 100,
+        finished: false,
+        finishTime: null
+      };
+      
+      room.players.push(player);
+      players.set(socket.id, { roomId, player });
       socket.join(roomId);
-      socket.emit('room-joined', { 
-        roomId, 
-        text: room.text, 
-        players: room.players,
-        chatMessages: room.chatMessages || []
-      });
-      // Envoyer les résultats
-      if (room.results && Object.keys(room.results).length > 0) {
-        socket.emit('game-finished', { 
-          results: room.results, 
-          players: room.players,
-          eloChanges: room.eloChanges || {}
-        });
-      }
-      console.log(`Player ${playerName} (${userId || 'guest'}) joined finished room ${roomId} to view results`);
+      socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+      io.to(roomId).emit('player-joined', { players: room.players });
+      console.log(`Player ${playerName} joined room ${roomId}`);
       return;
     }
     
-    // Vérification normale pour les rooms non-matchmaking en attente
-    if (!room.matchmaking && room.status === 'waiting' && room.players.length >= 2) {
-      socket.emit('error', { message: 'Room is full' });
-      return;
-    }
-    
-    // Ne pas permettre de rejoindre une room en cours de jeu (sauf si c'est une reconnexion)
+    // CAS : Reconnexion pendant le jeu (pour les deux types de rooms)
     if (room.status === 'playing') {
-      // Vérifier si c'est une reconnexion du même joueur
-      // Chercher par userId d'abord, puis par nom si pas de userId
-      const existingPlayer = room.players.find(p => {
-        if (userId && p.userId) {
-          return p.userId === userId;
-        }
-        if (!userId && !p.userId) {
-          return p.name === playerName;
-        }
-        return false;
-      });
-      
+      const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
-        // Reconnexion : mettre à jour le socket.id
         existingPlayer.id = socket.id;
         if (existingPlayer.disconnected !== undefined) {
-          existingPlayer.disconnected = false; // Marquer comme reconnecté
+          existingPlayer.disconnected = false;
         }
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
-        socket.emit('room-joined', { 
-          roomId, 
-          text: room.text, 
-          players: room.players,
-          chatMessages: room.chatMessages || []
+        socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        socket.emit('game-started', { 
+          startTime: room.startTime, 
+          text: room.text,
+          mode: room.mode,
+          timerDuration: room.timerDuration,
+          difficulty: room.difficulty
         });
-        // Si la partie est en cours, renvoyer l'état actuel
-        if (room.status === 'playing') {
-          socket.emit('game-started', { 
-            startTime: room.startTime, 
-            text: room.text,
-            mode: room.mode,
-            timerDuration: room.timerDuration,
-            difficulty: room.difficulty
-          });
-        }
-        console.log(`Player ${playerName} (${userId || 'guest'}) reconnected to playing room ${roomId}`);
-        return;
-      } else {
-        socket.emit('error', { message: 'Game is already in progress' });
+        console.log(`Player ${playerName} reconnected to playing room ${roomId}`);
         return;
       }
-    }
-    
-    // Si on arrive ici, la room doit être en 'waiting'
-    // Si ce n'est pas le cas, c'est un état inattendu
-    if (room.status !== 'waiting') {
-      console.error(`Unexpected room status: ${room.status} for room ${roomId}`);
-      socket.emit('error', { message: 'Room is not available' });
+      socket.emit('error', { message: 'Game is already in progress' });
       return;
     }
     
-    const player = {
-      id: socket.id,
-      userId: userId || null,
-      name: playerName || `Player ${room.players.length + 1}`,
-      progress: 0,
-      wpm: 0,
-      accuracy: 100,
-      finished: false,
-      finishTime: null
-    };
+    // CAS : Room terminée (voir les résultats)
+    if (room.status === 'finished') {
+      const existingPlayer = findExistingPlayer(room, userId, playerName);
+      if (existingPlayer) {
+        existingPlayer.id = socket.id;
+        players.set(socket.id, { roomId, player: existingPlayer });
+        socket.join(roomId);
+        socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        if (room.results) {
+          socket.emit('game-finished', { results: room.results, players: room.players, eloChanges: room.eloChanges || {} });
+        }
+        console.log(`Player ${playerName} reconnected to finished room ${roomId}`);
+        return;
+      }
+      // Permettre à n'importe qui de voir les résultats (lecture seule)
+      socket.join(roomId);
+      socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+      if (room.results) {
+        socket.emit('game-finished', { results: room.results, players: room.players, eloChanges: room.eloChanges || {} });
+      }
+      console.log(`Player ${playerName} joined finished room ${roomId} to view results`);
+      return;
+    }
     
-    room.players.push(player);
-    players.set(socket.id, { roomId, player });
-    
-    socket.join(roomId);
-    socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
-    io.to(roomId).emit('player-joined', { players: room.players });
-    
-    console.log(`Player ${playerName} joined room ${roomId}`);
+    // État inattendu
+    socket.emit('error', { message: 'Room is not available' });
   }));
 
   // Démarrer la partie

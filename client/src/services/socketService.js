@@ -5,14 +5,59 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /**
  * Crée une nouvelle instance de socket
- * Configuration par défaut (comme avant - version 3404b51)
+ * Configuration optimisée pour production avec polling forcé et meilleure gestion des erreurs
  */
 export function createSocket() {
-  return io(API_URL, {
+  const socket = io(API_URL, {
+    // Forcer polling pour éviter les problèmes avec Plesk/Apache
+    transports: ['polling'],
+    upgrade: false,
+    // Configuration de reconnexion améliorée
     reconnection: true,
     reconnectionDelay: 1000,
-    reconnectionAttempts: 5,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity, // Essayer indéfiniment de se reconnecter
+    // Timeouts alignés avec le serveur
+    timeout: 45000, // 45 secondes pour la connexion initiale
+    // Améliorer la gestion des erreurs
+    forceNew: false, // Réutiliser les connexions existantes
+    // Désactiver Engine.IO v3 pour éviter les problèmes
+    allowEIO3: false
   });
+
+  // Gestion améliorée des erreurs de connexion
+  socket.on('connect_error', (error) => {
+    console.error('❌ Socket.IO connection error:', error.message);
+    // Ne pas logger les erreurs de type "xhr poll error" trop fréquemment
+    if (!error.message.includes('xhr poll error')) {
+      console.error('Connection error details:', {
+        type: error.type,
+        description: error.description
+      });
+    }
+  });
+
+  // Logger les reconnexions réussies
+  socket.on('reconnect', (attemptNumber) => {
+    console.log(`✅ Socket.IO reconnected after ${attemptNumber} attempt(s)`);
+  });
+
+  // Logger les tentatives de reconnexion
+  socket.on('reconnect_attempt', (attemptNumber) => {
+    console.log(`🔄 Socket.IO reconnection attempt ${attemptNumber}`);
+  });
+
+  // Logger les échecs de reconnexion
+  socket.on('reconnect_error', (error) => {
+    console.error('❌ Socket.IO reconnection error:', error.message);
+  });
+
+  // Logger les échecs définitifs de reconnexion
+  socket.on('reconnect_failed', () => {
+    console.error('❌ Socket.IO reconnection failed after all attempts');
+  });
+
+  return socket;
 }
 
 /**

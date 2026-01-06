@@ -390,9 +390,42 @@ export default function BattleRoom() {
     socket.on('error', (error) => {
       console.error('❌ Socket error:', error);
       toast.error(error.message || 'An error occurred');
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
+      
+      // Ne pas rediriger immédiatement, laisser Socket.IO tenter de se reconnecter
+      // La redirection se fera seulement si la reconnexion échoue définitivement
+      socket.once('reconnect_failed', () => {
+        toast.error('Connection lost. Redirecting to home...');
+        setTimeout(() => {
+          navigate('/');
+        }, 2000);
+      });
+    });
+    
+    // Gérer les déconnexions avec reconnexion automatique
+    socket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Le serveur a déconnecté, reconnecter manuellement
+        socket.connect();
+      }
+      // Pour les autres raisons (transport close, etc.), Socket.IO se reconnectera automatiquement
+    });
+    
+    // Logger les reconnexions réussies
+    socket.on('reconnect', (attemptNumber) => {
+      console.log(`✅ Socket reconnected after ${attemptNumber} attempt(s)`);
+      toast.success('Connection restored');
+      
+      // Réessayer de rejoindre la room après reconnexion
+      if (playerName && roomId && hasJoinedRoomRef.current) {
+        console.log('🔄 Rejoining room after reconnection...');
+        hasJoinedRoomRef.current = false; // Permettre de rejoindre à nouveau
+        socket.emit('join-room', { 
+          roomId, 
+          playerName,
+          userId: userId || currentUser?.id || null
+        });
+      }
     });
 
     // Nettoyage des listeners sera fait dans le premier useEffect
@@ -496,6 +529,12 @@ export default function BattleRoom() {
     e.preventDefault();
     if (!chatInput.trim() || !socketRef.current) return;
     
+    // Vérifier que le socket est connecté avant d'émettre
+    if (!socketRef.current.connected) {
+      toast.error('Not connected to server. Please wait...');
+      return;
+    }
+    
     socketRef.current.emit('chat-message', {
       roomId,
       message: chatInput.trim(),
@@ -515,6 +554,22 @@ export default function BattleRoom() {
 
   const handleStartGame = () => {
     if (players.length === 2 && socketRef.current) {
+      // Vérifier que le socket est connecté avant d'émettre
+      if (!socketRef.current.connected) {
+        toast.error('Not connected to server. Please wait...');
+        // Attendre la reconnexion
+        socketRef.current.once('connect', () => {
+          socketRef.current.emit('start-game', { 
+            roomId, 
+            language: selectedLanguage,
+            mode: battleMode,
+            timerDuration: battleMode === 'timer' ? timerDuration : null,
+            difficulty: battleMode === 'phrases' ? phraseDifficulty : null
+          });
+        });
+        return;
+      }
+      
       socketRef.current.emit('start-game', { 
         roomId, 
         language: selectedLanguage,
@@ -608,7 +663,8 @@ export default function BattleRoom() {
         }, 500); // Throttling de 500ms pour réduire la charge
         
         // Envoyer la mise à jour au serveur (sans throttling car c'est léger)
-        if (socketRef.current) {
+        // Vérifier que le socket est connecté avant d'émettre
+        if (socketRef.current && socketRef.current.connected) {
           socketRef.current.emit('update-progress', {
             progress,
             wpm,
@@ -664,10 +720,19 @@ export default function BattleRoom() {
           });
         }
         
-        if (socketRef.current) {
+        // Vérifier que le socket est connecté avant d'émettre
+        if (socketRef.current && socketRef.current.connected) {
           socketRef.current.emit('finish-game', {
             wpm: finalWpm,
             accuracy: finalAccuracy
+          });
+        } else if (socketRef.current) {
+          // Si pas connecté, attendre la reconnexion
+          socketRef.current.once('connect', () => {
+            socketRef.current.emit('finish-game', {
+              wpm: finalWpm,
+              accuracy: finalAccuracy
+            });
           });
         }
       }
