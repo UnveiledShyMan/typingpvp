@@ -38,6 +38,10 @@ export default function Profile({ userId: currentUserId }) {
   const [recentMatches, setRecentMatches] = useState([]);
   const [soloMatches, setSoloMatches] = useState([]);
   const [multiplayerMatches, setMultiplayerMatches] = useState([]);
+  // Filtres pour l'historique des matchs
+  const [matchFilter, setMatchFilter] = useState('all'); // 'all', 'solo', 'multiplayer'
+  const [matchSort, setMatchSort] = useState('date'); // 'date', 'wpm', 'accuracy'
+  const [matchSortOrder, setMatchSortOrder] = useState('desc'); // 'asc', 'desc'
 
   // Initialiser le formulaire d'édition quand les données sont chargées
   useEffect(() => {
@@ -55,7 +59,8 @@ export default function Profile({ userId: currentUserId }) {
       });
       
       // Récupérer l'historique des matchs réels
-      fetchUserMatches(userId);
+      setCurrentPage(1); // Reset à la page 1
+      fetchUserMatches(userId, 1, false);
     }
   }, [user, userId]);
 
@@ -75,25 +80,46 @@ export default function Profile({ userId: currentUserId }) {
     };
   }, [userId, currentUserFromContext, refetchProfile]);
 
-  const fetchUserMatches = async (targetUserId) => {
+  const fetchUserMatches = async (targetUserId, page = 1, append = false) => {
     try {
+      setLoadingMatches(true);
+      const limit = matchesPerPage * page; // Charger tous les matchs jusqu'à la page actuelle
+      
       // Récupérer les matchs solo et multijoueurs séparément
-      const [soloData, multiplayerData, allData] = await Promise.all([
-        matchesService.getUserMatches(targetUserId, 10, 'solo').catch(() => ({ matches: [] })),
-        matchesService.getUserMatches(targetUserId, 10, 'multiplayer').catch(() => ({ matches: [] })),
-        matchesService.getUserMatches(targetUserId, 10).catch(() => ({ matches: [] }))
+      // Note: L'API ne supporte pas encore l'offset, donc on charge plus de matchs
+      const [soloData, multiplayerData] = await Promise.all([
+        matchesService.getUserMatches(targetUserId, limit, 'solo').catch(() => ({ matches: [] })),
+        matchesService.getUserMatches(targetUserId, limit, 'multiplayer').catch(() => ({ matches: [] }))
       ]);
       
+      // Remplacer les matchs existants (l'API retourne déjà tous les matchs jusqu'à la limite)
       setSoloMatches(soloData.matches || []);
       setMultiplayerMatches(multiplayerData.matches || []);
-      setRecentMatches(allData.matches || []);
+      
+      // Vérifier s'il y a plus de matchs à charger
+      // Si on a reçu exactement le nombre de matchs demandés, il y en a probablement plus
+      const totalLoaded = (soloData.matches?.length || 0) + (multiplayerData.matches?.length || 0);
+      setHasMoreMatches(totalLoaded >= limit);
     } catch (error) {
       // Erreur gérée par apiService
-      setSoloMatches([]);
-      setMultiplayerMatches([]);
-      setRecentMatches([]);
+      if (!append) {
+        setSoloMatches([]);
+        setMultiplayerMatches([]);
+        setRecentMatches([]);
+      }
+    } finally {
+      setLoadingMatches(false);
     }
   };
+  
+  // Charger plus de matchs (pagination)
+  const loadMoreMatches = useCallback(() => {
+    if (!loadingMatches && hasMoreMatches) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      fetchUserMatches(userId, nextPage, false);
+    }
+  }, [currentPage, hasMoreMatches, loadingMatches, userId]);
 
   const handleSave = async () => {
     if (!currentUserFromContext) {
@@ -545,7 +571,7 @@ export default function Profile({ userId: currentUserId }) {
                 <select
                   value={selectedLang}
                   onChange={(e) => setSelectedLang(e.target.value)}
-                  className="bg-bg-secondary/40 backdrop-blur-sm text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-secondary/60 transition-colors font-medium"
+                  className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-medium"
                 >
                   {Object.entries(user.mmr || {}).map(([lang]) => (
                     <option key={lang} value={lang} className="bg-bg-primary">
@@ -555,119 +581,175 @@ export default function Profile({ userId: currentUserId }) {
                 </select>
               </div>
 
-              {/* Historique des matchs - Deux sections : Solo et Multijoueurs */}
+              {/* Historique des matchs - Avec filtres et tri améliorés */}
               {(soloMatches.length > 0 || multiplayerMatches.length > 0) && (
                 <div className="space-y-6">
-                  {/* Matchs Solo */}
-                  {soloMatches.length > 0 && (
-                    <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
-                      <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
+                  {/* Contrôles de filtrage et tri */}
+                  <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+                      <h2 className="text-2xl font-bold text-text-primary flex items-center gap-3">
                         <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
-                        Solo Matches
+                        Match History
                       </h2>
                       
-                      <div className="space-y-3">
-                        {soloMatches.map((match) => (
-                          <div
-                            key={match.id}
-                            className="bg-bg-primary rounded-xl p-4 border border-border-secondary/50 transition-all hover:scale-[1.02] hover:border-accent-primary/50"
-                          >
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg bg-accent-primary/20 text-accent-primary">
-                                  ⌨️
+                      {/* Filtres et tri */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {/* Filtre par type */}
+                        <select
+                          value={matchFilter}
+                          onChange={(e) => setMatchFilter(e.target.value)}
+                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
+                        >
+                          <option value="all">All Matches</option>
+                          <option value="solo">Solo</option>
+                          <option value="multiplayer">Multiplayer</option>
+                        </select>
+                        
+                        {/* Tri */}
+                        <select
+                          value={matchSort}
+                          onChange={(e) => setMatchSort(e.target.value)}
+                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
+                        >
+                          <option value="date">Sort by Date</option>
+                          <option value="wpm">Sort by WPM</option>
+                          <option value="accuracy">Sort by Accuracy</option>
+                        </select>
+                        
+                        {/* Ordre */}
+                        <button
+                          onClick={() => setMatchSortOrder(matchSortOrder === 'desc' ? 'asc' : 'desc')}
+                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm hover:bg-bg-primary/70 transition-colors"
+                          title={matchSortOrder === 'desc' ? 'Descending' : 'Ascending'}
+                        >
+                          {matchSortOrder === 'desc' ? '↓' : '↑'}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Affichage des matchs filtrés et triés */}
+                    {(() => {
+                      // Combiner tous les matchs
+                      let allMatches = [];
+                      if (matchFilter === 'all' || matchFilter === 'solo') {
+                        allMatches.push(...soloMatches.map(m => ({ ...m, type: 'solo' })));
+                      }
+                      if (matchFilter === 'all' || matchFilter === 'multiplayer') {
+                        allMatches.push(...multiplayerMatches.map(m => ({ ...m, type: 'multiplayer' })));
+                      }
+                      
+                      // Trier les matchs
+                      allMatches.sort((a, b) => {
+                        let comparison = 0;
+                        if (matchSort === 'date') {
+                          comparison = new Date(b.date) - new Date(a.date);
+                        } else if (matchSort === 'wpm') {
+                          comparison = (b.wpm || 0) - (a.wpm || 0);
+                        } else if (matchSort === 'accuracy') {
+                          comparison = (b.accuracy || 0) - (a.accuracy || 0);
+                        }
+                        return matchSortOrder === 'desc' ? comparison : -comparison;
+                      });
+                      
+                      if (allMatches.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-text-secondary">
+                            No matches found with the selected filters.
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          <div className="space-y-3">
+                            {allMatches.map((match) => (
+                            <div
+                              key={match.id}
+                              className={`bg-bg-primary rounded-xl p-4 border transition-all hover:scale-[1.02] ${
+                                match.won 
+                                  ? 'border-correct-char/30 hover:border-correct-char/50' 
+                                  : match.type === 'solo'
+                                    ? 'border-border-secondary/50 hover:border-accent-primary/50'
+                                    : 'border-incorrect-char/30 hover:border-incorrect-char/50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-4">
+                                  <div 
+                                    className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
+                                      match.type === 'solo'
+                                        ? 'bg-accent-primary/20 text-accent-primary'
+                                        : match.won 
+                                          ? 'bg-correct-char/20 text-correct-char' 
+                                          : 'bg-incorrect-char/20 text-incorrect-char'
+                                    }`}
+                                  >
+                                    {match.type === 'solo' ? '⌨️' : (match.won ? '✓' : '✗')}
+                                  </div>
+                                  
+                                  <div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                      <span className="text-text-primary font-semibold">
+                                        {match.type === 'solo' ? 'Solo Practice' : getMatchTypeLabel(match.type)}
+                                      </span>
+                                      {match.opponent && (
+                                        <span className="text-text-secondary text-sm">vs {match.opponent}</span>
+                                      )}
+                                    </div>
+                                    <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
+                                  </div>
                                 </div>
                                 
-                                <div>
-                                  <div className="flex items-center gap-3 mb-1">
-                                    <span className="text-text-primary font-semibold">Solo Practice</span>
+                                <div className="flex items-center gap-6">
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                                      {match.wpm}
+                                    </div>
+                                    <div className="text-text-muted text-xs">WPM</div>
                                   </div>
-                                  <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                    {match.wpm}
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                                      {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
+                                    </div>
+                                    <div className="text-text-muted text-xs">ACC</div>
                                   </div>
-                                  <div className="text-text-muted text-xs">WPM</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                    {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
-                                  </div>
-                                  <div className="text-text-muted text-xs">ACC</div>
+                                  {match.eloChange !== undefined && match.eloChange !== null && (
+                                    <div className="text-center">
+                                      <div className={`text-lg font-bold ${match.eloChange >= 0 ? 'text-accent-secondary' : 'text-red-400'}`} style={{ fontFamily: 'JetBrains Mono' }}>
+                                        {match.eloChange >= 0 ? '+' : ''}{match.eloChange}
+                                      </div>
+                                      <div className="text-text-muted text-xs">ELO</div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
+                          ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Matchs Multijoueurs */}
-                  {multiplayerMatches.length > 0 && (
-                    <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
-                      <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-3">
-                        <span className="w-1 h-8 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
-                        Multiplayer Matches
-                      </h2>
-                      
-                      <div className="space-y-3">
-                        {multiplayerMatches.map((match) => (
-                          <div
-                            key={match.id}
-                            className={`bg-bg-primary rounded-xl p-4 border transition-all hover:scale-[1.02] ${
-                              match.won 
-                                ? 'border-correct-char/30 hover:border-correct-char/50' 
-                                : 'border-incorrect-char/30 hover:border-incorrect-char/50'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                              <div className="flex items-center gap-4">
-                                <div 
-                                  className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
-                                    match.won 
-                                      ? 'bg-correct-char/20 text-correct-char' 
-                                      : 'bg-incorrect-char/20 text-incorrect-char'
-                                  }`}
-                                >
-                                  {match.won ? '✓' : '✗'}
-                                </div>
-                                
-                                <div>
-                                  <div className="flex items-center gap-3 mb-1">
-                                    <span className="text-text-primary font-semibold">{getMatchTypeLabel(match.type)}</span>
-                                    {match.opponent && (
-                                      <span className="text-text-secondary text-sm">vs {match.opponent}</span>
-                                    )}
-                                  </div>
-                                  <div className="text-text-muted text-xs">{formatDate(match.date)}</div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                    {match.wpm}
-                                  </div>
-                                  <div className="text-text-muted text-xs">WPM</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                                    {typeof match.accuracy === 'number' ? match.accuracy.toFixed(1) : match.accuracy}%
-                                  </div>
-                                  <div className="text-text-muted text-xs">ACC</div>
-                                </div>
-                              </div>
+                          
+                          {/* Bouton "Load More" pour la pagination */}
+                          {hasMoreMatches && (
+                            <div className="text-center mt-6">
+                              <button
+                                onClick={loadMoreMatches}
+                                disabled={loadingMatches}
+                                className="px-6 py-3 bg-bg-primary/50 hover:bg-bg-primary/70 border border-border-secondary/30 rounded-lg text-text-primary text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {loadingMatches ? (
+                                  <span className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin"></div>
+                                    Loading...
+                                  </span>
+                                ) : (
+                                  'Load More Matches'
+                                )}
+                              </button>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
             </>

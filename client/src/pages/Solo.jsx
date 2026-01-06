@@ -4,6 +4,7 @@ import { generateText, languages } from '../data/languages'
 import { generateNumbers } from '../data/numbers'
 import LanguageSelector from '../components/LanguageSelector'
 import FontSelector from '../components/FontSelector'
+import ShareButtons from '../components/ShareButtons'
 import WordsIcon from '../components/icons/WordsIcon'
 import NumbersIcon from '../components/icons/NumbersIcon'
 import { getDefaultLanguage } from '../utils/languageDetection'
@@ -295,6 +296,35 @@ export default function Solo() {
     }
   };
 
+  // Raccourcis clavier pour améliorer l'expérience utilisateur
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Ne pas activer les raccourcis si on est en train de taper dans un input
+      if (e.target.matches('input, textarea') || e.target.isContentEditable) {
+        return;
+      }
+      
+      // R : Reset/New test
+      if (e.key === 'r' || e.key === 'R') {
+        if (finished || !startTime) {
+          e.preventDefault();
+          reset();
+        }
+      }
+      
+      // Esc : Focus sur l'input de frappe (si pas en cours de jeu)
+      if (e.key === 'Escape' && !finished && !startTime) {
+        e.preventDefault();
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [finished, startTime]);
+
   // Rendu simple caractère par caractère - comme avant
   const renderText = useMemo(() => {
     return text.split('').map((char, index) => {
@@ -577,7 +607,20 @@ export default function Solo() {
               </div>
             )}
 
-            <div className="text-center pt-2">
+            <div className="text-center pt-2 space-y-4">
+              {/* Boutons de partage */}
+              <div className="flex justify-center">
+                <ShareButtons 
+                  result={{
+                    wpm: stats.wpm,
+                    accuracy: stats.accuracy,
+                    averageWpm: averageWpm,
+                    totalWords: totalWords
+                  }}
+                  type="solo"
+                />
+              </div>
+              
               <button
                 onClick={reset}
                 className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-6 sm:py-3 sm:px-8 rounded transition-colors text-sm sm:text-base"

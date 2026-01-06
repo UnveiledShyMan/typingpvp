@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { languages } from '../data/languages'
 import { useRankings } from '../hooks/useRankings'
 import { TableSkeleton } from '../components/SkeletonLoader'
+import UserTooltip from '../components/UserTooltip'
 import SEOHead from '../components/SEOHead'
 
 export default function Rankings() {
@@ -104,19 +105,43 @@ export default function Rankings() {
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
+                          {/* Avatar cliquable pour accéder au profil */}
                           {player.avatar ? (
-                            <img
-                              src={player.avatar}
-                              alt={player.username}
-                              className="w-12 h-12 rounded-full object-cover ring-2 ring-text-secondary/20 group-hover:ring-accent-primary/50 transition-all"
-                              loading="lazy"
-                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation(); // Empêcher le clic sur la ligne
+                                navigate(`/profile/${player.id}`);
+                              }}
+                              className="w-12 h-12 rounded-full object-cover ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer overflow-hidden"
+                              title="View profile"
+                            >
+                              <img
+                                src={player.avatar}
+                                alt={player.username}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            </button>
                           ) : (
-                            <div className="w-12 h-12 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold text-lg ring-2 ring-text-secondary/20 group-hover:ring-accent-primary/50 transition-all">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation(); // Empêcher le clic sur la ligne
+                                navigate(`/profile/${player.id}`);
+                              }}
+                              className="w-12 h-12 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold text-lg ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer"
+                              title="View profile"
+                            >
                               {player.username[0].toUpperCase()}
-                            </div>
+                            </button>
                           )}
-                          <span className="text-text-primary font-semibold group-hover:text-accent-primary transition-colors">{player.username}</span>
+                          <UserTooltip userId={player.id} username={player.username}>
+                            <span 
+                              className="text-text-primary font-semibold group-hover:text-accent-primary transition-colors cursor-pointer"
+                              onClick={() => navigate(`/profile/${player.id}`)}
+                            >
+                              {player.username}
+                            </span>
+                          </UserTooltip>
                         </div>
                       </td>
                       <td className="px-6 py-5">

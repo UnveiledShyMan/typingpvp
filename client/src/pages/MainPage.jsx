@@ -9,6 +9,9 @@ import CompetitionIcon from '../components/icons/CompetitionIcon'
 import MatchmakingIcon from '../components/icons/MatchmakingIcon'
 import FriendsIcon from '../components/icons/FriendsIcon'
 import SoloDropdown from '../components/SoloDropdown'
+import ConnectionStatus from '../components/ConnectionStatus'
+import UserSearch from '../components/UserSearch'
+import Modal from '../components/Modal'
 import { profileService } from '../services/apiService'
 import { useUser } from '../contexts/UserContext'
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
@@ -38,6 +41,7 @@ export default function MainPage() {
   const [showAuth, setShowAuth] = useState(null); // 'login' | 'register' | null
   const { user, updateUser } = useUser();
   const [showSandbox, setShowSandbox] = useState(false);
+  const [showUserSearch, setShowUserSearch] = useState(false);
 
   useEffect(() => {
     // Charger la préférence depuis localStorage si pas d'utilisateur connecté
@@ -239,6 +243,20 @@ export default function MainPage() {
 
             {/* User section / Auth buttons */}
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              {/* Indicateur de connexion Socket */}
+              <ConnectionStatus />
+              
+              {/* Bouton de recherche d'utilisateurs */}
+              <button
+                onClick={() => setShowUserSearch(true)}
+                className="hidden md:flex items-center justify-center w-10 h-10 rounded-lg bg-bg-primary/50 hover:bg-bg-primary/70 text-text-secondary hover:text-text-primary transition-colors"
+                title="Search users (Ctrl+K)"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+              
               {user ? (
                 <>
                   {/* Profile button dans la nav pour mobile */}
@@ -406,6 +424,15 @@ export default function MainPage() {
 
       {/* Footer */}
       <Footer />
+      
+      {/* Modal de recherche d'utilisateurs */}
+      <Modal
+        isOpen={showUserSearch}
+        onClose={() => setShowUserSearch(false)}
+        title="Search Users"
+      >
+        <UserSearch onClose={() => setShowUserSearch(false)} />
+      </Modal>
       </div>
     </>
   )

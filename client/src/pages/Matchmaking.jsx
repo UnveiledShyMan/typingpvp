@@ -429,10 +429,11 @@ export default function Matchmaking() {
         </div>
       </Modal>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
-      <div className="space-y-6">
-        {/* Language Selector */}
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="space-y-6 pb-4">
+            {/* Language Selector */}
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
           <label className="block text-text-primary mb-3 text-sm font-medium">Language</label>
           <select
             value={selectedLang}
@@ -466,8 +467,8 @@ export default function Matchmaking() {
 
         {/* Queue Status */}
         {isInQueue ? (
-          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center">
-            <div className="mb-6 space-y-4">
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8 text-center">
+            <div className="mb-4 sm:mb-6 space-y-3 sm:space-y-4">
               <div className="relative w-20 h-20 mx-auto">
                 <div className="absolute inset-0 border-4 border-accent-primary/20 rounded-full"></div>
                 <div className="absolute inset-0 border-4 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
@@ -491,7 +492,7 @@ export default function Matchmaking() {
             </button>
           </div>
         ) : (
-          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-8 text-center space-y-6">
+          <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8 text-center space-y-4 sm:space-y-6">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent-primary/10 rounded-full mb-2">
                 <span className="text-accent-primary text-sm font-medium">Ready to battle?</span>
@@ -527,7 +528,8 @@ export default function Matchmaking() {
             </button>
           </div>
         )}
-      </div>
+          </div>
+        </div>
       </div>
     </div>
   )

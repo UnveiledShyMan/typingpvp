@@ -18,10 +18,10 @@ import friendsRoutes, { setOnlineUsers } from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 import discordRoutes from './routes/discord.js';
 import { getUserById, recordMatch, updateUser } from './db.js';
-import { calculateNewMMR } from './utils/elo.js';
+// Système ELO amélioré activé : K-factor adaptatif selon le nombre de matchs et le niveau
+// Plus précis que ELO standard, meilleure adaptation pour nouveaux joueurs
+import { calculateNewMMR } from './utils/eloImproved.js';
 import { MatchmakingQueue } from './utils/matchmakingQueue.js';
-// Système ELO amélioré disponible (optionnel - voir OPTIMIZATION_PLAN.md)
-// import { calculateNewMMR } from './utils/eloImproved.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -645,9 +645,13 @@ io.on('connection', (socket) => {
     const mmr1 = user1.getMMR(language);
     const mmr2 = user2.getMMR(language);
     
-    // Calculer les nouveaux MMR
-    const newMMR1 = calculateNewMMR(mmr1, mmr2, player1Won);
-    const newMMR2 = calculateNewMMR(mmr2, mmr1, !player1Won);
+    // Récupérer le nombre de matchs pour le K-factor adaptatif
+    const matchCount1 = user1.stats?.totalMatches || 0;
+    const matchCount2 = user2.stats?.totalMatches || 0;
+    
+    // Calculer les nouveaux MMR avec K-factor adaptatif (plus précis pour nouveaux joueurs)
+    const newMMR1 = calculateNewMMR(mmr1, mmr2, player1Won, matchCount1);
+    const newMMR2 = calculateNewMMR(mmr2, mmr1, !player1Won, matchCount2);
     
     // Mettre à jour les MMR
     user1.updateMMR(language, newMMR1);

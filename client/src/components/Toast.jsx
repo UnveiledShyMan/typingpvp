@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 /**
  * Composant Toast pour afficher des notifications élégantes
  * Style cohérent avec le design Monkeytype du site
+ * Supporte maintenant les actions (boutons) dans les notifications
  */
-export default function Toast({ message, type = 'info', duration = 4000, onClose }) {
+export default function Toast({ message, type = 'info', duration = 4000, actions = [], persistent = false, onClose }) {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -91,11 +92,38 @@ export default function Toast({ message, type = 'info', duration = 4000, onClose
         {style.icon}
       </div>
 
-      {/* Message */}
+      {/* Message et Actions */}
       <div className="flex-1 min-w-0">
         <p className={`${style.text} text-sm font-medium leading-relaxed`}>
           {message}
         </p>
+        
+        {/* Actions (boutons) */}
+        {actions && actions.length > 0 && (
+          <div className="flex items-center gap-2 mt-3">
+            {actions.map((action, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  if (action.onClick) {
+                    action.onClick();
+                  }
+                  // Fermer le toast après l'action (sauf si persistent)
+                  if (!persistent && action.closeOnClick !== false) {
+                    handleClose();
+                  }
+                }}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  action.primary
+                    ? `${style.text} bg-bg-primary/50 hover:bg-bg-primary/70 border ${style.border}`
+                    : 'text-text-secondary hover:text-text-primary bg-bg-primary/30 hover:bg-bg-primary/50'
+                }`}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bouton de fermeture */}

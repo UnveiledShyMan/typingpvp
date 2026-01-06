@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
+import ShareButtons from '../components/ShareButtons'
+import UserTooltip from '../components/UserTooltip'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
 import { useUser } from '../contexts/UserContext'
@@ -56,6 +58,8 @@ export default function BattleRoom() {
   const chatContainerRef = useRef(null);
   const hasJoinedRoomRef = useRef(false); // Ref pour éviter de joindre plusieurs fois
   const listenersSetupRef = useRef(false); // Ref pour éviter de configurer les listeners plusieurs fois
+  const lastErrorCountRef = useRef(0); // Ref pour le calcul incrémental des erreurs (optimisation O(1))
+  const statsUpdateRef = useRef(null); // Ref pour throttler les calculs de stats avec requestAnimationFrame
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -225,10 +229,16 @@ export default function BattleRoom() {
         setPhraseDifficulty(data.difficulty);
       }
       setInput(''); // Réinitialiser l'input
+      lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
       
       // Arrêter l'interval précédent s'il existe
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
+      }
+      // Annuler les calculs de stats en cours
+      if (statsUpdateRef.current) {
+        cancelAnimationFrame(statsUpdateRef.current);
+        statsUpdateRef.current = null;
       }
       
       // Démarrer le timer si mode timer
@@ -572,7 +582,7 @@ export default function BattleRoom() {
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     if (gameStatus !== 'playing') return;
     
     const value = e.target.value;
@@ -585,38 +595,76 @@ export default function BattleRoom() {
     }
     
     if (value.length <= text.length) {
+      // Mise à jour immédiate de l'input pour réduire l'input lag
       setInput(value);
       
-      // Calculer les erreurs
-      let errorCount = 0;
-      for (let i = 0; i < value.length; i++) {
-        if (value[i] !== text[i]) {
-          errorCount++;
+      // OPTIMISATION : Calcul incrémental des erreurs (O(1) au lieu de O(n))
+      // Ne vérifier que les nouveaux caractères ou les corrections
+      let errorCount = lastErrorCountRef.current;
+      if (value.length > input.length) {
+        // Nouveau caractère ajouté - vérifier seulement les nouveaux
+        for (let i = input.length; i < value.length; i++) {
+          if (value[i] !== text[i]) {
+            errorCount++;
+          }
+        }
+        // Vérifier les corrections dans la partie déjà tapée (si l'utilisateur corrige)
+        for (let i = 0; i < input.length; i++) {
+          if (input[i] !== text[i] && value[i] === text[i]) {
+            // Une erreur a été corrigée
+            errorCount = Math.max(0, errorCount - 1);
+          }
+        }
+      } else if (value.length < input.length) {
+        // Caractère supprimé - recalculer depuis le début (rare mais nécessaire)
+        errorCount = 0;
+        for (let i = 0; i < value.length; i++) {
+          if (value[i] !== text[i]) {
+            errorCount++;
+          }
         }
       }
+      lastErrorCountRef.current = errorCount;
       setErrors(errorCount);
 
-      // Calculer les stats - utiliser typingStartTime au lieu de startTime pour le WPM
+      // OPTIMISATION : Calculer les stats de manière throttlée avec requestAnimationFrame
+      // Cela évite de bloquer le thread principal et améliore la fluidité
       if (typingStartTime) {
-        const timeElapsed = (Date.now() - typingStartTime) / 1000 / 60;
-        const wordsTyped = value.trim().split(/\s+/).filter(w => w.length > 0).length;
-        const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
-        const accuracy = value.length > 0 
-          ? Math.round(((value.length - errorCount) / value.length) * 100)
-          : 100;
-        const progress = Math.round((value.length / text.length) * 100);
-        
-        setMyStats({ wpm, accuracy, progress });
-        
-        // Envoyer la mise à jour au serveur (sans throttling car c'est léger)
-        // Vérifier que le socket est connecté avant d'émettre
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit('update-progress', {
-            progress,
-            wpm,
-            accuracy
-          });
+        // Annuler le calcul précédent s'il existe
+        if (statsUpdateRef.current) {
+          cancelAnimationFrame(statsUpdateRef.current);
         }
+        
+        // Déférer les calculs de stats pour ne pas bloquer l'input
+        statsUpdateRef.current = requestAnimationFrame(() => {
+          const timeElapsed = (Date.now() - typingStartTimeRef.current) / 1000 / 60;
+          
+          // Calcul optimisé : utiliser errorCount déjà calculé
+          const correctChars = value.length - errorCount;
+          
+          // WPM basé uniquement sur les caractères corrects - empêche le spam du clavier
+          // Un mot = 5 caractères (standard typing test)
+          const wordsTyped = correctChars / 5;
+          const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
+          
+          // Accuracy : (caractères corrects / total) * 100
+          const accuracy = value.length > 0 
+            ? Math.round((correctChars / value.length) * 100)
+            : 100;
+          const progress = Math.round((value.length / text.length) * 100);
+          
+          setMyStats({ wpm, accuracy, progress });
+          
+          // Envoyer la mise à jour au serveur (throttling géré côté serveur)
+          // Vérifier que le socket est connecté avant d'émettre
+          if (socketRef.current && socketRef.current.connected) {
+            socketRef.current.emit('update-progress', {
+              progress,
+              wpm,
+              accuracy
+            });
+          }
+        });
 
         // Auto-scroll pour suivre la position de frappe
         // Optimisation : utiliser requestAnimationFrame pour décaler le scroll et éviter les lags
@@ -646,9 +694,11 @@ export default function BattleRoom() {
       // Vérifier si terminé
       if (value === text && typingStartTime) {
         // Utiliser typingStartTime pour le calcul du WPM final (temps réel de frappe)
-        const finalTime = (Date.now() - typingStartTime) / 1000 / 60;
-        const finalWpm = finalTime > 0 ? Math.round(text.trim().split(/\s+/).filter(w => w.length > 0).length / finalTime) : 0;
-        const finalAccuracy = Math.round(((text.length - errorCount) / text.length) * 100);
+        const finalTime = (Date.now() - typingStartTimeRef.current) / 1000 / 60;
+        const correctChars = text.length - errorCount;
+        const wordsTyped = correctChars / 5;
+        const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
+        const finalAccuracy = Math.round((correctChars / text.length) * 100);
         
         // Vérifier que le socket est connecté avant d'émettre
         if (socketRef.current && socketRef.current.connected) {
@@ -667,9 +717,11 @@ export default function BattleRoom() {
         }
       }
     }
-  };
+  }, [gameStatus, text, input, typingStartTime, errors]);
 
-  const renderText = () => {
+  // OPTIMISATION : Mémoriser renderText avec useMemo pour éviter de recalculer à chaque render
+  // Cela améliore significativement les performances lors de la frappe
+  const renderText = useMemo(() => {
     return text.split('').map((char, index) => {
       if (index < input.length) {
         const isCorrect = input[index] === char;
@@ -692,7 +744,7 @@ export default function BattleRoom() {
         );
       }
     });
-  };
+  }, [text, input]);
 
   const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));
   const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
@@ -823,7 +875,18 @@ export default function BattleRoom() {
                       Waiting for opponent...
                     </p>
                     <p className="text-text-secondary text-sm">
-                      Share the room ID: <span className="font-mono text-accent-primary">{roomId}</span>
+                      Share the room ID: <span 
+                        className="font-mono text-accent-primary cursor-pointer hover:text-accent-hover transition-colors"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(roomId);
+                            toast.success('Room ID copied to clipboard!');
+                          } catch (err) {
+                            toast.error('Failed to copy room ID');
+                          }
+                        }}
+                        title="Click to copy"
+                      >{roomId}</span>
                     </p>
                   </div>
                 ) : (
@@ -959,7 +1022,19 @@ export default function BattleRoom() {
                 
                 {opponent && (
                   <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="text-text-primary mb-2 text-sm font-medium">{opponent.name}</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-text-primary text-sm font-medium">{opponent.name}</div>
+                      {/* Lien vers le profil de l'adversaire */}
+                      {opponent.userId && (
+                        <button
+                          onClick={() => navigate(`/profile/${opponent.userId}`)}
+                          className="text-accent-primary hover:text-accent-hover text-xs font-medium transition-colors"
+                          title="View opponent profile"
+                        >
+                          👤 Profile
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.wpm}</div>
                       <div className="text-sm text-text-secondary">{opponentStats.accuracy}%</div>
@@ -1034,8 +1109,21 @@ export default function BattleRoom() {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-lg font-semibold text-text-primary">
-                          {isMe ? 'You' : player.name}
+                        <div className="flex items-center gap-3">
+                          <div className="text-lg font-semibold text-text-primary">
+                            {isMe ? 'You' : player.name}
+                          </div>
+                          {/* Lien vers le profil si ce n'est pas moi et que l'utilisateur a un userId */}
+                          {!isMe && player.userId && (
+                            <button
+                              onClick={() => navigate(`/profile/${player.userId}`)}
+                              className="text-accent-primary hover:text-accent-hover text-sm font-medium transition-colors flex items-center gap-1"
+                              title="View profile"
+                            >
+                              <span>👤</span>
+                              <span>Profile</span>
+                            </button>
+                          )}
                         </div>
                         {isWinner && <span className="text-2xl">🏆</span>}
                         {!result && <span className="text-text-secondary text-sm">Did not finish</span>}
@@ -1067,7 +1155,36 @@ export default function BattleRoom() {
                 })}
               </div>
 
-              <div className="text-center">
+              <div className="text-center space-y-4">
+                {/* Boutons de partage pour le gagnant */}
+                {players.map((player) => {
+                  const result = results[player.id];
+                  const isMe = player.name === playerName || (player.userId && player.userId === (userId || currentUser?.id));
+                  const otherPlayer = players.find(p => p.id !== player.id);
+                  const otherResult = otherPlayer ? results[otherPlayer.id] : null;
+                  const isWinner = result && otherResult && (
+                    result.wpm > otherResult.wpm ||
+                    (result.wpm === otherResult.wpm && result.accuracy > otherResult.accuracy)
+                  );
+                  
+                  // Afficher les boutons de partage seulement pour le joueur courant s'il a gagné
+                  if (!isMe || !isWinner) return null;
+                  
+                  return (
+                    <div key={player.id} className="flex justify-center">
+                      <ShareButtons
+                        result={{
+                          wpm: result.wpm,
+                          accuracy: result.accuracy,
+                          isWinner: true,
+                          eloChange: eloChanges[player.id]
+                        }}
+                        type="battle"
+                      />
+                    </div>
+                  );
+                })}
+                
                 <button
                   onClick={() => navigate('/')}
                   className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-colors"
@@ -1098,20 +1215,50 @@ export default function BattleRoom() {
                       No messages yet. Start the conversation!
                     </div>
                   ) : (
-                    chatMessages.map((msg) => (
-                      <div key={msg.id} className="flex gap-3">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold">
-                          {msg.username[0].toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2 mb-1">
-                            <span className="text-text-primary text-sm font-semibold">{msg.username}</span>
-                            <span className="text-text-secondary text-xs">{formatMessageTime(msg.timestamp)}</span>
+                    chatMessages.map((msg) => {
+                      // Trouver le joueur correspondant au message pour obtenir son userId
+                      const player = players.find(p => p.name === msg.username);
+                      const isMe = msg.username === playerName || (player?.userId && player.userId === (userId || currentUser?.id));
+                      
+                      return (
+                        <div key={msg.id} className="flex gap-3">
+                          {/* Avatar cliquable si le joueur a un userId */}
+                          {player?.userId ? (
+                            <button
+                              onClick={() => navigate(`/profile/${player.userId}`)}
+                              className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold hover:bg-accent-primary/30 transition-colors cursor-pointer"
+                              title="View profile"
+                            >
+                              {msg.username[0].toUpperCase()}
+                            </button>
+                          ) : (
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold">
+                              {msg.username[0].toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2 mb-1">
+                              {/* Nom d'utilisateur cliquable avec tooltip si le joueur a un userId */}
+                              {player?.userId && !isMe ? (
+                                <UserTooltip userId={player.userId} username={msg.username}>
+                                  <button
+                                    onClick={() => navigate(`/profile/${player.userId}`)}
+                                    className="text-text-primary text-sm font-semibold hover:text-accent-primary transition-colors cursor-pointer"
+                                    title="View profile"
+                                  >
+                                    {msg.username}
+                                  </button>
+                                </UserTooltip>
+                              ) : (
+                                <span className="text-text-primary text-sm font-semibold">{msg.username}</span>
+                              )}
+                              <span className="text-text-secondary text-xs">{formatMessageTime(msg.timestamp)}</span>
+                            </div>
+                            <div className="text-text-secondary text-sm break-words">{msg.message}</div>
                           </div>
-                          <div className="text-text-secondary text-sm break-words">{msg.message}</div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 

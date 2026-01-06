@@ -7,14 +7,21 @@ const ToastContext = createContext(null);
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const showToast = useCallback((message, type = 'info', duration = 4000) => {
+  const showToast = useCallback((message, type = 'info', duration = 4000, options = {}) => {
     const id = Date.now() + Math.random();
-    const newToast = { id, message, type, duration };
+    const newToast = { 
+      id, 
+      message, 
+      type, 
+      duration: options.persistent ? 0 : duration, // 0 = persistent
+      actions: options.actions || [],
+      persistent: options.persistent || false
+    };
     
     setToasts(prev => [...prev, newToast]);
 
-    // Retirer automatiquement après la durée spécifiée
-    if (duration > 0) {
+    // Retirer automatiquement après la durée spécifiée (sauf si persistent)
+    if (duration > 0 && !options.persistent) {
       setTimeout(() => {
         setToasts(prev => prev.filter(toast => toast.id !== id));
       }, duration + 300); // +300 pour l'animation de sortie
@@ -29,10 +36,13 @@ export function ToastProvider({ children }) {
 
   // Exposer les fonctions de convenance
   const toast = {
-    success: (message, duration) => showToast(message, 'success', duration),
-    error: (message, duration) => showToast(message, 'error', duration),
-    warning: (message, duration) => showToast(message, 'warning', duration),
-    info: (message, duration) => showToast(message, 'info', duration),
+    success: (message, duration, options) => showToast(message, 'success', duration, options),
+    error: (message, duration, options) => showToast(message, 'error', duration, options),
+    warning: (message, duration, options) => showToast(message, 'warning', duration, options),
+    info: (message, duration, options) => showToast(message, 'info', duration, options),
+    // Fonction pour les toasts avec actions
+    withActions: (message, type, actions, persistent = false) => 
+      showToast(message, type, 0, { actions, persistent }),
   };
 
   // Configurer les handlers d'erreur pour apiService après que showToast soit défini
@@ -64,6 +74,8 @@ export function ToastProvider({ children }) {
               message={toastItem.message}
               type={toastItem.type}
               duration={toastItem.duration}
+              actions={toastItem.actions}
+              persistent={toastItem.persistent}
               onClose={() => removeToast(toastItem.id)}
             />
           </div>
