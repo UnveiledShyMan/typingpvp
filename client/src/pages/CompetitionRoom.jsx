@@ -258,7 +258,7 @@ export default function CompetitionRoom() {
         }
       }
     }
-  };
+  }, [gameStatus, text, input, startTime]);
 
   // OPTIMISATION : Mémoriser renderText avec useMemo pour éviter de recalculer à chaque render
   // Cela améliore significativement les performances lors de la frappe
