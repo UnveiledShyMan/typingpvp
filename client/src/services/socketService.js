@@ -61,10 +61,10 @@ export function createSocket() {
     });
   });
 
-  // Gestion simplifiée des erreurs - éviter les boucles infinies
-  // Socket.IO gère déjà la reconnexion automatique, on ne doit pas forcer de reconnexion manuelle
+  // Gestion des erreurs avec reconnexion automatique pour les erreurs 400
+  // Les erreurs 400 indiquent des sessions expirées - on doit forcer une nouvelle connexion
   socket.on('connect_error', (error) => {
-    // Logger toutes les erreurs pour debug en production
+    // Logger toutes les erreurs pour debug
     console.error('❌ Socket.IO connection error:', {
       message: error.message,
       type: error.type,
@@ -72,7 +72,41 @@ export function createSocket() {
       url: API_URL,
       path: '/socket.io/'
     });
-    // Ne PAS forcer de reconnexion manuelle - laisser Socket.IO gérer
+    
+    // Si c'est une erreur 400 (session expirée/invalide), forcer une nouvelle connexion
+    // Socket.IO ne reconnecte pas toujours automatiquement pour les erreurs 400
+    if (error.description === 400 || error.message?.includes('400') || error.message?.includes('Bad Request')) {
+      console.warn('⚠️ Erreur 400 détectée (session expirée) - Forcer une nouvelle connexion...');
+      // Délai court avant de forcer la reconnexion pour éviter les boucles
+      setTimeout(() => {
+        if (!socket.connected) {
+          console.log('🔄 Tentative de reconnexion après erreur 400...');
+          socket.disconnect();
+          socket.connect();
+        }
+      }, 1000);
+    }
+  });
+  
+  // Intercepter aussi les erreurs au niveau du transport (polling)
+  // Les erreurs 400 peuvent survenir ici sans déclencher connect_error
+  socket.io.engine.on('error', (error) => {
+    console.error('❌ Socket.IO transport error:', {
+      message: error.message,
+      type: error.type,
+      description: error.description
+    });
+    
+    // Si erreur 400, forcer reconnexion
+    if (error.description === 400 || error.message?.includes('400')) {
+      console.warn('⚠️ Erreur 400 au niveau transport - Forcer reconnexion...');
+      setTimeout(() => {
+        if (!socket.connected) {
+          socket.disconnect();
+          socket.connect();
+        }
+      }, 1000);
+    }
   });
 
   // Logger les reconnexions réussies
