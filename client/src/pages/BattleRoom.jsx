@@ -52,6 +52,7 @@ export default function BattleRoom() {
   const [currentUser, setCurrentUser] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
   const progressIntervalRef = useRef(null);
   const timerIntervalRef = useRef(null); // Ref pour le timer du mode timer
   const inputRef = useRef(null);
@@ -514,7 +515,7 @@ export default function BattleRoom() {
   // Fonction pour envoyer un message de chat
   const handleSendChatMessage = (e) => {
     e.preventDefault();
-    if (!chatInput.trim() || !socketRef.current) return;
+    if (!chatInput.trim() || !socketRef.current || sendingMessage) return;
     
     // Vérifier que le socket est connecté avant d'émettre
     if (!socketRef.current.connected) {
@@ -522,13 +523,20 @@ export default function BattleRoom() {
       return;
     }
     
+    setSendingMessage(true);
+    const messageText = chatInput.trim();
+    setChatInput(''); // Vider l'input immédiatement pour meilleure UX
+    
     socketRef.current.emit('chat-message', {
       roomId,
-      message: chatInput.trim(),
+      message: messageText,
       username: currentUser?.username || playerName
     });
     
-    setChatInput('');
+    // Réinitialiser le loading après un court délai (le message apparaîtra via chat-message event)
+    setTimeout(() => {
+      setSendingMessage(false);
+    }, 500);
   };
 
   // Formater l'heure du message
@@ -1214,10 +1222,20 @@ export default function BattleRoom() {
                     />
                     <button
                       type="submit"
-                      disabled={!chatInput.trim() || gameStatus === 'playing'}
-                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      disabled={!chatInput.trim() || gameStatus === 'playing' || sendingMessage}
+                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2"
                     >
-                      Send
+                      {sendingMessage ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        'Send'
+                      )}
                     </button>
                   </div>
                   {gameStatus === 'playing' && (

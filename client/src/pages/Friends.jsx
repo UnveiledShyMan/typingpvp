@@ -17,6 +17,11 @@ export default function Friends() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('friends'); // 'friends' | 'requests' | 'search'
   const [currentUser, setCurrentUser] = useState(null);
+  // Loading states pour les actions
+  const [sendingRequest, setSendingRequest] = useState(new Set()); // Set d'IDs en cours d'envoi
+  const [acceptingRequest, setAcceptingRequest] = useState(new Set()); // Set d'IDs en cours d'acceptation
+  const [removingRequest, setRemovingRequest] = useState(new Set()); // Set d'IDs en cours de suppression
+  const [removingFriend, setRemovingFriend] = useState(new Set()); // Set d'IDs en cours de suppression
   const navigate = useNavigate();
   const socketRef = useRef(null);
   const { toast } = useToastContext();
@@ -137,6 +142,9 @@ export default function Friends() {
   }, [debouncedSearchQuery]);
 
   const handleSendRequest = async (userId) => {
+    if (sendingRequest.has(userId)) return; // Éviter les doubles clics
+    
+    setSendingRequest(prev => new Set(prev).add(userId));
     try {
       await friendsService.sendFriendRequest(userId);
       fetchFriendRequests();
@@ -148,10 +156,19 @@ export default function Friends() {
       toast.success('Demande d\'ami envoyée !');
     } catch (error) {
       // Erreur gérée par apiService
+    } finally {
+      setSendingRequest(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   };
 
   const handleAcceptRequest = async (userId) => {
+    if (acceptingRequest.has(userId)) return; // Éviter les doubles clics
+    
+    setAcceptingRequest(prev => new Set(prev).add(userId));
     try {
       await friendsService.acceptFriendRequest(userId);
       fetchFriends();
@@ -159,6 +176,12 @@ export default function Friends() {
       toast.success('Demande d\'ami acceptée !');
     } catch (error) {
       // Erreur gérée par apiService
+    } finally {
+      setAcceptingRequest(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   };
 
@@ -183,7 +206,9 @@ export default function Friends() {
 
   const handleRemoveFriend = async (userId) => {
     if (!confirm('Remove this friend?')) return;
+    if (removingFriend.has(userId)) return; // Éviter les doubles clics
     
+    setRemovingFriend(prev => new Set(prev).add(userId));
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -195,9 +220,16 @@ export default function Friends() {
       
       if (response.ok) {
         fetchFriends();
+        toast.success('Ami retiré de votre liste');
       }
     } catch (error) {
       logger.error('Error removing friend:', error);
+    } finally {
+      setRemovingFriend(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   };
 
@@ -369,9 +401,20 @@ export default function Friends() {
                     </button>
                     <button
                       onClick={() => handleRemoveFriend(friend.id)}
-                      className="bg-bg-secondary/40 hover:bg-bg-secondary/60 text-text-secondary hover:text-text-primary font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                      disabled={removingFriend.has(friend.id)}
+                      className="bg-bg-secondary/40 hover:bg-bg-secondary/60 text-text-secondary hover:text-text-primary font-medium py-2 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      Remove
+                      {removingFriend.has(friend.id) ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Removing...</span>
+                        </>
+                      ) : (
+                        'Remove'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -412,15 +455,27 @@ export default function Friends() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleAcceptRequest(request.id)}
-                        className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                        disabled={acceptingRequest.has(request.id) || removingRequest.has(request.id)}
+                        className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        Accept
+                        {acceptingRequest.has(request.id) ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Accepting...</span>
+                          </>
+                        ) : (
+                          'Accept'
+                        )}
                       </button>
                       <button
                         onClick={() => handleRemoveRequest(request.id)}
-                        className="bg-bg-secondary/40 hover:bg-bg-secondary/60 text-text-secondary hover:text-text-primary font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                        disabled={acceptingRequest.has(request.id) || removingRequest.has(request.id)}
+                        className="bg-bg-secondary/40 hover:bg-bg-secondary/60 text-text-secondary hover:text-text-primary font-medium py-2 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Decline
+                        {removingRequest.has(request.id) ? 'Declining...' : 'Decline'}
                       </button>
                     </div>
                   </div>

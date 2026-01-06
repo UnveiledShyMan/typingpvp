@@ -1,7 +1,9 @@
 import express from 'express';
 import { getUserById, getAllUsers, updateUser } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { searchLimiter, apiLimiter } from '../middleware/rateLimiter.js';
 import { notifyFriendRequest, notifyFriendAccepted, notifyFriendRejected } from '../utils/socketNotifications.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -41,7 +43,7 @@ router.get('/', authenticateToken, async (req, res) => {
     
     res.json({ friends: friendsList });
   } catch (error) {
-    console.error('Error fetching friends:', error);
+    logger.error('Error fetching friends:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -80,7 +82,7 @@ router.get('/requests', authenticateToken, async (req, res) => {
     
     res.json({ sent, received });
   } catch (error) {
-    console.error('Error fetching friend requests:', error);
+    logger.error('Error fetching friend requests:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -97,17 +99,26 @@ router.post('/request/:userId', authenticateToken, async (req, res) => {
     
     const targetUser = await getUserById(targetUserId);
     if (!targetUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        error: 'User not found',
+        message: 'The user you are trying to add as a friend does not exist. Please check the username and try again.'
+      });
     }
     
     // Vérifier si déjà amis
     if (currentUser.friends && currentUser.friends.includes(targetUserId)) {
-      return res.status(400).json({ error: 'Already friends' });
+      return res.status(400).json({ 
+        error: 'Already friends',
+        message: `You are already friends with ${targetUser.username}.`
+      });
     }
     
     // Vérifier si une demande existe déjà
     if (currentUser.friendRequests?.sent?.includes(targetUserId)) {
-      return res.status(400).json({ error: 'Friend request already sent' });
+      return res.status(400).json({ 
+        error: 'Friend request already sent',
+        message: `You have already sent a friend request to ${targetUser.username}. Please wait for their response.`
+      });
     }
     
     // Initialiser les structures si elles n'existent pas
@@ -149,7 +160,7 @@ router.post('/request/:userId', authenticateToken, async (req, res) => {
       avatar: targetUser.avatar
     }});
   } catch (error) {
-    console.error('Error sending friend request:', error);
+    logger.error('Error sending friend request:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -162,12 +173,18 @@ router.post('/accept/:userId', authenticateToken, async (req, res) => {
     
     const senderUser = await getUserById(senderUserId);
     if (!senderUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        error: 'User not found',
+        message: 'The user who sent this friend request no longer exists.'
+      });
     }
     
     // Vérifier si la demande existe
     if (!currentUser.friendRequests?.received?.includes(senderUserId)) {
-      return res.status(400).json({ error: 'Friend request not found' });
+      return res.status(400).json({ 
+        error: 'Friend request not found',
+        message: 'This friend request does not exist or has already been processed.'
+      });
     }
     
     // Initialiser les structures si nécessaire
@@ -213,7 +230,7 @@ router.post('/accept/:userId', authenticateToken, async (req, res) => {
       avatar: senderUser.avatar
     }});
   } catch (error) {
-    console.error('Error accepting friend request:', error);
+    logger.error('Error accepting friend request:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -226,7 +243,10 @@ router.delete('/request/:userId', authenticateToken, async (req, res) => {
     
     const targetUser = await getUserById(targetUserId);
     if (!targetUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        error: 'User not found',
+        message: 'The user you are trying to remove from your friend requests does not exist.'
+      });
     }
     
     // Retirer des demandes reçues (refuser)
@@ -260,7 +280,7 @@ router.delete('/request/:userId', authenticateToken, async (req, res) => {
     
     res.json({ message: 'Friend request removed' });
   } catch (error) {
-    console.error('Error removing friend request:', error);
+    logger.error('Error removing friend request:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -273,7 +293,10 @@ router.delete('/:userId', authenticateToken, async (req, res) => {
     
     const friendUser = await getUserById(friendUserId);
     if (!friendUser) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        error: 'User not found',
+        message: 'The user you are trying to remove from your friends list does not exist.'
+      });
     }
     
     // Retirer des listes d'amis
@@ -290,13 +313,14 @@ router.delete('/:userId', authenticateToken, async (req, res) => {
     
     res.json({ message: 'Friend removed' });
   } catch (error) {
-    console.error('Error removing friend:', error);
+    logger.error('Error removing friend:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Rechercher des utilisateurs (pour ajouter des amis)
-router.get('/search', authenticateToken, async (req, res) => {
+// Rechercher des utilisateurs - Rate limiting pour éviter les abus
+router.get('/search', authenticateToken, searchLimiter, async (req, res) => {
   try {
     const query = req.query.q || '';
     const currentUser = req.user;
@@ -332,7 +356,7 @@ router.get('/search', authenticateToken, async (req, res) => {
     
     res.json({ users: searchResults });
   } catch (error) {
-    console.error('Error searching users:', error);
+    logger.error('Error searching users:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -53,7 +53,8 @@ async function request(endpoint, options = {}, retryCount = 0) {
         error: `Erreur HTTP ${response.status}` 
       }));
       
-      const errorMessage = error.error || `Erreur HTTP ${response.status}`;
+      // Utiliser le message détaillé si disponible, sinon l'erreur générique
+      const errorMessage = error.message || error.error || `Erreur HTTP ${response.status}`;
       
       // Afficher l'erreur via toast si handler disponible
       if (errorHandler) {

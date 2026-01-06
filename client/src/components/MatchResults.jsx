@@ -3,12 +3,12 @@
  * Affiche les résultats avec animations, statistiques détaillées et actions
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ShareButtons from './ShareButtons';
 import { navigateToProfile, isValidUserId } from '../utils/profileNavigation';
 
-export default function MatchResults({ 
+function MatchResults({ 
   players, 
   results, 
   eloChanges, 
@@ -347,4 +347,7 @@ export default function MatchResults({
     </div>
   );
 }
+
+// Mémoriser le composant pour éviter les re-renders inutiles
+export default memo(MatchResults);
 

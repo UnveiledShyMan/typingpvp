@@ -3,6 +3,7 @@ import { Suspense, lazy } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { UserProvider } from './contexts/UserContext'
 import { QueryProvider } from './providers/QueryProvider'
+import ErrorBoundary from './components/ErrorBoundary'
 import './App.css'
 
 // Lazy loading des routes pour améliorer les performances
@@ -25,27 +26,29 @@ const LoadingSpinner = () => (
 
 function App() {
   return (
-    <QueryProvider>
-      <ToastProvider>
-        <UserProvider>
-          <Router>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/" element={<MainPage />} />
-                <Route path="/battle/:roomId" element={<BattleRoom />} />
-                <Route path="/competition/:competitionId" element={<CompetitionRoom />} />
-                <Route path="/oauth/callback" element={<OAuthCallback />} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/legal" element={<LegalNotice />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
-                <Route path="/profile/:id" element={<Profile />} />
-                <Route path="/user/:username" element={<UserProfile />} />
-              </Routes>
-            </Suspense>
-          </Router>
-        </UserProvider>
-      </ToastProvider>
-    </QueryProvider>
+    <ErrorBoundary>
+      <QueryProvider>
+        <ToastProvider>
+          <UserProvider>
+            <Router>
+              <Suspense fallback={<LoadingSpinner />}>
+                <Routes>
+                  <Route path="/" element={<MainPage />} />
+                  <Route path="/battle/:roomId" element={<BattleRoom />} />
+                  <Route path="/competition/:competitionId" element={<CompetitionRoom />} />
+                  <Route path="/oauth/callback" element={<OAuthCallback />} />
+                  <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/legal" element={<LegalNotice />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/profile/:id" element={<Profile />} />
+                  <Route path="/user/:username" element={<UserProfile />} />
+                </Routes>
+              </Suspense>
+            </Router>
+          </UserProvider>
+        </ToastProvider>
+      </QueryProvider>
+    </ErrorBoundary>
   )
 }
 

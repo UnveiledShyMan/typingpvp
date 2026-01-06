@@ -1,12 +1,14 @@
 import express from 'express';
 import { createUser, getUserByUsername, getUserByEmail, getUserByProviderId, verifyPassword, updateUser } from '../db.js';
 import jwt from 'jsonwebtoken';
+import { authLimiter, strictLimiter } from '../middleware/rateLimiter.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Inscription
-router.post('/register', async (req, res) => {
+// Inscription - Rate limiting strict pour éviter les abus
+router.post('/register', authLimiter, async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -46,7 +48,7 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error('Register error:', error);
     // En développement, retourner le message d'erreur complet pour faciliter le debug
     const errorMessage = process.env.NODE_ENV === 'production' 
       ? 'Internal server error' 
@@ -55,8 +57,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Connexion
-router.post('/login', async (req, res) => {
+// Connexion - Rate limiting strict pour éviter les attaques par force brute
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -92,7 +94,7 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -228,7 +230,7 @@ router.post('/oauth/exchange', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('OAuth exchange error:', error);
+    logger.error('OAuth exchange error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -304,7 +306,7 @@ router.post('/oauth/callback', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('OAuth callback error:', error);
+    logger.error('OAuth callback error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

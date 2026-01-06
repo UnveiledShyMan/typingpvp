@@ -3,11 +3,11 @@
  * Charge les données du profil en lazy loading
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { profileService } from '../services/apiService';
 import { getRankFromMMR } from '../utils/ranks';
 
-export default function UserTooltip({ userId, username, children }) {
+function UserTooltip({ userId, username, children }) {
   const [show, setShow] = useState(false);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -30,8 +30,8 @@ export default function UserTooltip({ userId, username, children }) {
         });
     }
   }, [show, userId, userData, loading]);
-  
-  // Gérer le hover avec un petit délai pour éviter les tooltips trop sensibles
+
+  // Gérer le hover avec un délai pour éviter les affichages trop rapides
   const handleMouseEnter = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -40,14 +40,14 @@ export default function UserTooltip({ userId, username, children }) {
       setShow(true);
     }, 300); // Délai de 300ms avant d'afficher
   };
-  
+
   const handleMouseLeave = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     setShow(false);
   };
-  
+
   // Nettoyer le timeout au démontage
   useEffect(() => {
     return () => {
@@ -56,29 +56,12 @@ export default function UserTooltip({ userId, username, children }) {
       }
     };
   }, []);
-  
-  // Positionner le tooltip
-  useEffect(() => {
-    if (show && tooltipRef.current) {
-      // Le positionnement sera géré par CSS (position: absolute)
-      // On peut ajouter du positionnement dynamique si nécessaire
-    }
-  }, [show]);
-  
-  if (!userId) {
-    return children;
-  }
-  
-  const rankInfo = userData ? getRankFromMMR(
-    Math.max(...Object.values(userData.mmr || {}).map(m => parseInt(m) || 1000), 1000)
-  ) : null;
-  
-  const getRankColor = (rankInfo) => {
-    return rankInfo?.color || '#646669';
-  };
-  
+
+  // Calculer le rank info
+  const rankInfo = userData ? getRankFromMMR(Math.max(...Object.values(userData.mmr || {}).map(m => parseInt(m) || 1000), 1000)) : null;
+
   return (
-    <div
+    <div 
       className="relative inline-block"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -86,10 +69,10 @@ export default function UserTooltip({ userId, username, children }) {
       {children}
       
       {/* Tooltip */}
-      {show && (
+      {show && (userData || loading) && (
         <div
           ref={tooltipRef}
-          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 p-4 pointer-events-none"
+          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg p-4 shadow-xl"
           style={{ animation: 'fadeIn 0.2s ease-out' }}
         >
           {loading ? (
@@ -136,27 +119,29 @@ export default function UserTooltip({ userId, username, children }) {
               {/* Stats rapides */}
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border-secondary/30">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                  <div className="text-text-primary font-bold text-sm">
                     {userData.stats?.totalMatches || 0}
                   </div>
                   <div className="text-text-secondary text-xs">Matches</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                    {userData.stats?.wins || 0}W
+                  <div className="text-text-primary font-bold text-sm">
+                    {userData.stats?.wins || 0}
                   </div>
                   <div className="text-text-secondary text-xs">Wins</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                    {userData.stats?.bestWPM || 0}
+                  <div className="text-text-primary font-bold text-sm">
+                    {userData.stats?.totalMatches > 0 
+                      ? Math.round((userData.stats.wins || 0) / userData.stats.totalMatches * 100)
+                      : 0}%
                   </div>
-                  <div className="text-text-secondary text-xs">Best WPM</div>
+                  <div className="text-text-secondary text-xs">Win Rate</div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="text-text-secondary text-sm py-2">
+            <div className="text-text-secondary text-sm text-center py-2">
               {username || 'User'}
             </div>
           )}
@@ -166,3 +151,10 @@ export default function UserTooltip({ userId, username, children }) {
   );
 }
 
+// Fonction helper pour obtenir la couleur du rank
+function getRankColor(rankInfo) {
+  return rankInfo?.color || '#646669';
+}
+
+// Mémoriser le composant pour éviter les re-renders inutiles
+export default memo(UserTooltip);

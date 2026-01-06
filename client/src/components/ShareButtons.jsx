@@ -3,10 +3,10 @@
  * Supporte Twitter, copie dans le presse-papier, et autres plateformes
  */
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useToastContext } from '../contexts/ToastContext';
 
-export default function ShareButtons({ result, type = 'solo' }) {
+function ShareButtons({ result, type = 'solo' }) {
   const { toast } = useToastContext();
   const [copied, setCopied] = useState(false);
 
@@ -134,4 +134,7 @@ export default function ShareButtons({ result, type = 'solo' }) {
     </div>
   );
 }
+
+// Mémoriser le composant pour éviter les re-renders inutiles
+export default memo(ShareButtons);
 

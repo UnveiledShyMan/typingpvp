@@ -24,6 +24,7 @@ import { calculateNewMMR } from './utils/eloImproved.js';
 import { invalidateRankingsCache } from './utils/rankingsCache.js';
 import { MatchmakingQueue } from './utils/matchmakingQueue.js';
 import { initSocketNotifications } from './utils/socketNotifications.js';
+import logger from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -76,7 +77,7 @@ app.use(express.json());
 // Middleware pour logger les requêtes API
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
-    console.log(`📡 ${req.method} ${req.path}`);
+    logger.debug(`📡 ${req.method} ${req.path}`);
   }
   next();
 });
@@ -190,7 +191,7 @@ app.get('/api/socket-health', (req, res) => {
 const uploadsPath = join(__dirname, 'uploads');
 if (existsSync(uploadsPath)) {
   app.use('/uploads', express.static(uploadsPath));
-  console.log('✅ Dossier uploads configuré pour servir les fichiers statiques');
+  logger.info('✅ Dossier uploads configuré pour servir les fichiers statiques');
 }
 
 // Servir les fichiers statiques du client (frontend) - UNIQUEMENT si SERVE_CLIENT=true
@@ -200,11 +201,11 @@ if (process.env.SERVE_CLIENT === 'true') {
   
   // Vérifier que le dossier client/dist existe
   if (!existsSync(clientDistPath)) {
-    console.error('❌ ERREUR: Le dossier client/dist n\'existe pas!');
-    console.error('Le serveur ne peut pas servir le client sans ce dossier.');
-    console.error('Vérifiez que le build du client a été effectué correctement.');
+    logger.error('❌ ERREUR: Le dossier client/dist n\'existe pas!');
+    logger.error('Le serveur ne peut pas servir le client sans ce dossier.');
+    logger.error('Vérifiez que le build du client a été effectué correctement.');
   } else {
-    console.log('✅ Dossier client/dist trouvé, configuration du serveur de fichiers statiques...');
+    logger.info('✅ Dossier client/dist trouvé, configuration du serveur de fichiers statiques...');
   }
   
   // Middleware pour servir les fichiers statiques avec gestion d'erreur
@@ -229,19 +230,19 @@ if (process.env.SERVE_CLIENT === 'true') {
     if (req.path.startsWith('/api') && !req.path.startsWith('/api/socket.io/')) {
       // Si on arrive ici, c'est qu'aucune route API n'a matché
       // Logger pour debug
-      console.warn(`⚠️ Route API non trouvée: ${req.method} ${req.path}`);
+      logger.warn(`⚠️ Route API non trouvée: ${req.method} ${req.path}`);
       return res.status(404).json({ error: 'API route not found', path: req.path, method: req.method });
     }
     
     // Servir index.html pour toutes les autres routes (SPA routing)
     const indexPath = join(clientDistPath, 'index.html');
     if (!existsSync(indexPath)) {
-      console.error('❌ ERREUR: index.html non trouvé dans client/dist');
+      logger.error('❌ ERREUR: index.html non trouvé dans client/dist');
       return res.status(500).json({ error: 'Client not built. Please build the client first.' });
     }
     res.sendFile(indexPath, (err) => {
       if (err) {
-        console.error('Error sending index.html:', err);
+        logger.error('Error sending index.html:', err);
         res.status(500).json({ error: 'Internal server error' });
       }
     });
@@ -260,15 +261,15 @@ if (process.env.SERVE_CLIENT === 'true') {
 
 // Gestion des connexions Socket.io
 io.on('connection', (socket) => {
-  console.log(`✅ User connected: ${socket.id}`);
+  logger.debug(`✅ User connected: ${socket.id}`);
   
   socket.on('disconnect', (reason) => {
-    console.log(`⚠️ Socket ${socket.id} connection closed:`, reason);
+    logger.debug(`⚠️ Socket ${socket.id} connection closed:`, reason);
   });
   
   // Gérer les reconnexions (si le transport se reconnecte)
   socket.conn.on('upgrade', () => {
-    console.log(`⬆️ Socket ${socket.id} transport upgraded`);
+    logger.debug(`⬆️ Socket ${socket.id} transport upgraded`);
   });
 
   // Enregistrer un utilisateur comme en ligne (pour les notifications)
@@ -304,7 +305,7 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     
     socket.emit('room-created', { roomId, text });
-    console.log(`Room created: ${roomId}`);
+      logger.debug(`Room created: ${roomId}`);
   });
 
   // Helper pour trouver un joueur existant dans une room (pour reconnexions)
@@ -319,7 +320,7 @@ io.on('connection', (socket) => {
   // Rejoindre une room
   socket.on('join-room', (data) => {
     const { roomId, playerName, userId } = data;
-    console.log(`🔌 Tentative de rejoindre la room ${roomId} par ${playerName} (${userId || 'guest'})`);
+    logger.debug(`🔌 Tentative de rejoindre la room ${roomId} par ${playerName} (${userId || 'guest'})`);
     
     // Validation basique
     if (!roomId) {
@@ -356,12 +357,12 @@ io.on('connection', (socket) => {
             difficulty: room.difficulty
           });
         }
-        console.log(`Player ${playerName} reconnected to matchmaking room ${roomId}`);
+        logger.debug(`Player ${playerName} reconnected to matchmaking room ${roomId}`);
         return;
       } else {
         // NOUVEAU JOUEUR tentant de rejoindre une room matchmaking
         // Cela ne devrait pas arriver normalement, mais on refuse pour éviter les problèmes
-        console.warn(`⚠️ Tentative de rejoindre une room matchmaking par un joueur non autorisé: ${playerName}`);
+        logger.warn(`⚠️ Tentative de rejoindre une room matchmaking par un joueur non autorisé: ${playerName}`);
         socket.emit('error', { message: 'Cannot join matchmaking room. Players are already assigned.' });
         return;
       }
@@ -377,7 +378,7 @@ io.on('connection', (socket) => {
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
         socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
-        console.log(`Player ${playerName} reconnected to room ${roomId}`);
+        logger.debug(`Player ${playerName} reconnected to room ${roomId}`);
         return;
       }
       
@@ -404,7 +405,7 @@ io.on('connection', (socket) => {
       socket.join(roomId);
       socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
       io.to(roomId).emit('player-joined', { players: room.players });
-      console.log(`Player ${playerName} joined room ${roomId}`);
+      logger.debug(`Player ${playerName} joined room ${roomId}`);
       return;
     }
     
@@ -426,7 +427,7 @@ io.on('connection', (socket) => {
           timerDuration: room.timerDuration,
           difficulty: room.difficulty
         });
-        console.log(`Player ${playerName} reconnected to playing room ${roomId}`);
+        logger.debug(`Player ${playerName} reconnected to playing room ${roomId}`);
         return;
       }
       socket.emit('error', { message: 'Game is already in progress' });
@@ -453,7 +454,7 @@ io.on('connection', (socket) => {
       if (room.results) {
         socket.emit('game-finished', { results: room.results, players: room.players, eloChanges: room.eloChanges || {} });
       }
-      console.log(`Player ${playerName} joined finished room ${roomId} to view results`);
+      logger.debug(`Player ${playerName} joined finished room ${roomId} to view results`);
       return;
     }
     
@@ -498,7 +499,7 @@ io.on('connection', (socket) => {
       difficulty: room.difficulty
     });
     
-    console.log(`Game started in room ${roomId}`);
+    logger.debug(`Game started in room ${roomId}`);
   });
 
   // Mettre à jour la progression
@@ -605,13 +606,13 @@ io.on('connection', (socket) => {
       if (room.ranked && room.matchmaking && room.players.some(p => p.userId)) {
         // updateMatchResults calcule et enregistre les changements d'ELO, et les retourne
         eloChanges = await updateMatchResults(room).catch(err => {
-          console.error('Error updating match results:', err);
+          logger.error('Error updating match results:', err);
           return {};
         });
       } else if (room.matchmaking && !room.ranked) {
         // Pour unrated, enregistrer le match sans mettre à jour l'ELO
         await recordUnratedMatch(room).catch(err => {
-          console.error('Error recording unrated match:', err);
+          logger.error('Error recording unrated match:', err);
         });
       }
       
@@ -730,7 +731,7 @@ io.on('connection', (socket) => {
     
     // Log seulement en développement
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`Match results updated: ${user1.username} (${mmr1} → ${newMMR1}) vs ${user2.username} (${mmr2} → ${newMMR2}), Winner: ${player1Won ? user1.username : user2.username}`);
+      logger.debug(`Match results updated: ${user1.username} (${mmr1} → ${newMMR1}) vs ${user2.username} (${mmr2} → ${newMMR2}), Winner: ${player1Won ? user1.username : user2.username}`);
     }
     
     return eloChanges;
@@ -781,7 +782,7 @@ io.on('connection', (socket) => {
       }]
     });
     
-    console.log(`Unrated match recorded: ${player1.name} vs ${player2.name}, Winner: ${player1Won ? player1.name : player2.name}`);
+    logger.debug(`Unrated match recorded: ${player1.name} vs ${player2.name}, Winner: ${player1Won ? player1.name : player2.name}`);
   }
 
   // MATCHMAKING SYSTEM - Optimisé avec buckets MMR
@@ -822,7 +823,7 @@ io.on('connection', (socket) => {
     }
     
     socket.emit('matchmaking-joined', { language, mmr, ranked });
-    console.log(`Player ${userId || username || 'guest'} joined ${queueName} matchmaking queue (${language}, MMR: ${mmr}) - Queue size: ${matchmakingQueue.getQueueSizeFor(language, queueName)}`);
+    logger.debug(`Player ${userId || username || 'guest'} joined ${queueName} matchmaking queue (${language}, MMR: ${mmr}) - Queue size: ${matchmakingQueue.getQueueSizeFor(language, queueName)}`);
     
     // Chercher un match (optimisé avec buckets)
     findMatch(socket.id, language, mmr, ranked);
@@ -833,7 +834,7 @@ io.on('connection', (socket) => {
     const left = matchmakingQueue.removePlayer(socket.id);
     if (left) {
       socket.emit('matchmaking-left');
-      console.log(`Player left matchmaking queue: ${socket.id} - Queue size: ${matchmakingQueue.getQueueSize()}`);
+      logger.debug(`Player left matchmaking queue: ${socket.id} - Queue size: ${matchmakingQueue.getQueueSize()}`);
     }
   });
 
@@ -1014,7 +1015,7 @@ io.on('connection', (socket) => {
       status: competition.status
     });
     
-    console.log(`Player ${username || socket.id} joined competition ${competitionId}`);
+    logger.debug(`Player ${username || socket.id} joined competition ${competitionId}`);
   });
 
   // Créer une nouvelle compétition
@@ -1059,7 +1060,7 @@ io.on('connection', (socket) => {
       players: competition.players,
       status: competition.status
     });
-    console.log(`Competition created: ${competitionId} (${language}, max: ${maxPlayers}) by ${username || socket.id}`);
+    logger.debug(`Competition created: ${competitionId} (${language}, max: ${maxPlayers}) by ${username || socket.id}`);
   });
 
   // Démarrer une compétition (automatique après un délai ou manuel)
@@ -1090,7 +1091,7 @@ io.on('connection', (socket) => {
           text: competition.text
         });
         
-        console.log(`Competition ${competitionId} started with ${competition.players.length} players`);
+        logger.debug(`Competition ${competitionId} started with ${competition.players.length} players`);
       }
     }, 1000);
   });
@@ -1249,7 +1250,7 @@ io.on('connection', (socket) => {
     const wasInQueue = matchmakingQueue.hasPlayer(socket.id);
     if (wasInQueue) {
       matchmakingQueue.removePlayer(socket.id);
-      console.log(`Player ${socket.id} removed from matchmaking queue - Queue size: ${matchmakingQueue.getQueueSize()}`);
+      logger.debug(`Player ${socket.id} removed from matchmaking queue - Queue size: ${matchmakingQueue.getQueueSize()}`);
     }
     
     const playerData = players.get(socket.id);
@@ -1279,10 +1280,10 @@ io.on('connection', (socket) => {
             // Si aucun joueur n'est connecté, supprimer la room
             if (connectedPlayers.length === 0) {
               rooms.delete(playerData.roomId);
-              console.log(`Finished room ${playerData.roomId} deleted - all players disconnected`);
+              logger.debug(`Finished room ${playerData.roomId} deleted - all players disconnected`);
               return; // Sortir tôt car la room n'existe plus
             } else {
-              console.log(`Player disconnected from finished room ${playerData.roomId}, ${connectedPlayers.length} player(s) still connected`);
+              logger.debug(`Player disconnected from finished room ${playerData.roomId}, ${connectedPlayers.length} player(s) still connected`);
             }
           }
           
@@ -1300,7 +1301,7 @@ io.on('connection', (socket) => {
             } else {
               // Suppression immédiate pour les rooms normales (pas finished)
               rooms.delete(playerData.roomId);
-              console.log(`Normal room ${playerData.roomId} deleted (empty and not finished)`);
+              logger.debug(`Normal room ${playerData.roomId} deleted (empty and not finished)`);
             }
           } else {
             // Notifier les autres joueurs seulement si la partie n'est pas terminée
@@ -1330,7 +1331,7 @@ io.on('connection', (socket) => {
       players.delete(socket.id);
     }
     
-    console.log('User disconnected:', socket.id);
+    logger.debug('User disconnected:', socket.id);
   });
 });
 
@@ -1349,22 +1350,22 @@ try {
   httpServer.listen(PORT, HOST, () => {
     console.log(`✅ Serveur démarré sur ${HOST}:${PORT}`);
   }).on('error', (error) => {
-    console.error('❌ Erreur lors du démarrage du serveur:', error);
-    console.error('Code erreur:', error.code);
-    console.error('Message:', error.message);
+    logger.error('❌ Erreur lors du démarrage du serveur:', error);
+    logger.error('Code erreur:', error.code);
+    logger.error('Message:', error.message);
     if (error.code === 'EADDRINUSE') {
-      console.error(`⚠️ Le port ${PORT} est déjà utilisé. Vérifiez votre configuration Plesk.`);
+      logger.error(`⚠️ Le port ${PORT} est déjà utilisé. Vérifiez votre configuration Plesk.`);
     } else if (error.code === 'EACCES') {
-      console.error(`⚠️ Permission refusée pour le port ${PORT}. Vérifiez les permissions.`);
+      logger.error(`⚠️ Permission refusée pour le port ${PORT}. Vérifiez les permissions.`);
     }
     process.exit(1);
   });
   
   // Gérer les erreurs du serveur HTTP après démarrage
   httpServer.on('error', (error) => {
-    console.error('❌ Erreur HTTP serveur:', error);
-    console.error('Code:', error.code);
-    console.error('Stack:', error.stack);
+    logger.error('❌ Erreur HTTP serveur:', error);
+    logger.error('Code:', error.code);
+    logger.error('Stack:', error.stack);
     // Ne pas faire planter le serveur, juste logger
   });
   
@@ -1373,19 +1374,19 @@ try {
     console.error('❌ Erreur client HTTP:', error.message);
     // Ne pas logger toutes les erreurs client (peut être très verbeux)
     if (error.code !== 'ECONNRESET' && error.code !== 'EPIPE') {
-      console.error('Code:', error.code);
+      logger.error('Code:', error.code);
     }
     socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
   });
   
 // Logger les erreurs de requête
 app.use((err, req, res, next) => {
-  console.error('❌ Erreur:', err.message);
+  logger.error('❌ Erreur:', err.message);
   res.status(500).json({ error: 'Internal server error' });
 });
 
 } catch (error) {
-  console.error('❌ Erreur fatale lors de la configuration du serveur:', error);
-  console.error('Stack:', error.stack);
+  logger.error('❌ Erreur fatale lors de la configuration du serveur:', error);
+  logger.error('Stack:', error.stack);
   process.exit(1);
 }

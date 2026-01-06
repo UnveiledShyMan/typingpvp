@@ -56,6 +56,7 @@ export default function Header() {
                 src={user.avatar}
                 alt={user.username}
                 className="w-10 h-10 rounded-full object-cover border-2 border-border-secondary/30"
+                loading="lazy"
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-accent-primary/20 border-2 border-border-secondary/30 flex items-center justify-center text-accent-primary font-bold">
