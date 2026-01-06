@@ -74,7 +74,7 @@ export default function Header() {
               />
               <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2">
                 <Link
-                  to={`/profile/${user.id}`}
+                  to={`/profile/${user.username || user.id}`}
                   className="block px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
                   onClick={() => setShowMenu(false)}
                 >

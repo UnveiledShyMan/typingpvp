@@ -10,24 +10,33 @@ import SEOHead from '../components/SEOHead'
 import logger from '../utils/logger'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
-export default function Profile({ userId: currentUserId }) {
-  const { id } = useParams();
-  const userId = id || currentUserId;
+export default function Profile({ userId: currentUserId, username: currentUsername }) {
+  const { username } = useParams(); // Utiliser username au lieu de id
+  const identifier = username || currentUsername || currentUserId; // Priorité: username > currentUsername > currentUserId
   const navigate = useNavigate();
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
-  // Valider que userId est présent et valide
+  // Valider que identifier est présent et valide
   useEffect(() => {
-    if (!userId || userId === 'undefined' || userId === 'null') {
-      toast.error('Invalid user ID');
+    if (!identifier || identifier === 'undefined' || identifier === 'null') {
+      toast.error('Invalid user identifier');
       navigate('/');
       return;
     }
-  }, [userId, navigate, toast]);
+  }, [identifier, navigate, toast]);
   
-  // Utiliser React Query pour le cache du profil
-  const { data: user, isLoading: loading, refetch: refetchProfile } = useProfile(userId);
+  // Utiliser React Query pour le cache du profil (supporte maintenant username)
+  const { data: user, isLoading: loading, refetch: refetchProfile, error } = useProfile(identifier);
+  
+  // Si on a chargé un profil avec un ID mais qu'on est sur une route username, 
+  // mettre à jour l'URL pour utiliser le username
+  useEffect(() => {
+    if (user && user.username && identifier && identifier !== user.username && /^\d+$/.test(String(identifier))) {
+      // Rediriger vers l'URL avec username pour une URL propre
+      navigate(`/profile/${user.username}`, { replace: true });
+    }
+  }, [user, identifier, navigate]);
   const updateProfileMutation = useUpdateProfile();
   
   const [selectedLang, setSelectedLang] = useState('en');
@@ -76,15 +85,16 @@ export default function Profile({ userId: currentUserId }) {
       
       // Récupérer l'historique des matchs réels
       setCurrentPage(1); // Reset à la page 1
-      fetchUserMatches(userId, 1, false);
+      // Utiliser user.id pour récupérer les matchs (toujours utiliser ID pour l'API)
+      fetchUserMatches(user.id, 1, false);
     }
-  }, [user, userId]);
+  }, [user, identifier]);
 
   useEffect(() => {
     // Écouter les événements de mise à jour ELO après une battle
     const handleEloUpdate = () => {
       // Rafraîchir le profil si c'est le profil de l'utilisateur courant
-      if (currentUserFromContext && currentUserFromContext.id === userId) {
+      if (currentUserFromContext && user && currentUserFromContext.id === user.id) {
         refetchProfile();
       }
     };
@@ -94,7 +104,7 @@ export default function Profile({ userId: currentUserId }) {
     return () => {
       window.removeEventListener('elo-updated', handleEloUpdate);
     };
-  }, [userId, currentUserFromContext, refetchProfile]);
+  }, [user, currentUserFromContext, refetchProfile]);
 
   const fetchUserMatches = async (targetUserId, page = 1, append = false) => {
     try {
@@ -130,12 +140,12 @@ export default function Profile({ userId: currentUserId }) {
   
   // Charger plus de matchs (pagination)
   const loadMoreMatches = useCallback(() => {
-    if (!loadingMatches && hasMoreMatches) {
+    if (!loadingMatches && hasMoreMatches && user) {
       const nextPage = currentPage + 1;
       setCurrentPage(nextPage);
-      fetchUserMatches(userId, nextPage, false);
+      fetchUserMatches(user.id, nextPage, false);
     }
-  }, [currentPage, hasMoreMatches, loadingMatches, userId]);
+  }, [currentPage, hasMoreMatches, loadingMatches, user]);
 
   const handleSave = async () => {
     if (!currentUserFromContext) {
@@ -145,8 +155,12 @@ export default function Profile({ userId: currentUserId }) {
 
     setSaving(true);
     try {
+      if (!user || !user.id) {
+        toast.error('User not found');
+        return;
+      }
       await updateProfileMutation.mutateAsync({
-        userId,
+        userId: user.id,
         profileData: editForm
       });
       setIsEditing(false);
@@ -178,7 +192,11 @@ export default function Profile({ userId: currentUserId }) {
 
     setUploadingAvatar(true);
     try {
-      const response = await profileService.uploadAvatar(userId, file);
+      if (!user || !user.id) {
+        toast.error('User not found');
+        return;
+      }
+      const response = await profileService.uploadAvatar(user.id, file);
       // Mettre à jour l'avatar dans le formulaire d'édition
       setEditForm({ ...editForm, avatar: response.avatar });
       toast.success('Photo de profil uploadée avec succès !');
@@ -218,7 +236,7 @@ export default function Profile({ userId: currentUserId }) {
     }
   };
 
-  const isOwnProfile = currentUserFromContext && currentUserFromContext.id === userId;
+  const isOwnProfile = currentUserFromContext && user && currentUserFromContext.id === user.id;
 
   if (loading) {
     return (

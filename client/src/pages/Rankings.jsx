@@ -97,7 +97,7 @@ export default function Rankings() {
                       key={player.id}
                       className="hover:bg-bg-primary/30 transition-all duration-200 cursor-pointer group"
                       onClick={() => {
-                        navigate(`/profile/${player.id}`);
+                        navigate(`/profile/${player.username}`);
                       }}
                     >
                       <td className="px-6 py-5 text-text-primary font-bold group-hover:text-accent-primary transition-colors" style={{ fontFamily: 'JetBrains Mono' }}>
@@ -110,7 +110,7 @@ export default function Rankings() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation(); // Empêcher le clic sur la ligne
-                                navigate(`/profile/${player.id}`);
+                                navigate(`/profile/${player.username}`);
                               }}
                               className="w-12 h-12 rounded-full object-cover ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer overflow-hidden"
                               title="View profile"
@@ -126,7 +126,7 @@ export default function Rankings() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation(); // Empêcher le clic sur la ligne
-                                navigate(`/profile/${player.id}`);
+                                navigate(`/profile/${player.username}`);
                               }}
                               className="w-12 h-12 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold text-lg ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer"
                               title="View profile"
@@ -137,7 +137,7 @@ export default function Rankings() {
                           <UserTooltip userId={player.id} username={player.username}>
                             <span 
                               className="text-text-primary font-semibold group-hover:text-accent-primary transition-colors cursor-pointer"
-                              onClick={() => navigate(`/profile/${player.id}`)}
+                              onClick={() => navigate(`/profile/${player.username}`)}
                             >
                               {player.username}
                             </span>

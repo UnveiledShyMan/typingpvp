@@ -458,7 +458,7 @@ export default function CompetitionRoom() {
                               {player.userId && player.name !== username ? (
                                 <UserTooltip userId={player.userId} username={player.name}>
                                   <button
-                                    onClick={() => navigateToProfile(navigate, player.userId)}
+                                    onClick={() => navigateToProfile(navigate, player.userId, player.name)}
                                     className="text-sm font-semibold text-text-primary hover:text-accent-primary transition-colors cursor-pointer"
                                     title="View profile"
                                   >

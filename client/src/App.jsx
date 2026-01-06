@@ -40,7 +40,8 @@ function App() {
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/legal" element={<LegalNotice />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/profile/:id" element={<Profile />} />
+                  <Route path="/profile/:username" element={<Profile />} />
+                  {/* Route de compatibilité pour les anciens liens avec ID */}
                   <Route path="/user/:username" element={<UserProfile />} />
                 </Routes>
               </Suspense>

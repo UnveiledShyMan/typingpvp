@@ -1110,17 +1110,23 @@ export default function BattleRoom() {
                 </div>
                 
                 {/* Stats de l'adversaire */}
-                {opponent && (
+                {opponent && opponent.name && (
                   <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-5 border border-border-secondary/30">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-text-secondary/50"></div>
                         <span className="text-text-primary text-sm font-semibold">{opponent.name}</span>
                       </div>
-                      {/* Lien vers le profil de l'adversaire */}
+                      {/* Lien vers le profil de l'adversaire - Vérifications de sécurité */}
                       {isValidUserId(opponent.userId) && (
                         <button
-                          onClick={() => navigateToProfile(navigate, opponent.userId)}
+                          onClick={() => {
+                            try {
+                              navigateToProfile(navigate, opponent.userId, opponent.name);
+                            } catch (error) {
+                              console.error('Error navigating to profile:', error);
+                            }
+                          }}
                           className="text-xs px-2 py-1 bg-bg-primary/50 hover:bg-accent-primary/20 text-accent-primary hover:text-accent-primary rounded-full font-medium transition-colors border border-border-secondary/30 hover:border-accent-primary/30"
                           title="View opponent profile"
                         >
@@ -1225,7 +1231,7 @@ export default function BattleRoom() {
                           {/* Avatar cliquable si le joueur a un userId - Design amélioré */}
                           {isValidUserId(player?.userId) ? (
                             <button
-                              onClick={() => navigateToProfile(navigate, player.userId)}
+                              onClick={() => navigateToProfile(navigate, player.userId, msg.username)}
                               className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110 ${
                                 isMe 
                                   ? 'bg-accent-primary/30 text-accent-primary border-2 border-accent-primary/40' 
@@ -1246,11 +1252,17 @@ export default function BattleRoom() {
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 mb-1.5">
-                              {/* Nom d'utilisateur cliquable avec tooltip si le joueur a un userId */}
-                              {isValidUserId(player?.userId) && !isMe ? (
+                              {/* Nom d'utilisateur cliquable avec tooltip si le joueur a un userId - Vérifications de sécurité */}
+                              {player && isValidUserId(player.userId) && !isMe && msg.username ? (
                                 <UserTooltip userId={player.userId} username={msg.username}>
                                   <button
-                                    onClick={() => navigateToProfile(navigate, player.userId)}
+                                    onClick={() => {
+                                      try {
+                                        navigateToProfile(navigate, player.userId, msg.username);
+                                      } catch (error) {
+                                        console.error('Error navigating to profile:', error);
+                                      }
+                                    }}
                                     className={`text-sm font-semibold hover:text-accent-primary transition-colors cursor-pointer ${
                                       isMe ? 'text-accent-primary' : 'text-text-primary'
                                     }`}

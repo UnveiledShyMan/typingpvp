@@ -67,7 +67,7 @@ export default function UserSearch({ onClose }) {
   
   // Gérer la sélection d'un utilisateur
   const handleSelectUser = useCallback((user) => {
-    navigate(`/profile/${user.id}`);
+    navigate(`/profile/${user.username || user.id}`);
     setQuery('');
     setShowResults(false);
     if (onClose) onClose();

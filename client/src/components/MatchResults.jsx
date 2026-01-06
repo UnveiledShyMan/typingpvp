@@ -173,7 +173,7 @@ function MatchResults({
               </div>
               {isValidUserId(opponent.userId) && (
                 <button
-                  onClick={() => navigateToProfile(navigate, opponent.userId)}
+                  onClick={() => navigateToProfile(navigate, opponent.userId, opponent.name)}
                   className="text-accent-primary hover:text-accent-hover text-sm font-medium transition-colors flex items-center gap-1"
                   title="View profile"
                 >
