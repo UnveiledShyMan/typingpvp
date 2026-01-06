@@ -68,6 +68,8 @@ const socketCorsConfig = {
 
 const io = new Server(httpServer, {
   cors: socketCorsConfig,
+  // Path explicite pour Socket.io - CRITIQUE pour éviter les problèmes de routage
+  path: '/socket.io/',
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
@@ -85,7 +87,16 @@ const io = new Server(httpServer, {
   compression: false,
   // Options supplémentaires pour la stabilité du polling
   httpCompression: false // Désactiver la compression HTTP pour polling
-  // Note: transports: ['polling'] est déjà défini plus haut
+});
+
+// Middleware pour rejeter explicitement les transports non-polling AVANT la négociation
+// Cela évite l'erreur "Transport unknown" en rejetant immédiatement les transports non autorisés
+io.engine.on('initial_headers', (headers, req) => {
+  const requestedTransport = req._query?.transport;
+  if (requestedTransport && requestedTransport !== 'polling') {
+    console.warn('⚠️ Transport non autorisé demandé lors de la négociation:', requestedTransport);
+    console.warn('⚠️ Rejet de la connexion - seul polling est autorisé');
+  }
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -245,6 +256,10 @@ app.use('/api/discord', discordRoutes);
 // IMPORTANT: Cette route doit être AVANT la route catch-all
 app.get('/api/socket-health', (req, res) => {
   const socketCount = io.sockets.sockets.size;
+  // Récupérer le port réel utilisé par le serveur (peut être différent de process.env.PORT)
+  const actualPort = httpServer.address()?.port || process.env.PORT || 3001;
+  const envPort = process.env.PORT || 'not set';
+  
   res.json({
     status: 'ok',
     socketIo: {
@@ -260,7 +275,20 @@ app.get('/api/socket-health', (req, res) => {
     server: {
       nodeEnv: process.env.NODE_ENV || 'development',
       clientUrl: process.env.CLIENT_URL || 'not set',
-      port: process.env.PORT || 3001
+      // Port réel utilisé par le serveur (celui à utiliser dans ProxyPass)
+      actualPort: actualPort,
+      // Port de la variable d'environnement (peut être différent)
+      envPort: envPort,
+      // Informations importantes pour la configuration du reverse proxy
+      proxyConfig: {
+        note: 'Utilisez actualPort (pas envPort) dans la configuration Apache/Plesk pour ProxyPass',
+        example: `ProxyPass /socket.io/ http://localhost:${actualPort}/socket.io/`,
+        warning: actualPort !== parseInt(envPort) && envPort !== 'not set' ? 
+          `⚠️ Le port réel (${actualPort}) est différent du port dans les variables d'environnement (${envPort}). Utilisez actualPort.` :
+          null,
+        // Note importante sur l'accessibilité
+        accessibilityNote: 'Le port Node.js n\'est généralement PAS accessible publiquement. Utilisez le reverse proxy Apache/Plesk pour router les requêtes depuis https://typingpvp.com vers localhost:PORT.'
+      }
     }
   });
 });
@@ -360,17 +388,33 @@ io.engine.on('connection_error', (err) => {
   console.error('❌ Erreur de connexion Socket.io:', err.message);
   console.error('Code:', err.code);
   if (err.req) {
+    const requestedTransport = err.req._query?.transport || 'non spécifié';
     console.error('URL:', err.req.url);
     console.error('SID:', err.req._query?.sid);
-    console.error('Transport demandé:', err.req._query?.transport);
+    console.error('Transport demandé:', requestedTransport);
     console.error('Origin:', err.req.headers?.origin);
     console.error('Host:', err.req.headers?.host);
+    console.error('Method:', err.req.method);
     
     // Gérer spécifiquement l'erreur "Transport unknown"
-    if (err.message && err.message.includes('Transport unknown')) {
+    if (err.message && (err.message.includes('Transport unknown') || err.message.includes('transport unknown'))) {
       console.error('⚠️ Transport inconnu détecté - Le client essaie d\'utiliser un transport non autorisé');
       console.error('⚠️ Transports autorisés: polling uniquement');
-      console.error('⚠️ Transport demandé:', err.req._query?.transport || 'non spécifié');
+      console.error('⚠️ Transport demandé:', requestedTransport);
+      
+      // Si le transport demandé n'est pas polling, c'est le problème
+      if (requestedTransport !== 'polling' && requestedTransport !== 'non spécifié') {
+        console.error('❌ ERREUR: Le client demande un transport non autorisé:', requestedTransport);
+        console.error('❌ SOLUTION: Le client doit être configuré pour utiliser uniquement polling');
+      } else if (requestedTransport === 'non spécifié') {
+        console.error('⚠️ Le transport n\'est pas spécifié dans la requête - peut être un problème de négociation');
+      }
+    }
+    
+    // Gérer spécifiquement les erreurs de polling
+    if (requestedTransport === 'polling') {
+      console.error('⚠️ Erreur spécifique au polling - Vérifier la configuration du reverse proxy');
+      console.error('⚠️ Le reverse proxy (Plesk/Apache) pourrait bloquer ou timeout les requêtes polling');
     }
   }
   if (err.context) {
@@ -392,14 +436,28 @@ io.engine.on('connection', (req) => {
 
 // Logger toutes les requêtes Socket.io pour le débogage
 io.engine.on('request', (req, res) => {
-  // Logger seulement les erreurs pour éviter trop de logs
+  // Logger toutes les requêtes polling pour diagnostiquer les problèmes
+  if (req._query?.transport === 'polling') {
+    console.log('📡 Requête polling Socket.io:', {
+      method: req.method,
+      url: req.url,
+      sid: req._query?.sid || 'new',
+      transport: req._query?.transport,
+      origin: req.headers?.origin,
+      host: req.headers?.host
+    });
+  }
+  
+  // Logger les erreurs
   if (res.statusCode >= 400) {
     console.error('❌ Requête Socket.io échouée:', {
       method: req.method,
       url: req.url,
       statusCode: res.statusCode,
       origin: req.headers?.origin,
-      host: req.headers?.host
+      host: req.headers?.host,
+      transport: req._query?.transport,
+      sid: req._query?.sid
     });
   }
 });
@@ -1521,15 +1579,20 @@ console.log(`📍 Port: ${PORT}, Host: ${HOST}`);
 // Démarrer le serveur avec gestion d'erreur
 try {
   httpServer.listen(PORT, HOST, () => {
-    console.log(`✅ Serveur démarré avec succès sur ${HOST}:${PORT}`);
+    // Récupérer le port réel (peut être différent si PORT=0 pour port aléatoire)
+    const actualPort = httpServer.address()?.port || PORT;
+    console.log(`✅ Serveur démarré avec succès sur ${HOST}:${actualPort}`);
     console.log(`📡 Socket.io configuré avec polling uniquement (compatible Plesk)`);
     console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log(`📦 SERVE_CLIENT: ${process.env.SERVE_CLIENT || 'false'}`);
     console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🌍 Origines Socket.io autorisées:`, allowedSocketOrigins);
     console.log(`✅ Le serveur est prêt à accepter les connexions`);
-    console.log(`🔍 Test Socket.io: http://${HOST}:${PORT}/api/socket-test`);
-    console.log(`🔍 Santé Socket.io: http://${HOST}:${PORT}/api/socket-health`);
+    console.log(`🔍 Test Socket.io: http://${HOST}:${actualPort}/api/socket-test`);
+    console.log(`🔍 Santé Socket.io: http://${HOST}:${actualPort}/api/socket-health`);
+    console.log(`⚠️ IMPORTANT pour configuration reverse proxy:`);
+    console.log(`   Utilisez le port ${actualPort} dans votre configuration Apache/Plesk`);
+    console.log(`   Exemple: ProxyPass /socket.io/ http://localhost:${actualPort}/socket.io/`);
   }).on('error', (error) => {
     console.error('❌ Erreur lors du démarrage du serveur:', error);
     console.error('Code erreur:', error.code);
