@@ -316,51 +316,6 @@ async function startServer() {
   }
 }
 
-/**
- * Démarre le bot Discord
- */
-async function startDiscordBot() {
-  try {
-    // Vérifier que le token Discord est défini
-    if (!process.env.DISCORD_BOT_TOKEN) {
-      console.log('⚠️ DISCORD_BOT_TOKEN non défini - Le bot Discord ne démarrera pas');
-      console.log('⚠️ Le serveur continuera de fonctionner sans le bot Discord');
-      return false;
-    }
-    
-    // Vérifier que les dépendances du bot Discord sont installées
-    const discordBotDir = join(__dirname, 'server', 'discord-bot');
-    const discordBotNodeModules = join(discordBotDir, 'node_modules');
-    
-    if (!existsSync(discordBotNodeModules)) {
-      console.log('Installation des dépendances du bot Discord...');
-      try {
-        const { stdout, stderr } = await execAsync('npm install', { 
-          cwd: discordBotDir,
-          shell: true,
-          maxBuffer: 10 * 1024 * 1024 // 10MB buffer
-        });
-        if (stdout) console.log(stdout);
-        if (stderr) console.error('npm install stderr:', stderr);
-        console.log('✅ Dépendances du bot Discord installées');
-      } catch (error) {
-        console.error('❌ Erreur lors de l\'installation des dépendances du bot Discord:', error.message);
-        console.error('⚠️ Le bot Discord ne démarrera pas, mais le serveur continuera');
-        return false;
-      }
-    }
-    
-    // Démarrer le bot Discord
-    console.log('🤖 Démarrage du bot Discord...');
-    await import('./server/discord-bot/index.js');
-    console.log('✅ Bot Discord démarré');
-    return true;
-  } catch (error) {
-    console.error('❌ Erreur lors du démarrage du bot Discord:', error.message);
-    console.error('⚠️ Le serveur continuera de fonctionner sans le bot Discord');
-    return false;
-  }
-}
 
 /**
  * Fonction principale
@@ -422,13 +377,7 @@ async function main() {
       }
     }
     
-    // 4. Démarrer le bot Discord (en parallèle, ne bloque pas le démarrage du serveur)
-    startDiscordBot().catch(error => {
-      console.error('❌ Erreur lors du démarrage du bot Discord:', error);
-      console.error('⚠️ Le serveur continuera de fonctionner sans le bot Discord');
-    });
-    
-    // 5. Démarrer le serveur
+    // 4. Démarrer le serveur
     await startServer();
     
   } catch (error) {

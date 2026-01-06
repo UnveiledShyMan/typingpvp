@@ -29,21 +29,25 @@ const httpServer = createServer(app);
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 
-// Configuration Socket.io - version simple qui fonctionnait (3404b51)
+// Configuration Socket.io - optimisée pour Plesk qui tue les connexions long-running
+// Plesk tue automatiquement les connexions long-running, donc on utilise des timeouts très courts
+// et un polling plus fréquent pour éviter que Plesk ne tue les connexions
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.NODE_ENV === 'production' ? true : (process.env.CLIENT_URL || "http://localhost:5173"),
     methods: ["GET", "POST"],
     credentials: true
   },
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  // Timeouts plus courts pour éviter que Plesk tue les connexions
-  pingTimeout: 20000, // 20 secondes
-  pingInterval: 10000, // 10 secondes
+  // Timeouts très courts pour éviter que Plesk tue les connexions (Plesk vérifie et tue les connexions long-running)
+  pingTimeout: 10000, // 10 secondes - très court pour éviter que Plesk tue la connexion
+  pingInterval: 5000, // 5 secondes - polling plus fréquent pour maintenir la connexion active
   // Permettre les reconnexions rapides
-  connectTimeout: 20000 // 20 secondes
+  connectTimeout: 10000, // 10 secondes - timeout court pour la connexion initiale
+  // Désactiver la compression HTTP qui peut ralentir les réponses
+  httpCompression: false
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -79,13 +83,15 @@ app.use(express.json());
 
 // Middleware pour logger les requêtes API uniquement
 // IMPORTANT: Ignorer complètement les requêtes Socket.io - Socket.io les gère directement
+// Ne pas ajouter de middleware qui pourrait ralentir les requêtes Socket.io
 app.use((req, res, next) => {
-  // Ignorer les requêtes Socket.io - laisser Socket.io les gérer directement
+  // Ignorer complètement les requêtes Socket.io - laisser Socket.io les gérer directement
+  // Ne pas logger, ne pas modifier - juste passer immédiatement
   if (req.path.startsWith('/socket.io/')) {
-    return next(); // Passer immédiatement sans modification
+    return next(); // Passer immédiatement sans aucune modification
   }
   
-  // Logger les requêtes API seulement
+  // Logger les requêtes API seulement (pas Socket.io)
   if (req.path.startsWith('/api')) {
     console.log(`📡 ${req.method} ${req.path}`, {
       origin: req.headers.origin,
@@ -283,18 +289,31 @@ app.get('/api/socket-test', (req, res) => {
   });
 });
 
-// Gestion des erreurs Socket.io - logs simplifiés
+// Gestion des erreurs Socket.io - logs détaillés pour diagnostic
 io.engine.on('connection_error', (err) => {
   console.error('❌ Erreur Socket.io:', err.message);
+  console.error('Code:', err.code);
   if (err.req) {
     console.error('Transport:', err.req._query?.transport || 'non spécifié');
+    console.error('Origin:', err.req.headers?.origin);
+    console.error('URL:', err.req.url);
   }
 });
 
-// Logger détaillé pour diagnostiquer les erreurs 400
+// Logger toutes les requêtes Socket.io pour diagnostic (production)
 io.engine.on('request', (req, res) => {
+  // Logger toutes les requêtes en production pour voir si elles arrivent au serveur
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`🔌 Socket.io ${req.method} ${req.url}`, {
+      origin: req.headers.origin,
+      transport: req.query?.transport,
+      sid: req.query?.sid || 'new'
+    });
+  }
+  
+  // Logger les erreurs
   if (res.statusCode >= 400) {
-    console.error('❌ Erreur Socket.io:', req.method, req.url, res.statusCode);
+    console.error(`❌ Erreur Socket.io ${req.method} ${req.url}:`, res.statusCode);
     console.error('Headers:', {
       origin: req.headers.origin,
       host: req.headers.host,
@@ -331,13 +350,14 @@ io.on('connection', (socket) => {
   console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
   
   // Heartbeat pour maintenir la connexion active
+  // Intervalle réduit à 5 secondes pour correspondre à pingInterval et éviter que Plesk tue la connexion
   const heartbeatInterval = setInterval(() => {
     if (socket.connected) {
       socket.emit('ping', { timestamp: Date.now() });
     } else {
       clearInterval(heartbeatInterval);
     }
-  }, 10000); // Ping toutes les 10 secondes
+  }, 5000); // Ping toutes les 5 secondes (compatible avec pingInterval de 5s)
   
   // Nettoyer l'intervalle à la déconnexion
   socket.on('disconnect', safeHandler((reason) => {
