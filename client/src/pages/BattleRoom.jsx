@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
 import ShareButtons from '../components/ShareButtons'
 import UserTooltip from '../components/UserTooltip'
+import MatchResults from '../components/MatchResults'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
 import { useUser } from '../contexts/UserContext'
@@ -312,6 +313,11 @@ export default function BattleRoom() {
         accuracy: data.accuracy,
         progress: 100
       });
+      
+      // Notification visuelle quand l'adversaire termine
+      if (gameStatus === 'playing') {
+        toast.info('Opponent finished! Complete your text to see results.', 3000);
+      }
     });
 
     socket.on('game-finished', (data) => {
@@ -700,6 +706,9 @@ export default function BattleRoom() {
         const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
         const finalAccuracy = Math.round((correctChars / text.length) * 100);
         
+        // Notification de fin
+        toast.success('You finished! Waiting for opponent...', 2000);
+        
         // Vérifier que le socket est connecté avant d'émettre
         if (socketRef.current && socketRef.current.connected) {
           socketRef.current.emit('finish-game', {
@@ -718,6 +727,37 @@ export default function BattleRoom() {
       }
     }
   }, [gameStatus, text, input, typingStartTime, errors]);
+
+  // Raccourcis clavier pour BattleRoom
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Ne pas activer les raccourcis si on est en train de taper dans un input
+      if (e.target.matches('input, textarea') || e.target.isContentEditable) {
+        return;
+      }
+      
+      // Esc : Focus sur l'input de frappe (si en attente ou en jeu)
+      if (e.key === 'Escape' && gameStatus !== 'finished') {
+        e.preventDefault();
+        if (inputRef.current && (gameStatus === 'waiting' || gameStatus === 'playing')) {
+          inputRef.current.focus();
+        }
+      }
+      
+      // R : Retour au lobby (seulement si le match est terminé)
+      if ((e.key === 'r' || e.key === 'R') && gameStatus === 'finished') {
+        e.preventDefault();
+        if (location.state?.matchmaking) {
+          navigate('/matchmaking');
+        } else {
+          navigate('/battle');
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [gameStatus, navigate, location.state]);
 
   // OPTIMISATION : Mémoriser renderText avec useMemo pour éviter de recalculer à chaque render
   // Cela améliore significativement les performances lors de la frappe
@@ -1074,125 +1114,23 @@ export default function BattleRoom() {
           )}
 
           {gameStatus === 'finished' && results && (
-            <div className="py-8">
-              {/* Titre des résultats */}
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-text-primary mb-2">Match Finished!</h2>
-                <p className="text-text-secondary text-sm">Results</p>
-              </div>
-              
-              {/* Résultats finaux - design sobre */}
-              <div className="grid md:grid-cols-2 gap-6 mb-8">
-                {players.map((player) => {
-                  const result = results[player.id];
-                  const isMe = player.name === playerName || (player.userId && player.userId === (userId || currentUser?.id));
-                  
-                  // Déterminer le gagnant : meilleur WPM, en cas d'égalité meilleure accuracy
-                  const otherPlayer = players.find(p => p.id !== player.id);
-                  const otherResult = otherPlayer ? results[otherPlayer.id] : null;
-                  const isWinner = result && otherResult && (
-                    result.wpm > otherResult.wpm ||
-                    (result.wpm === otherResult.wpm && result.accuracy > otherResult.accuracy)
-                  );
-                  
-                  const eloChange = eloChanges[player.id];
-                  
-                  return (
-                    <div
-                      key={player.id}
-                      className={`bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 border-2 transition-all ${
-                        isWinner 
-                          ? 'border-accent-primary/50 shadow-lg shadow-accent-primary/20' 
-                          : result 
-                            ? 'border-border-secondary/30' 
-                            : 'border-border-secondary/10 opacity-60'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="text-lg font-semibold text-text-primary">
-                            {isMe ? 'You' : player.name}
-                          </div>
-                          {/* Lien vers le profil si ce n'est pas moi et que l'utilisateur a un userId */}
-                          {!isMe && player.userId && (
-                            <button
-                              onClick={() => navigate(`/profile/${player.userId}`)}
-                              className="text-accent-primary hover:text-accent-hover text-sm font-medium transition-colors flex items-center gap-1"
-                              title="View profile"
-                            >
-                              <span>👤</span>
-                              <span>Profile</span>
-                            </button>
-                          )}
-                        </div>
-                        {isWinner && <span className="text-2xl">🏆</span>}
-                        {!result && <span className="text-text-secondary text-sm">Did not finish</span>}
-                      </div>
-                      
-                      {result ? (
-                        <div className="space-y-3">
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-4xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{result.wpm}</span>
-                            <span className="text-text-secondary text-sm">wpm</span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-text-secondary">
-                            <span>{result.accuracy}% accuracy</span>
-                            <span>{Math.round(result.time / 1000)}s</span>
-                          </div>
-                          {eloChange !== undefined && (
-                            <div className={`text-sm font-semibold ${eloChange >= 0 ? 'text-accent-secondary' : 'text-red-400'}`}>
-                              ELO: {eloChange >= 0 ? '+' : ''}{eloChange}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-text-secondary text-sm py-4">
-                          This player did not complete the match.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="text-center space-y-4">
-                {/* Boutons de partage pour le gagnant */}
-                {players.map((player) => {
-                  const result = results[player.id];
-                  const isMe = player.name === playerName || (player.userId && player.userId === (userId || currentUser?.id));
-                  const otherPlayer = players.find(p => p.id !== player.id);
-                  const otherResult = otherPlayer ? results[otherPlayer.id] : null;
-                  const isWinner = result && otherResult && (
-                    result.wpm > otherResult.wpm ||
-                    (result.wpm === otherResult.wpm && result.accuracy > otherResult.accuracy)
-                  );
-                  
-                  // Afficher les boutons de partage seulement pour le joueur courant s'il a gagné
-                  if (!isMe || !isWinner) return null;
-                  
-                  return (
-                    <div key={player.id} className="flex justify-center">
-                      <ShareButtons
-                        result={{
-                          wpm: result.wpm,
-                          accuracy: result.accuracy,
-                          isWinner: true,
-                          eloChange: eloChanges[player.id]
-                        }}
-                        type="battle"
-                      />
-                    </div>
-                  );
-                })}
-                
-                <button
-                  onClick={() => navigate('/')}
-                  className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-colors"
-                >
-                  New Battle
-                </button>
-              </div>
-            </div>
+            <MatchResults
+              players={players}
+              results={results}
+              eloChanges={eloChanges}
+              playerName={playerName}
+              userId={userId}
+              currentUser={currentUser}
+              onPlayAgain={() => {
+                // Relancer le matchmaking ou créer une nouvelle room
+                if (location.state?.matchmaking) {
+                  navigate('/matchmaking');
+                } else {
+                  navigate('/battle');
+                }
+              }}
+              onBackToLobby={() => navigate('/')}
+            />
           )}
             </div>
 

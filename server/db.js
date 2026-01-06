@@ -413,7 +413,8 @@ export async function getUserMatches(userId, limit = 50, type = undefined) {
       }
       const players = matchData.players || [];
       
-      // Trouver l'adversaire (autre joueur)
+      // Trouver le joueur actuel et l'adversaire
+      const currentPlayer = players.find(p => p.userId === userId);
       const opponent = players.find(p => p.userId !== userId);
       
       return {
@@ -425,7 +426,10 @@ export async function getUserMatches(userId, limit = 50, type = undefined) {
         accuracy: parseFloat(row.accuracy),
         won: row.won,
         opponent: opponent?.username || null,
-        position: row.position
+        position: row.position,
+        eloChange: currentPlayer?.eloChange || null,
+        eloBefore: currentPlayer?.eloBefore || null,
+        eloAfter: currentPlayer?.eloAfter || null
       };
     });
   } catch (error) {

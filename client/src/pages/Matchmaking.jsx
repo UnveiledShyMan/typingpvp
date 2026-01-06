@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { languages } from '../data/languages'
 import Modal from '../components/Modal'
@@ -15,11 +15,68 @@ export default function Matchmaking() {
   const [guestUsername, setGuestUsername] = useState('');
   const [showGuestWarning, setShowGuestWarning] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    // Charger la préférence depuis localStorage
+    const saved = localStorage.getItem('matchmakingSoundEnabled');
+    return saved !== null ? saved === 'true' : true; // Par défaut activé
+  });
   const socketRef = useRef(null);
   const intervalRef = useRef(null);
   const queueStartTimeRef = useRef(null);
   const navigate = useNavigate();
   const { toast } = useToastContext();
+  
+  // Fonction pour jouer le son de match trouvé
+  const playMatchFoundSound = useCallback(() => {
+    if (!soundEnabled) return;
+    
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Premier beep
+      const oscillator1 = audioContext.createOscillator();
+      const gainNode1 = audioContext.createGain();
+      
+      oscillator1.connect(gainNode1);
+      gainNode1.connect(audioContext.destination);
+      
+      oscillator1.frequency.value = 800;
+      oscillator1.type = 'sine';
+      
+      gainNode1.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      
+      oscillator1.start(audioContext.currentTime);
+      oscillator1.stop(audioContext.currentTime + 0.15);
+      
+      // Deuxième beep après un court délai
+      setTimeout(() => {
+        const oscillator2 = audioContext.createOscillator();
+        const gainNode2 = audioContext.createGain();
+        
+        oscillator2.connect(gainNode2);
+        gainNode2.connect(audioContext.destination);
+        
+        oscillator2.frequency.value = 1000;
+        oscillator2.type = 'sine';
+        
+        gainNode2.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        
+        oscillator2.start(audioContext.currentTime);
+        oscillator2.stop(audioContext.currentTime + 0.15);
+      }, 200);
+    } catch (error) {
+      console.warn('Could not play match found sound:', error);
+    }
+  }, [soundEnabled]);
+  
+  // Sauvegarder la préférence de son
+  const toggleSound = useCallback(() => {
+    const newValue = !soundEnabled;
+    setSoundEnabled(newValue);
+    localStorage.setItem('matchmakingSoundEnabled', newValue.toString());
+  }, [soundEnabled]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -257,6 +314,9 @@ export default function Matchmaking() {
         intervalRef.current = null;
       }
       
+      // Jouer le son de match trouvé
+      playMatchFoundSound();
+      
       navigate(`/battle/${data.roomId}`, { 
         state: { 
           playerName: guestUsername.trim(),
@@ -299,7 +359,32 @@ export default function Matchmaking() {
       {/* Sélection du type de match */}
       <div className="mb-6 flex-shrink-0">
         <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-          <div className="text-text-secondary text-xs mb-3 font-medium">Match Type</div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-text-secondary text-xs font-medium">Match Type</div>
+            {/* Toggle pour le son */}
+            <button
+              onClick={toggleSound}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-secondary/50 hover:bg-bg-secondary/70 transition-colors text-text-secondary hover:text-text-primary text-xs"
+              title={soundEnabled ? 'Disable match found sound' : 'Enable match found sound'}
+            >
+              {soundEnabled ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </svg>
+                  <span>Sound On</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </svg>
+                  <span>Sound Off</span>
+                </>
+              )}
+            </button>
+          </div>
           <div className="flex gap-3">
             <button
               onClick={() => {

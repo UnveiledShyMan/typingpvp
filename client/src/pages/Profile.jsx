@@ -8,6 +8,7 @@ import { useProfile, useUpdateProfile } from '../hooks/useProfile'
 import { useUser } from '../contexts/UserContext'
 import SEOHead from '../components/SEOHead'
 import logger from '../utils/logger'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 export default function Profile({ userId: currentUserId }) {
   const { id } = useParams();
@@ -40,6 +41,7 @@ export default function Profile({ userId: currentUserId }) {
   const [multiplayerMatches, setMultiplayerMatches] = useState([]);
   // Filtres pour l'historique des matchs
   const [matchFilter, setMatchFilter] = useState('all'); // 'all', 'solo', 'multiplayer'
+  const [matchLanguageFilter, setMatchLanguageFilter] = useState('all'); // 'all' ou code langue spécifique
   const [matchSort, setMatchSort] = useState('date'); // 'date', 'wpm', 'accuracy'
   const [matchSortOrder, setMatchSortOrder] = useState('desc'); // 'asc', 'desc'
 
@@ -226,6 +228,74 @@ export default function Profile({ userId: currentUserId }) {
   const winRate = user.stats.totalMatches > 0
     ? ((user.stats.wins / user.stats.totalMatches) * 100).toFixed(1)
     : 0;
+  
+  // Calculer les stats par langue à partir des matchs
+  const calculateLanguageStats = useMemo(() => {
+    if (!soloMatches.length && !multiplayerMatches.length) return null;
+    
+    const allMatches = [...soloMatches, ...multiplayerMatches];
+    const langMatches = allMatches.filter(m => m.language === selectedLang);
+    
+    if (langMatches.length === 0) return null;
+    
+    const wins = langMatches.filter(m => m.won).length;
+    const losses = langMatches.length - wins;
+    const totalWPM = langMatches.reduce((sum, m) => sum + (m.wpm || 0), 0);
+    const avgWPM = totalWPM / langMatches.length;
+    const totalAccuracy = langMatches.reduce((sum, m) => sum + (m.accuracy || 0), 0);
+    const avgAccuracy = totalAccuracy / langMatches.length;
+    const bestWPM = Math.max(...langMatches.map(m => m.wpm || 0), 0);
+    const winRate = langMatches.length > 0 ? ((wins / langMatches.length) * 100).toFixed(1) : 0;
+    
+    return {
+      totalMatches: langMatches.length,
+      wins,
+      losses,
+      avgWPM: Math.round(avgWPM),
+      avgAccuracy: avgAccuracy.toFixed(1),
+      bestWPM,
+      winRate: parseFloat(winRate)
+    };
+  }, [soloMatches, multiplayerMatches, selectedLang]);
+  
+  // Calculer la progression ELO pour le graphique
+  const eloProgressionData = useMemo(() => {
+    if (!soloMatches.length && !multiplayerMatches.length) return [];
+    
+    const allMatches = [...soloMatches, ...multiplayerMatches]
+      .filter(m => m.language === selectedLang && m.eloChange !== undefined && m.eloChange !== null)
+      .sort((a, b) => new Date(a.date) - new Date(b.date)); // Trier par date croissante
+    
+    if (allMatches.length === 0) return [];
+    
+    // Reconstruire la progression ELO en partant du MMR actuel et en remontant
+    let currentELO = user.mmr[selectedLang] || 1000;
+    const progression = [];
+    
+    // Parcourir les matchs en ordre inverse pour reconstruire l'ELO
+    for (let i = allMatches.length - 1; i >= 0; i--) {
+      const match = allMatches[i];
+      // L'ELO avant ce match = ELO actuel - changement
+      currentELO = currentELO - (match.eloChange || 0);
+      
+      progression.unshift({
+        date: new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        elo: currentELO,
+        match: i + 1
+      });
+    }
+    
+    // Ajouter le point final (ELO actuel)
+    if (progression.length > 0) {
+      progression.push({
+        date: 'Now',
+        elo: user.mmr[selectedLang] || 1000,
+        match: allMatches.length + 1
+      });
+    }
+    
+    return progression;
+  }, [soloMatches, multiplayerMatches, selectedLang, user.mmr]);
 
   const socialMedia = user.socialMedia || {
     twitter: '',
@@ -566,8 +636,8 @@ export default function Profile({ userId: currentUserId }) {
                 </div>
               </div>
 
-              {/* Language Selector */}
-              <div className="mb-4 sm:mb-6">
+              {/* Language Selector et Stats par Langue */}
+              <div className="mb-4 sm:mb-6 space-y-4">
                 <select
                   value={selectedLang}
                   onChange={(e) => setSelectedLang(e.target.value)}
@@ -579,6 +649,110 @@ export default function Profile({ userId: currentUserId }) {
                     </option>
                   ))}
                 </select>
+                
+                {/* Stats détaillées pour la langue sélectionnée */}
+                {calculateLanguageStats && (
+                  <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/30">
+                    <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+                      <span className="text-accent-primary">📊</span>
+                      Statistics for {selectedLang.toUpperCase()}
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <div className="text-text-secondary text-xs mb-1">Matches</div>
+                        <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                          {calculateLanguageStats.totalMatches}
+                        </div>
+                        <div className="text-text-muted text-xs">
+                          {calculateLanguageStats.wins}W - {calculateLanguageStats.losses}L
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-text-secondary text-xs mb-1">Win Rate</div>
+                        <div 
+                          className="text-2xl font-bold" 
+                          style={{ 
+                            fontFamily: 'JetBrains Mono',
+                            color: calculateLanguageStats.winRate >= 50 ? '#10b981' : '#f472b6'
+                          }}
+                        >
+                          {calculateLanguageStats.winRate}%
+                        </div>
+                        <div className="text-text-muted text-xs">
+                          {calculateLanguageStats.wins} wins
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-text-secondary text-xs mb-1">Avg WPM</div>
+                        <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                          {calculateLanguageStats.avgWPM}
+                        </div>
+                        <div className="text-text-muted text-xs">
+                          Best: {calculateLanguageStats.bestWPM}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-text-secondary text-xs mb-1">Avg Accuracy</div>
+                        <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                          {calculateLanguageStats.avgAccuracy}%
+                        </div>
+                        <div className="text-text-muted text-xs">
+                          Average
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Graphique de progression ELO */}
+                    {eloProgressionData.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-border-secondary/30">
+                        <h4 className="text-md font-semibold text-text-primary mb-4">ELO Progression</h4>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={eloProgressionData} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.3} />
+                              <XAxis 
+                                dataKey="date" 
+                                stroke="#646669"
+                                style={{ fontSize: '12px' }}
+                                angle={-45}
+                                textAnchor="end"
+                                height={60}
+                              />
+                              <YAxis 
+                                stroke="#646669"
+                                style={{ fontSize: '12px' }}
+                                domain={['dataMin - 50', 'dataMax + 50']}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: '#1c1c1c',
+                                  border: '1px solid #646669',
+                                  borderRadius: '8px',
+                                  color: '#e6edf3'
+                                }}
+                                formatter={(value) => [value, 'ELO']}
+                                labelStyle={{ color: '#e6edf3' }}
+                              />
+                              <Legend 
+                                wrapperStyle={{ paddingTop: '10px' }}
+                                formatter={(value) => <span style={{ color: '#e6edf3', fontSize: '12px' }}>{value}</span>}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="elo" 
+                                stroke="#2188ff" 
+                                strokeWidth={3}
+                                dot={{ fill: '#2188ff', r: 4 }}
+                                activeDot={{ r: 6, fill: '#2188ff', strokeWidth: 2, stroke: '#0d1117' }}
+                                name="ELO"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Historique des matchs - Avec filtres et tri améliorés */}
@@ -603,6 +777,20 @@ export default function Profile({ userId: currentUserId }) {
                           <option value="all">All Matches</option>
                           <option value="solo">Solo</option>
                           <option value="multiplayer">Multiplayer</option>
+                        </select>
+                        
+                        {/* Filtre par langue */}
+                        <select
+                          value={matchLanguageFilter}
+                          onChange={(e) => setMatchLanguageFilter(e.target.value)}
+                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
+                        >
+                          <option value="all">All Languages</option>
+                          {Object.keys(user.mmr || {}).map(lang => (
+                            <option key={lang} value={lang}>
+                              {lang.toUpperCase()}
+                            </option>
+                          ))}
                         </select>
                         
                         {/* Tri */}
@@ -636,6 +824,11 @@ export default function Profile({ userId: currentUserId }) {
                       }
                       if (matchFilter === 'all' || matchFilter === 'multiplayer') {
                         allMatches.push(...multiplayerMatches.map(m => ({ ...m, type: 'multiplayer' })));
+                      }
+                      
+                      // Filtrer par langue si nécessaire
+                      if (matchLanguageFilter !== 'all') {
+                        allMatches = allMatches.filter(m => m.language === matchLanguageFilter);
                       }
                       
                       // Trier les matchs

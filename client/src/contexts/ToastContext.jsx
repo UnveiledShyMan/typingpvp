@@ -8,6 +8,62 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback((message, type = 'info', duration = 4000, options = {}) => {
+    // Groupement des notifications similaires
+    // Si groupKey est fourni, on groupe les toasts avec la même clé
+    if (options.groupKey) {
+      setToasts(prev => {
+        // Chercher si un toast avec la même groupKey existe déjà
+        const existingToastIndex = prev.findIndex(t => t.groupKey === options.groupKey);
+        
+        if (existingToastIndex !== -1) {
+          // Mettre à jour le toast existant avec un compteur
+          const existingToast = prev[existingToastIndex];
+          const newCount = (existingToast.count || 1) + 1;
+          
+          // Créer une copie mise à jour
+          const updatedToasts = [...prev];
+          updatedToasts[existingToastIndex] = {
+            ...existingToast,
+            message: options.groupMessage 
+              ? options.groupMessage.replace('{count}', newCount)
+              : `${message} (${newCount}x)`,
+            count: newCount,
+            // Réinitialiser le timer si on a une durée
+            lastUpdated: Date.now()
+          };
+          
+          return updatedToasts;
+        } else {
+          // Créer un nouveau toast avec groupKey
+          const id = Date.now() + Math.random();
+          const newToast = { 
+            id, 
+            message, 
+            type, 
+            duration: options.persistent ? 0 : duration,
+            actions: options.actions || [],
+            persistent: options.persistent || false,
+            groupKey: options.groupKey,
+            count: 1,
+            lastUpdated: Date.now()
+          };
+          
+          // Retirer automatiquement après la durée spécifiée (sauf si persistent)
+          if (duration > 0 && !options.persistent) {
+            setTimeout(() => {
+              setToasts(prev => prev.filter(toast => toast.id !== id));
+            }, duration + 300);
+          }
+          
+          return [...prev, newToast];
+        }
+      });
+      
+      // Retourner l'ID du toast groupé (on ne peut pas le retourner ici car c'est asynchrone)
+      return null;
+    }
+    
+    // Comportement normal sans groupement
     const id = Date.now() + Math.random();
     const newToast = { 
       id, 

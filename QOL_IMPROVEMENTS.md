@@ -320,7 +320,7 @@ toast.withActions('Match found!', 'success', [
 **Badges proposés** :
 - 🏆 First Win
 - 🔥 Win Streak (3, 5, 10 wins)
-- ⚡ Speed Demon (100+ WPM)
+- ⚡ Speed Demon (115+ WPM)
 - 🎯 Perfect Accuracy (100% accuracy)
 - 🌍 Polyglot (ELO > 1500 dans 3+ langues)
 - 💪 100 Matches
@@ -469,34 +469,34 @@ toast.withActions('Match found!', 'success', [
 
 ## 📊 Statut d'Implémentation
 
-### ✅ Implémenté (13 améliorations)
+### ✅ Implémenté (20 améliorations - 100% !)
 1. ✅ Lien vers Profil dans les Résultats de Battle
 2. ✅ Lien vers Profil dans CompetitionRoom  
 3. ✅ Copier Room ID au Clic
 4. ✅ Lien vers Profil dans le Chat (nom + avatar cliquables)
 5. ✅ Indicateur de Connexion Socket
 6. ✅ Raccourcis Clavier pour Solo (R pour reset, Esc pour focus)
-7. ✅ Avatar Clicable Partout (rankings, chat, battle, competition)
-8. ✅ Partage de Résultats (Solo, Battle et Competition - Twitter, Copy, Share API)
-9. ✅ Recherche d'Utilisateurs (composant avec autocomplete, debounce, modal)
-10. ✅ Historique des Matchs Amélioré (filtres par type, tri par date/WPM/accuracy, ordre asc/desc)
-11. ✅ Tooltip avec Infos Rapides (intégré dans Rankings, BattleRoom et CompetitionRoom)
-12. ✅ Notifications Toast Améliorées (avec actions et notifications persistantes)
-13. ✅ Pagination pour l'Historique des Matchs (bouton "Load More" avec chargement progressif)
+7. ✅ Raccourcis Clavier pour BattleRoom (Esc pour focus, R pour retour après match)
+8. ✅ Raccourcis Clavier pour CompetitionRoom (Esc pour focus, R pour retour après match)
+9. ✅ Avatar Clicable Partout (rankings, chat, battle, competition)
+10. ✅ Partage de Résultats (Solo, Battle et Competition - Twitter, Copy, Share API)
+11. ✅ Recherche d'Utilisateurs (composant avec autocomplete, debounce, modal)
+12. ✅ Historique des Matchs Amélioré (filtres par type, tri par date/WPM/accuracy, ordre asc/desc)
+13. ✅ Tooltip avec Infos Rapides (intégré dans Rankings, BattleRoom et CompetitionRoom)
+14. ✅ Notifications Toast Améliorées (avec actions et notifications persistantes)
+15. ✅ Pagination pour l'Historique des Matchs (bouton "Load More" avec chargement progressif)
+16. ✅ Statistiques Détaillées par Langue (calculées depuis les matchs, affichées dans le profil)
+17. ✅ Graphique de Progression ELO (affiché dans les stats par langue avec recharts)
+18. ✅ Écran de Fin de Match Amélioré (composant MatchResults avec animations, comparaisons visuelles, actions)
+19. ✅ Groupement des Notifications Similaires (groupKey dans ToastContext pour grouper les toasts identiques)
+20. ✅ Son Optionnel pour les Matchs Trouvés (toggle dans Matchmaking, sauvegardé dans localStorage)
+21. ✅ Filtres par Langue dans l'Historique des Matchs (sélecteur de langue dans les filtres)
 
 ### ⏳ En Cours / Partiellement Implémenté
-- Raccourcis Clavier (Solo fait, autres pages à faire)
-- Historique des Matchs (filtres, tri et pagination fait, graphiques à faire)
-- Notifications Toast (actions faites, groupement et son à faire)
+- Aucune amélioration en cours - toutes les améliorations prioritaires sont complétées !
 
 ### 📋 À Implémenter
-- Tooltip avec Infos Rapides (intégrer dans BattleRoom, CompetitionRoom, etc.)
-- Statistiques Détaillées par Langue
-- Pagination pour l'historique des matchs
-- Graphique de progression ELO
-- Groupement des notifications similaires
-- Son optionnel pour les matchs trouvés
-- Et autres améliorations de priorité basse
+- Améliorations de priorité basse (mode sombre/clair, badges, etc.)
 
-**Statut global** : 🟢 **13/20 améliorations implémentées (65%)** - Excellent progrès ! Toutes les priorités hautes sont complétées et plus de la moitié des améliorations sont faites !
+**Statut global** : 🟢 **20/20 améliorations prioritaires implémentées (100%)** - Toutes les améliorations prioritaires sont complétées ! 🎉
 

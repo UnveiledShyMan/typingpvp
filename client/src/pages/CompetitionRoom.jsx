@@ -287,6 +287,33 @@ export default function CompetitionRoom() {
     });
   }, [text, input]);
 
+  // Raccourcis clavier pour CompetitionRoom
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Ne pas activer les raccourcis si on est en train de taper dans un input
+      if (e.target.matches('input, textarea') || e.target.isContentEditable) {
+        return;
+      }
+      
+      // Esc : Focus sur l'input de frappe (si en attente ou en jeu)
+      if (e.key === 'Escape' && gameStatus !== 'finished') {
+        e.preventDefault();
+        if (inputRef.current && (gameStatus === 'waiting' || gameStatus === 'playing')) {
+          inputRef.current.focus();
+        }
+      }
+      
+      // R : Retour aux competitions (seulement si le match est terminé)
+      if ((e.key === 'r' || e.key === 'R') && gameStatus === 'finished') {
+        e.preventDefault();
+        navigate('/competitions');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [gameStatus, navigate]);
+
   const myPosition = leaderboard.findIndex(p => p.name === username) + 1 || players.length;
 
   return (
