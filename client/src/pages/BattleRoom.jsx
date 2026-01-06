@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
@@ -49,9 +48,6 @@ export default function BattleRoom() {
   const [currentUser, setCurrentUser] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
-  // Séries temporelles pour les graphiques
-  const [myTimeSeries, setMyTimeSeries] = useState([]);
-  const [opponentTimeSeries, setOpponentTimeSeries] = useState([]);
   const progressIntervalRef = useRef(null);
   const timerIntervalRef = useRef(null); // Ref pour le timer du mode timer
   const inputRef = useRef(null);
@@ -60,10 +56,6 @@ export default function BattleRoom() {
   const chatContainerRef = useRef(null);
   const hasJoinedRoomRef = useRef(false); // Ref pour éviter de joindre plusieurs fois
   const listenersSetupRef = useRef(false); // Ref pour éviter de configurer les listeners plusieurs fois
-  const opponentUpdateTimeoutRef = useRef(null); // Ref pour throttling des mises à jour opponent
-  const lastOpponentUpdateRef = useRef(null); // Ref pour stocker la dernière mise à jour opponent
-  const myTimeSeriesUpdateTimeoutRef = useRef(null); // Ref pour throttling des mises à jour du graphique local
-  const lastMyStatsRef = useRef(null); // Ref pour stocker les dernières stats locales
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -233,8 +225,6 @@ export default function BattleRoom() {
         setPhraseDifficulty(data.difficulty);
       }
       setInput(''); // Réinitialiser l'input
-      setMyTimeSeries([]);
-      setOpponentTimeSeries([]);
       
       // Arrêter l'interval précédent s'il existe
       if (progressIntervalRef.current) {
@@ -287,13 +277,10 @@ export default function BattleRoom() {
       }
     });
 
-    // Handler optimisé pour opponent-update avec throttling pour éviter les problèmes de performance
+    // Handler pour opponent-update
     // Ce handler est appelé très fréquemment (à chaque frappe de l'adversaire)
     socket.on('opponent-update', (data) => {
-      // Stocker la dernière mise à jour (pour le throttling)
-      lastOpponentUpdateRef.current = data;
-      
-      // Mettre à jour les stats immédiatement (léger, pas de problème de performance)
+      // Mettre à jour les stats immédiatement
       // Utiliser une ref pour éviter de chercher dans players à chaque fois
       setOpponentStats({
         wpm: data.wpm,
@@ -304,61 +291,9 @@ export default function BattleRoom() {
       // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
       // Utiliser TOUJOURS le startTime de la partie pour synchroniser les deux joueurs
       if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTimeRef.current && startTimeRef.current) {
-        // Utiliser le startTime de la partie pour synchroniser les deux graphiques
         setOpponentTypingStartTime(startTimeRef.current);
         opponentTypingStartTimeRef.current = startTimeRef.current;
       }
-      
-      // Throttling : mettre à jour le graphique seulement toutes les 500ms pour éviter les problèmes de performance
-      // Les mises à jour trop fréquentes peuvent causer des lags (violation > 50ms)
-      if (opponentUpdateTimeoutRef.current) {
-        clearTimeout(opponentUpdateTimeoutRef.current);
-      }
-      
-      opponentUpdateTimeoutRef.current = setTimeout(() => {
-        const updateData = lastOpponentUpdateRef.current;
-        if (!updateData) return;
-        
-        // Ajouter aux séries temporelles pour le graphique en temps réel
-        // Utiliser le startTime de la partie pour synchroniser avec le joueur local
-        const typingStart = startTimeRef.current;
-        if (typingStart) {
-          const currentSecond = Math.floor((Date.now() - typingStart) / 1000);
-          
-          // Optimisation : utiliser requestAnimationFrame pour décaler la mise à jour du DOM
-          requestAnimationFrame(() => {
-            setOpponentTimeSeries((prev) => {
-              // Optimisation : utiliser Map pour une recherche plus rapide (O(1) au lieu de O(n))
-              const existingIndex = prev.findIndex((item) => item.second === currentSecond);
-              const newData = { 
-                second: currentSecond, 
-                wpm: updateData.wpm, 
-                accuracy: updateData.accuracy 
-              };
-              
-              if (existingIndex >= 0) {
-                // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
-                const existingData = prev[existingIndex];
-                if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
-                  // Créer un nouveau tableau seulement si nécessaire
-                  const updated = [...prev];
-                  updated[existingIndex] = newData;
-                  return updated;
-                }
-                return prev; // Pas de changement significatif, retourner la même référence
-              }
-              
-              // Ajouter un nouvel élément - optimiser le tri en insérant au bon endroit
-              const newArray = [...prev, newData];
-              // Ne trier que si nécessaire (si l'élément n'est pas déjà à la fin)
-              if (newArray.length > 1 && newData.second < prev[prev.length - 1]?.second) {
-                return newArray.sort((a, b) => a.second - b.second);
-              }
-              return newArray;
-            });
-          });
-        }
-      }, 500); // Throttling de 500ms pour réduire la charge
     });
 
     socket.on('opponent-finished', (data) => {
@@ -367,28 +302,6 @@ export default function BattleRoom() {
         accuracy: data.accuracy,
         progress: 100
       });
-      
-      // Ajouter les données finales de l'adversaire au graphique
-      // Utiliser le startTime de la partie pour calculer la seconde finale
-      const gameStartTime = startTimeRef.current;
-      if (gameStartTime && data.time) {
-        // data.time est le temps écoulé depuis le début de la partie en millisecondes
-        const finalSecond = Math.floor(data.time / 1000);
-        setOpponentTimeSeries((prev) => {
-          const existing = prev.findIndex((item) => item.second === finalSecond);
-          const newData = { 
-            second: finalSecond, 
-            wpm: data.wpm, 
-            accuracy: data.accuracy 
-          };
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = newData;
-            return updated;
-          }
-          return [...prev, newData].sort((a, b) => a.second - b.second);
-        });
-      }
     });
 
     socket.on('game-finished', (data) => {
@@ -478,11 +391,6 @@ export default function BattleRoom() {
     // Nettoyage des listeners sera fait dans le premier useEffect
     return () => {
       listenersSetupRef.current = false;
-      // Nettoyer le timeout de throttling
-      if (opponentUpdateTimeoutRef.current) {
-        clearTimeout(opponentUpdateTimeoutRef.current);
-        opponentUpdateTimeoutRef.current = null;
-      }
     };
   }, []); // Exécuter une seule fois
 
@@ -569,15 +477,6 @@ export default function BattleRoom() {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
-      }
-      // Nettoyer les timeouts de throttling
-      if (opponentUpdateTimeoutRef.current) {
-        clearTimeout(opponentUpdateTimeoutRef.current);
-        opponentUpdateTimeoutRef.current = null;
-      }
-      if (myTimeSeriesUpdateTimeoutRef.current) {
-        clearTimeout(myTimeSeriesUpdateTimeoutRef.current);
-        myTimeSeriesUpdateTimeoutRef.current = null;
       }
     };
   }, []);
@@ -709,52 +608,6 @@ export default function BattleRoom() {
         
         setMyStats({ wpm, accuracy, progress });
         
-        // Stocker les stats pour le throttling du graphique
-        lastMyStatsRef.current = { wpm, accuracy, progress };
-        
-        // Throttling : mettre à jour le graphique seulement toutes les 500ms pour éviter les problèmes de performance
-        // Les mises à jour trop fréquentes peuvent causer des lags (violation > 50ms)
-        if (myTimeSeriesUpdateTimeoutRef.current) {
-          clearTimeout(myTimeSeriesUpdateTimeoutRef.current);
-        }
-        
-        myTimeSeriesUpdateTimeoutRef.current = setTimeout(() => {
-          const stats = lastMyStatsRef.current;
-          if (!stats) return;
-          
-          // Enregistrer dans les séries temporelles pour le graphique
-          // Utiliser le startTime de la partie pour synchroniser avec l'adversaire
-          const gameStartTime = startTimeRef.current;
-          if (gameStartTime) {
-            const currentSecond = Math.floor((Date.now() - gameStartTime) / 1000);
-            
-            // Optimisation : utiliser requestAnimationFrame pour décaler la mise à jour du DOM
-            requestAnimationFrame(() => {
-              setMyTimeSeries((prev) => {
-                const existing = prev.findIndex((item) => item.second === currentSecond);
-                const newData = { second: currentSecond, wpm: stats.wpm, accuracy: stats.accuracy };
-                if (existing >= 0) {
-                  // Mettre à jour seulement si les données ont changé significativement (tolérance de 1 WPM/1%)
-                  const existingData = prev[existing];
-                  if (Math.abs(existingData.wpm - newData.wpm) > 1 || Math.abs(existingData.accuracy - newData.accuracy) > 1) {
-                    const updated = [...prev];
-                    updated[existing] = newData;
-                    return updated;
-                  }
-                  return prev; // Pas de changement significatif, retourner la même référence
-                }
-                // Ajouter un nouvel élément - optimiser le tri en insérant au bon endroit
-                const newArray = [...prev, newData];
-                // Ne trier que si nécessaire (si l'élément n'est pas déjà à la fin)
-                if (newArray.length > 1 && newData.second < prev[prev.length - 1]?.second) {
-                  return newArray.sort((a, b) => a.second - b.second);
-                }
-                return newArray;
-              });
-            });
-          }
-        }, 500); // Throttling de 500ms pour réduire la charge
-        
         // Envoyer la mise à jour au serveur (sans throttling car c'est léger)
         // Vérifier que le socket est connecté avant d'émettre
         if (socketRef.current && socketRef.current.connected) {
@@ -796,22 +649,6 @@ export default function BattleRoom() {
         const finalTime = (Date.now() - typingStartTime) / 1000 / 60;
         const finalWpm = finalTime > 0 ? Math.round(text.trim().split(/\s+/).filter(w => w.length > 0).length / finalTime) : 0;
         const finalAccuracy = Math.round(((text.length - errorCount) / text.length) * 100);
-        
-        // Ajouter les données finales au graphique (utiliser startTime pour synchroniser)
-        const gameStartTime = startTimeRef.current;
-        if (gameStartTime) {
-          const finalSecond = Math.floor((Date.now() - gameStartTime) / 1000);
-          setMyTimeSeries((prev) => {
-            const existing = prev.findIndex((item) => item.second === finalSecond);
-            const newData = { second: finalSecond, wpm: finalWpm, accuracy: finalAccuracy };
-            if (existing >= 0) {
-              const updated = [...prev];
-              updated[existing] = newData;
-              return updated;
-            }
-            return [...prev, newData].sort((a, b) => a.second - b.second);
-          });
-        }
         
         // Vérifier que le socket est connecté avant d'émettre
         if (socketRef.current && socketRef.current.connected) {
@@ -859,28 +696,6 @@ export default function BattleRoom() {
 
   const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));
   const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
-
-  // Mémoriser les données du graphique pour éviter les recalculs constants
-  const chartData = useMemo(() => {
-    if (myTimeSeries.length === 0 && opponentTimeSeries.length === 0) return [];
-    
-    const maxSecond = Math.max(
-      myTimeSeries.length > 0 ? Math.max(...myTimeSeries.map(d => d.second)) : 0,
-      opponentTimeSeries.length > 0 ? Math.max(...opponentTimeSeries.map(d => d.second)) : 0
-    );
-    
-    const data = [];
-    for (let i = 0; i <= maxSecond; i++) {
-      const myData = myTimeSeries.find(d => d.second === i);
-      const oppData = opponentTimeSeries.find(d => d.second === i);
-      data.push({
-        time: i,
-        me: myData?.wpm ?? null,
-        opponent: oppData?.wpm ?? null
-      });
-    }
-    return data;
-  }, [myTimeSeries, opponentTimeSeries]);
 
   // Écran de chargement
   if (gameStatus === 'connecting' || !playerName) {
@@ -1161,60 +976,6 @@ export default function BattleRoom() {
                 )}
               </div>
 
-              {/* Graphique de progression en temps réel */}
-              {chartData.length > 0 && (
-                <div className="mb-6 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-text-secondary text-xs mb-3 font-medium">Live Progress - Depuis le début de la partie</div>
-                  <ResponsiveContainer width="100%" height={150}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.3} />
-                      <XAxis 
-                        dataKey="time" 
-                        stroke="#646669"
-                        style={{ fontSize: '11px' }}
-                        domain={['dataMin', 'dataMax']}
-                      />
-                      <YAxis 
-                        stroke="#646669"
-                        style={{ fontSize: '11px' }}
-                        domain={[0, 'auto']}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#1e1e1e', 
-                          border: '1px solid #646669',
-                          borderRadius: '8px',
-                          color: '#e8e8e8'
-                        }}
-                        formatter={(value, name) => {
-                          if (value === null || value === undefined) return ['-', name];
-                          return [value + ' WPM', name];
-                        }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="me" 
-                        stroke="#00ff9f" 
-                        strokeWidth={2.5}
-                        dot={false}
-                        name={myPlayer?.name || 'You'}
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="opponent" 
-                        stroke="#ff6b6b" 
-                        strokeWidth={2.5}
-                        dot={false}
-                        name={opponent?.name || 'Opponent'}
-                        connectNulls={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
               <div 
                 ref={textContainerRef}
                 className="mb-6 typing-text bg-bg-primary/30 backdrop-blur-sm p-6 rounded-lg" 
@@ -1305,76 +1066,6 @@ export default function BattleRoom() {
                   );
                 })}
               </div>
-
-              {/* Graphique de fin de partie */}
-              {chartData.length > 0 && (() => {
-                // Trouver l'adversaire dans le contexte du graphique de fin de partie
-                const finishedOpponent = players.find(p => {
-                  const isMe = p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id));
-                  return !isMe;
-                });
-                const finishedMyPlayer = players.find(p => {
-                  return p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id));
-                });
-                
-                return (
-                  <div className="mb-8 bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6">
-                    <div className="text-text-primary mb-4 text-sm font-semibold">Match Performance</div>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#646669" opacity={0.2} />
-                        <XAxis 
-                          dataKey="time" 
-                          stroke="#646669"
-                          label={{ value: 'Temps depuis le début de la partie (s)', position: 'insideBottom', offset: -5, style: { fill: '#646669', fontSize: '12px' } }}
-                          domain={['dataMin', 'dataMax']}
-                        />
-                        <YAxis 
-                          stroke="#646669"
-                          label={{ value: 'WPM', angle: -90, position: 'insideLeft', style: { fill: '#646669', fontSize: '12px' } }}
-                          domain={[0, 'auto']}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#1e1e1e', 
-                            border: '1px solid #646669',
-                            borderRadius: '8px',
-                            color: '#e8e8e8'
-                          }}
-                          formatter={(value, name) => {
-                            if (value === null || value === undefined) return ['-', name === 'me' ? (finishedMyPlayer?.name || 'You') : (finishedOpponent?.name || 'Opponent')];
-                            return [value + ' WPM', name === 'me' ? (finishedMyPlayer?.name || 'You') : (finishedOpponent?.name || 'Opponent')];
-                          }}
-                        />
-                        <Legend 
-                          wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-                          iconType="line"
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="me" 
-                          stroke="#00ff9f" 
-                          strokeWidth={3}
-                          dot={false}
-                          activeDot={{ r: 5, fill: '#00ff9f' }}
-                          name={finishedMyPlayer?.name || 'You'}
-                          connectNulls={false}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="opponent" 
-                          stroke="#ff6b6b" 
-                          strokeWidth={3}
-                          dot={false}
-                          activeDot={{ r: 5, fill: '#ff6b6b' }}
-                          name={finishedOpponent?.name || 'Opponent'}
-                          connectNulls={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
-              })()}
 
               <div className="text-center">
                 <button
