@@ -6,6 +6,7 @@ import { friendsService, authService } from '../services/apiService'
 import { useDebounce } from '../hooks/useDebounce'
 import { FriendsListSkeleton } from '../components/SkeletonLoader'
 import logger from '../utils/logger'
+import { API_URL } from '../config/api.js'
 
 export default function Friends() {
   const [friends, setFriends] = useState([]);
@@ -51,7 +52,7 @@ export default function Friends() {
   };
 
   const connectSocket = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const apiUrl = API_URL;
     socketRef.current = io(apiUrl, {
       transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
       upgrade: false,
@@ -200,7 +201,7 @@ export default function Friends() {
 
     if (!socketRef.current || !socketRef.current.connected) {
       // Réconnecter le socket si nécessaire
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const apiUrl = API_URL;
       socketRef.current = io(apiUrl);
     }
 

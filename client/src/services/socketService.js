@@ -2,46 +2,8 @@
 // Gère une instance unique de socket pour éviter les connexions multiples
 import { io } from 'socket.io-client';
 
-/**
- * Détermine l'URL de l'API pour les connexions Socket.io
- * En production, si VITE_API_URL n'est pas défini, on utilise le même domaine
- * En développement, on utilise localhost:3001 par défaut
- */
-function getApiUrl() {
-  // Si VITE_API_URL est défini explicitement, l'utiliser
-  if (import.meta.env.VITE_API_URL) {
-    const url = import.meta.env.VITE_API_URL;
-    console.log('🔧 Utilisation de VITE_API_URL:', url);
-    return url;
-  }
-  
-  // En production (quand on est sur un domaine réel, pas localhost)
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    // Utiliser le même domaine que le client
-    // En production avec Plesk, le serveur backend est généralement sur le même domaine
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const port = window.location.port;
-    
-    // Construire l'URL
-    let url;
-    if (port && port !== '80' && port !== '443' && port !== '') {
-      url = `${protocol}//${hostname}:${port}`;
-    } else {
-      url = `${protocol}//${hostname}`;
-    }
-    
-    console.log('🔧 URL API détectée automatiquement (production):', url);
-    return url;
-  }
-  
-  // En développement, utiliser localhost:3001 par défaut
-  const devUrl = 'http://localhost:3001';
-  console.log('🔧 URL API (développement):', devUrl);
-  return devUrl;
-}
-
-const API_URL = getApiUrl();
+// URL API - version simple qui fonctionnait
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // Instance unique de socket (singleton)
 let socketInstance = null;
@@ -50,15 +12,13 @@ let socketInstance = null;
  * Configuration standardisée pour tous les sockets
  * Utilise polling uniquement pour compatibilité avec Plesk/Apache
  */
+// Configuration Socket.io simplifiée
 const SOCKET_CONFIG = {
-  transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-  upgrade: false, // Désactiver l'upgrade vers WebSocket
+  transports: ['polling'],
+  upgrade: false,
   reconnection: true,
-  reconnectionDelay: 2000, // Augmenter le délai initial de reconnexion
-  reconnectionDelayMax: 10000, // Délai maximum entre les tentatives
-  reconnectionAttempts: 10, // Augmenter le nombre de tentatives
-  // Ne pas forcer une nouvelle connexion par défaut
-  // forceNew sera utilisé uniquement quand nécessaire
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5
 };
 
 /**
@@ -80,18 +40,9 @@ export function getSocket(forceNew = false) {
     socketInstance = io(API_URL, {
       ...SOCKET_CONFIG,
       forceNew: forceNew,
-      // Ajouter le path explicitement pour éviter les problèmes de routage
       path: '/socket.io/',
-      // Timeouts plus longs en production pour éviter les erreurs "xhr poll error"
-      timeout: 45000, // Augmenté à 45 secondes pour correspondre au serveur
-      // Ajouter des options supplémentaires pour la stabilité
-      autoConnect: true,
-      // Forcer explicitement le transport polling dès le début pour éviter "Transport unknown"
-      // Ne pas laisser Socket.io négocier d'autres transports
-      rememberUpgrade: false, // Ne pas se souvenir des upgrades précédents
-      // Options pour améliorer la stabilité du polling
-      withCredentials: false // Désactiver les credentials pour éviter les problèmes CORS
-      // Note: transports: ['polling'] et upgrade: false sont déjà dans SOCKET_CONFIG
+      timeout: 20000,
+      autoConnect: true
     });
     
     // Ajouter des listeners pour le debugging
@@ -105,36 +56,7 @@ export function getSocket(forceNew = false) {
     });
     
     socketInstance.on('connect_error', (error) => {
-      console.error('❌ Erreur de connexion socket:', error.message);
-      console.error('URL tentée:', API_URL);
-      console.error('Type d\'erreur:', error.type);
-      // Si c'est une erreur de transport, ne pas spammer les reconnexions
-      if (error.type === 'TransportError' || error.message.includes('xhr poll error')) {
-        console.warn('⚠️ Erreur de transport détectée - la reconnexion sera tentée automatiquement');
-      }
-    });
-    
-    // Gérer spécifiquement les erreurs de transport
-    socketInstance.io.on('error', (error) => {
-      if (error.type === 'TransportError' || error.message?.includes('xhr poll error')) {
-        console.warn('⚠️ Erreur de transport polling:', error.message);
-        console.warn('⚠️ La reconnexion sera tentée automatiquement');
-      } else {
-        console.error('❌ Erreur Socket.io:', error.message);
-      }
-    });
-    
-    // Logger les tentatives de reconnexion
-    socketInstance.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`🔄 Tentative de reconnexion #${attemptNumber}`);
-    });
-    
-    socketInstance.on('reconnect', (attemptNumber) => {
-      console.log(`✅ Reconnexion réussie après ${attemptNumber} tentatives`);
-    });
-    
-    socketInstance.on('reconnect_failed', () => {
-      console.error('❌ Échec de toutes les tentatives de reconnexion');
+      console.error('❌ Erreur connexion socket:', error.message);
     });
   }
   

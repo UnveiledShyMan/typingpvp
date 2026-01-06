@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useToastContext } from '../contexts/ToastContext';
+import { API_URL } from '../config/api.js';
 
 /**
  * Composant bouton OAuth pour Google
@@ -8,7 +9,6 @@ import { useToastContext } from '../contexts/ToastContext';
 export default function OAuthButton({ onSuccess }) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToastContext();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
   const handleOAuth = () => {
     setLoading(true);

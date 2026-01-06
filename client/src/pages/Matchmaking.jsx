@@ -5,6 +5,7 @@ import { languages } from '../data/languages'
 import Modal from '../components/Modal'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
+import { API_URL } from '../config/api.js'
 
 export default function Matchmaking() {
   const [selectedLang, setSelectedLang] = useState('en');
@@ -60,7 +61,7 @@ export default function Matchmaking() {
       socketRef.current.disconnect();
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const apiUrl = API_URL;
     socketRef.current = io(apiUrl, {
       transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
       upgrade: false,
@@ -166,7 +167,7 @@ export default function Matchmaking() {
       socketRef.current.disconnect();
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const apiUrl = API_URL;
     socketRef.current = io(apiUrl, {
       transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
       upgrade: false,

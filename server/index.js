@@ -29,74 +29,21 @@ const httpServer = createServer(app);
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 
-// Configuration CORS pour Socket.io - accepter les connexions depuis le même domaine en production
-const allowedSocketOrigins = [
-  process.env.CLIENT_URL,
-  'https://typingpvp.com',
-  'http://localhost:5173',
-  'http://localhost:3000'
-].filter(Boolean);
-
-// En production, accepter aussi les connexions depuis le même domaine (même origine)
+// Configuration CORS Socket.io - version simple qui fonctionnait
 const socketCorsConfig = {
-  origin: function (origin, callback) {
-    // En développement ou si pas d'origine (connexion directe), permettre
-    if (process.env.NODE_ENV === 'development' || !origin) {
-      return callback(null, true);
-    }
-    
-    // Vérifier si l'origine est dans la liste autorisée
-    const isAllowed = allowedSocketOrigins.some(allowed => {
-      // Comparer les domaines (sans protocole et port)
-      const allowedDomain = allowed.replace(/^https?:\/\//, '').split(':')[0];
-      const originDomain = origin.replace(/^https?:\/\//, '').split(':')[0];
-      return originDomain === allowedDomain || origin.includes(allowedDomain);
-    });
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.warn('⚠️ Origine non autorisée pour Socket.io:', origin);
-      // En production, permettre quand même si c'est le même domaine
-      callback(null, true);
-    }
-  },
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
   methods: ["GET", "POST"],
-  credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  credentials: true
 };
 
+// Configuration Socket.io - version simple qui fonctionnait
 const io = new Server(httpServer, {
   cors: socketCorsConfig,
-  // Path explicite pour Socket.io - CRITIQUE pour éviter les problèmes de routage
-  path: '/socket.io/',
-  // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  // Timeouts augmentés pour éviter les erreurs "xhr poll error"
-  // Les timeouts trop courts causaient des déconnexions immédiates
-  pingTimeout: 60000, // 60 secondes - temps avant de considérer la connexion morte
-  pingInterval: 25000, // 25 secondes - intervalle entre les pings (augmenté pour réduire la charge)
-  // Permettre les reconnexions avec timeout plus long
-  connectTimeout: 45000, // 45 secondes - temps max pour établir une connexion
-  // Réduire la taille du buffer pour éviter les timeouts
-  maxHttpBufferSize: 1e6, // 1MB au lieu de la valeur par défaut
-  // Forcer la fermeture des connexions inactives rapidement
-  allowEIO3: true,
-  // Compression désactivée pour réduire la latence
-  compression: false,
-  // Options supplémentaires pour la stabilité du polling
-  httpCompression: false // Désactiver la compression HTTP pour polling
-});
-
-// Middleware pour rejeter explicitement les transports non-polling AVANT la négociation
-// Cela évite l'erreur "Transport unknown" en rejetant immédiatement les transports non autorisés
-io.engine.on('initial_headers', (headers, req) => {
-  const requestedTransport = req._query?.transport;
-  if (requestedTransport && requestedTransport !== 'polling') {
-    console.warn('⚠️ Transport non autorisé demandé lors de la négociation:', requestedTransport);
-    console.warn('⚠️ Rejet de la connexion - seul polling est autorisé');
-  }
+  pingTimeout: 20000,
+  pingInterval: 10000,
+  connectTimeout: 20000
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -256,39 +203,17 @@ app.use('/api/discord', discordRoutes);
 // IMPORTANT: Cette route doit être AVANT la route catch-all
 app.get('/api/socket-health', (req, res) => {
   const socketCount = io.sockets.sockets.size;
-  // Récupérer le port réel utilisé par le serveur (peut être différent de process.env.PORT)
-  const actualPort = httpServer.address()?.port || process.env.PORT || 3001;
-  const envPort = process.env.PORT || 'not set';
-  
   res.json({
     status: 'ok',
     socketIo: {
       connected: true,
       activeConnections: socketCount,
-      transports: ['polling'],
-      path: '/socket.io/'
-    },
-    cors: {
-      allowedOrigins: allowedSocketOrigins,
-      currentOrigin: req.headers.origin
+      transports: ['polling']
     },
     server: {
       nodeEnv: process.env.NODE_ENV || 'development',
       clientUrl: process.env.CLIENT_URL || 'not set',
-      // Port réel utilisé par le serveur (celui à utiliser dans ProxyPass)
-      actualPort: actualPort,
-      // Port de la variable d'environnement (peut être différent)
-      envPort: envPort,
-      // Informations importantes pour la configuration du reverse proxy
-      proxyConfig: {
-        note: 'Utilisez actualPort (pas envPort) dans la configuration Apache/Plesk pour ProxyPass',
-        example: `ProxyPass /socket.io/ http://localhost:${actualPort}/socket.io/`,
-        warning: actualPort !== parseInt(envPort) && envPort !== 'not set' ? 
-          `⚠️ Le port réel (${actualPort}) est différent du port dans les variables d'environnement (${envPort}). Utilisez actualPort.` :
-          null,
-        // Note importante sur l'accessibilité
-        accessibilityNote: 'Le port Node.js n\'est généralement PAS accessible publiquement. Utilisez le reverse proxy Apache/Plesk pour router les requêtes depuis https://typingpvp.com vers localhost:PORT.'
-      }
+      port: process.env.PORT || 3001
     }
   });
 });
@@ -371,94 +296,25 @@ app.get('/api/socket-test', (req, res) => {
     message: 'Socket.io endpoint is accessible',
     socketIoPath: '/socket.io/',
     transports: ['polling'],
-    cors: {
-      allowedOrigins: allowedSocketOrigins,
-      currentOrigin: req.headers.origin
-    },
     server: {
       nodeEnv: process.env.NODE_ENV || 'development',
       clientUrl: process.env.CLIENT_URL || 'not set'
-    },
-    note: 'Pour tester Socket.io directement, utilisez /socket.io/ avec un client Socket.io. Cette route vérifie uniquement la configuration.'
+    }
   });
 });
 
-// Gestion des erreurs Socket.io avec logs détaillés
+// Gestion des erreurs Socket.io - logs simplifiés
 io.engine.on('connection_error', (err) => {
-  console.error('❌ Erreur de connexion Socket.io:', err.message);
-  console.error('Code:', err.code);
+  console.error('❌ Erreur Socket.io:', err.message);
   if (err.req) {
-    const requestedTransport = err.req._query?.transport || 'non spécifié';
-    console.error('URL:', err.req.url);
-    console.error('SID:', err.req._query?.sid);
-    console.error('Transport demandé:', requestedTransport);
-    console.error('Origin:', err.req.headers?.origin);
-    console.error('Host:', err.req.headers?.host);
-    console.error('Method:', err.req.method);
-    
-    // Gérer spécifiquement l'erreur "Transport unknown"
-    if (err.message && (err.message.includes('Transport unknown') || err.message.includes('transport unknown'))) {
-      console.error('⚠️ Transport inconnu détecté - Le client essaie d\'utiliser un transport non autorisé');
-      console.error('⚠️ Transports autorisés: polling uniquement');
-      console.error('⚠️ Transport demandé:', requestedTransport);
-      
-      // Si le transport demandé n'est pas polling, c'est le problème
-      if (requestedTransport !== 'polling' && requestedTransport !== 'non spécifié') {
-        console.error('❌ ERREUR: Le client demande un transport non autorisé:', requestedTransport);
-        console.error('❌ SOLUTION: Le client doit être configuré pour utiliser uniquement polling');
-      } else if (requestedTransport === 'non spécifié') {
-        console.error('⚠️ Le transport n\'est pas spécifié dans la requête - peut être un problème de négociation');
-      }
-    }
-    
-    // Gérer spécifiquement les erreurs de polling
-    if (requestedTransport === 'polling') {
-      console.error('⚠️ Erreur spécifique au polling - Vérifier la configuration du reverse proxy');
-      console.error('⚠️ Le reverse proxy (Plesk/Apache) pourrait bloquer ou timeout les requêtes polling');
-    }
+    console.error('Transport:', err.req._query?.transport || 'non spécifié');
   }
-  if (err.context) {
-    console.error('Context:', err.context);
-  }
-  // Ne pas faire planter le serveur pour une erreur de connexion
 });
 
-// Logger les tentatives de connexion réussies avec plus de détails
-io.engine.on('connection', (req) => {
-  console.log('🔌 Connexion Socket.io établie:', {
-    url: req.url,
-    transport: req._query?.transport || 'polling',
-    origin: req.headers?.origin || 'unknown',
-    host: req.headers?.host || 'unknown',
-    userAgent: req.headers?.['user-agent']?.substring(0, 50) || 'unknown'
-  });
-});
-
-// Logger toutes les requêtes Socket.io pour le débogage
+// Logger simplifié - seulement les erreurs
 io.engine.on('request', (req, res) => {
-  // Logger toutes les requêtes polling pour diagnostiquer les problèmes
-  if (req._query?.transport === 'polling') {
-    console.log('📡 Requête polling Socket.io:', {
-      method: req.method,
-      url: req.url,
-      sid: req._query?.sid || 'new',
-      transport: req._query?.transport,
-      origin: req.headers?.origin,
-      host: req.headers?.host
-    });
-  }
-  
-  // Logger les erreurs
   if (res.statusCode >= 400) {
-    console.error('❌ Requête Socket.io échouée:', {
-      method: req.method,
-      url: req.url,
-      statusCode: res.statusCode,
-      origin: req.headers?.origin,
-      host: req.headers?.host,
-      transport: req._query?.transport,
-      sid: req._query?.sid
-    });
+    console.error('❌ Erreur Socket.io:', req.method, req.url, res.statusCode);
   }
 });
 
@@ -488,16 +344,14 @@ io.on('connection', (socket) => {
   socketConnectionCount++;
   console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
   
-  // Heartbeat manuel pour maintenir la connexion active avec Plesk
-  // Réduire la fréquence pour éviter de surcharger les requêtes polling
-  // Plesk tue les connexions inactives, donc on envoie un ping toutes les 20 secondes
+  // Heartbeat pour maintenir la connexion active
   const heartbeatInterval = setInterval(() => {
     if (socket.connected) {
       socket.emit('ping', { timestamp: Date.now() });
     } else {
       clearInterval(heartbeatInterval);
     }
-  }, 20000); // Ping toutes les 20 secondes (réduit pour éviter les erreurs de transport)
+  }, 10000); // Ping toutes les 10 secondes
   
   // Nettoyer l'intervalle à la déconnexion
   socket.on('disconnect', safeHandler((reason) => {
@@ -1579,20 +1433,8 @@ console.log(`📍 Port: ${PORT}, Host: ${HOST}`);
 // Démarrer le serveur avec gestion d'erreur
 try {
   httpServer.listen(PORT, HOST, () => {
-    // Récupérer le port réel (peut être différent si PORT=0 pour port aléatoire)
-    const actualPort = httpServer.address()?.port || PORT;
-    console.log(`✅ Serveur démarré avec succès sur ${HOST}:${actualPort}`);
-    console.log(`📡 Socket.io configuré avec polling uniquement (compatible Plesk)`);
-    console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-    console.log(`📦 SERVE_CLIENT: ${process.env.SERVE_CLIENT || 'false'}`);
-    console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌍 Origines Socket.io autorisées:`, allowedSocketOrigins);
-    console.log(`✅ Le serveur est prêt à accepter les connexions`);
-    console.log(`🔍 Test Socket.io: http://${HOST}:${actualPort}/api/socket-test`);
-    console.log(`🔍 Santé Socket.io: http://${HOST}:${actualPort}/api/socket-health`);
-    console.log(`⚠️ IMPORTANT pour configuration reverse proxy:`);
-    console.log(`   Utilisez le port ${actualPort} dans votre configuration Apache/Plesk`);
-    console.log(`   Exemple: ProxyPass /socket.io/ http://localhost:${actualPort}/socket.io/`);
+    console.log(`✅ Serveur démarré sur ${HOST}:${PORT}`);
+    console.log(`📡 Socket.io configuré (polling uniquement)`);
   }).on('error', (error) => {
     console.error('❌ Erreur lors du démarrage du serveur:', error);
     console.error('Code erreur:', error.code);

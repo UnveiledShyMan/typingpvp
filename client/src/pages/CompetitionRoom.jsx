@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { useToastContext } from '../contexts/ToastContext'
+import { API_URL } from '../config/api.js'
 
 export default function CompetitionRoom() {
   const { competitionId } = useParams();
@@ -29,7 +30,7 @@ export default function CompetitionRoom() {
       return;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const apiUrl = API_URL;
     socketRef.current = io(apiUrl, {
       transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
       upgrade: false,
