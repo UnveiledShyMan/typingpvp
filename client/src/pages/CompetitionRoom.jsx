@@ -336,21 +336,46 @@ export default function CompetitionRoom() {
 
           {gameStatus === 'waiting' && (
             <div className="text-center py-12">
-              <p className="text-text-primary text-lg mb-4">
-                Waiting for players... ({players.length} joined)
-              </p>
-              {isCreator && players.length >= 2 && (
-                <p className="text-text-secondary text-sm">Competition will start automatically in 10 seconds...</p>
-              )}
+              <div className="max-w-md mx-auto space-y-6">
+                {/* Indicateur visuel d'attente */}
+                <div className="relative w-20 h-20 mx-auto">
+                  <div className="absolute inset-0 border-4 border-accent-primary/20 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
+                </div>
+                
+                <div className="space-y-3">
+                  <p className="text-text-primary text-xl font-semibold">
+                    Waiting for players...
+                  </p>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-bg-secondary/60 backdrop-blur-sm rounded-full border border-border-secondary/30">
+                    <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></div>
+                    <span className="text-text-secondary text-sm">
+                      <span className="text-accent-primary font-bold">{players.length}</span> player{players.length !== 1 ? 's' : ''} joined
+                    </span>
+                  </div>
+                  {isCreator && players.length >= 2 && (
+                    <div className="bg-accent-primary/10 border border-accent-primary/30 rounded-lg p-4 mt-4">
+                      <p className="text-accent-primary text-sm font-medium">
+                        Competition will start automatically in 10 seconds...
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
           {gameStatus === 'starting' && (
             <div className="text-center py-12">
-              <div className="text-6xl font-bold text-accent-primary mb-4" style={{ fontFamily: 'JetBrains Mono' }}>
-                {countdown}
+              <div className="space-y-6">
+                <div className="relative inline-block">
+                  <div className="absolute inset-0 bg-accent-primary/20 rounded-full blur-3xl animate-pulse"></div>
+                  <div className="relative text-7xl font-bold text-accent-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                    {countdown}
+                  </div>
+                </div>
+                <p className="text-text-secondary text-lg font-medium">Get ready!</p>
               </div>
-              <p className="text-text-secondary">Get ready!</p>
             </div>
           )}
 
@@ -358,21 +383,24 @@ export default function CompetitionRoom() {
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Zone de frappe */}
               <div className="lg:col-span-2">
-                <div className="bg-bg-card/40 backdrop-blur-sm rounded-lg p-6 mb-4">
+                <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-6 mb-4 border border-border-secondary/30 shadow-lg">
                   <div className="flex gap-6 text-text-primary mb-4">
-                    <div>
-                      <div className="text-2xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
-                      <div className="text-text-secondary text-xs mt-1">wpm</div>
+                    <div className="flex flex-col">
+                      <div className="text-3xl font-bold text-accent-primary" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
+                      <div className="text-text-secondary text-xs mt-1 font-medium">WPM</div>
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.accuracy}%</div>
-                      <div className="text-text-secondary text-xs mt-1">acc</div>
+                    <div className="flex flex-col">
+                      <div className="text-3xl font-bold text-accent-secondary" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.accuracy}%</div>
+                      <div className="text-text-secondary text-xs mt-1 font-medium">Accuracy</div>
                     </div>
                     <div className="flex-1">
-                      <div className="text-text-secondary text-xs mb-1">Progress</div>
-                      <div className="w-full bg-text-secondary/20 rounded-full h-1.5">
+                      <div className="flex items-center justify-between text-text-secondary text-xs mb-2">
+                        <span className="font-medium">Progress</span>
+                        <span className="font-mono">{Math.round(myStats.progress)}%</span>
+                      </div>
+                      <div className="w-full bg-text-secondary/20 rounded-full h-2.5 overflow-hidden">
                         <div 
-                          className="bg-accent-primary h-1.5 rounded-full transition-all"
+                          className="bg-gradient-to-r from-accent-primary to-accent-secondary h-2.5 rounded-full transition-all shadow-sm"
                           style={{ width: `${myStats.progress}%` }}
                         ></div>
                       </div>
@@ -399,48 +427,62 @@ export default function CompetitionRoom() {
                 />
               </div>
 
-              {/* Classement */}
+              {/* Classement - Design amélioré */}
               <div className="lg:col-span-1">
-                <div className="bg-bg-card/40 backdrop-blur-sm rounded-lg p-4 sticky top-4">
-                  <h2 className="text-lg font-bold text-text-primary mb-4">Leaderboard</h2>
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                    {leaderboard.slice(0, 20).map((player, index) => (
-                      <div
-                        key={player.id}
-                        className={`p-3 rounded-lg ${
-                          player.name === username
-                            ? 'bg-accent-primary/10 ring-2 ring-accent-primary/30'
-                            : 'bg-bg-secondary/40 backdrop-blur-sm'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-text-secondary text-sm font-bold" style={{ fontFamily: 'JetBrains Mono' }}>
-                              #{player.position}
-                            </span>
-                            {player.userId && player.name !== username ? (
-                              <UserTooltip userId={player.userId} username={player.name}>
-                                <button
-                                  onClick={() => navigateToProfile(navigate, player.userId)}
-                                  className="text-sm font-medium text-text-primary hover:text-accent-primary transition-colors cursor-pointer"
-                                  title="View profile"
-                                >
-                                  {player.name}
-                                </button>
-                              </UserTooltip>
-                            ) : (
-                              <span className={`text-sm font-medium ${player.name === username ? 'text-accent-primary' : 'text-text-primary'}`}>
-                                {player.name} {player.name === username && '(you)'}
+                <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-5 border border-border-secondary/30 shadow-lg sticky top-4">
+                  <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+                    <span className="w-1 h-5 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
+                    Leaderboard
+                  </h2>
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+                    {leaderboard.slice(0, 20).map((player, index) => {
+                      const isTopThree = player.position <= 3;
+                      const isMe = player.name === username;
+                      
+                      return (
+                        <div
+                          key={player.id}
+                          className={`p-3 rounded-lg border transition-all ${
+                            isMe
+                              ? 'bg-accent-primary/15 border-accent-primary/40 ring-2 ring-accent-primary/20'
+                              : isTopThree
+                              ? 'bg-bg-primary/30 border-border-secondary/30'
+                              : 'bg-bg-primary/20 border-border-secondary/20'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-bold ${isTopThree ? 'text-accent-primary' : 'text-text-secondary'}`} style={{ fontFamily: 'JetBrains Mono' }}>
+                                #{player.position}
                               </span>
-                            )}
+                              {player.userId && player.name !== username ? (
+                                <UserTooltip userId={player.userId} username={player.name}>
+                                  <button
+                                    onClick={() => navigateToProfile(navigate, player.userId)}
+                                    className="text-sm font-semibold text-text-primary hover:text-accent-primary transition-colors cursor-pointer"
+                                    title="View profile"
+                                  >
+                                    {player.name}
+                                  </button>
+                                </UserTooltip>
+                              ) : (
+                                <span className={`text-sm font-semibold ${isMe ? 'text-accent-primary' : 'text-text-primary'}`}>
+                                  {player.name} {isMe && <span className="text-xs">(you)</span>}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-4 text-xs">
+                            <span className="text-text-secondary font-medium">
+                              <span className="text-text-primary font-bold font-mono">{player.wpm}</span> wpm
+                            </span>
+                            <span className="text-text-secondary font-medium">
+                              <span className="text-text-primary font-bold font-mono">{player.accuracy}%</span> acc
+                            </span>
                           </div>
                         </div>
-                        <div className="flex gap-4 text-xs text-text-secondary">
-                          <span style={{ fontFamily: 'JetBrains Mono' }}>{player.wpm} wpm</span>
-                          <span style={{ fontFamily: 'JetBrains Mono' }}>{player.accuracy}%</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

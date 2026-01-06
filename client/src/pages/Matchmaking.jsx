@@ -524,17 +524,18 @@ export default function Matchmaking() {
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="space-y-6 pb-4">
-            {/* Language Selector */}
+            {/* Language Selector - Design harmonisé */}
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
           <label className="block text-text-primary mb-3 text-sm font-medium">Language</label>
           <select
             value={selectedLang}
             onChange={(e) => setSelectedLang(e.target.value)}
             disabled={isInQueue}
-            className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
           >
             {Object.entries(languages).map(([code, lang]) => (
-              <option key={code} value={code} className="bg-bg-primary">
+              <option key={code} value={code} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                 {lang.name}
               </option>
             ))}

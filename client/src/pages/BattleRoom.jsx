@@ -882,30 +882,41 @@ export default function BattleRoom() {
 
           {gameStatus === 'waiting' && (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-6 max-w-md">
-                {/* Liste des joueurs */}
-                <div className="space-y-3">
-                  <h3 className="text-text-secondary text-sm font-medium uppercase tracking-wider mb-4">
+              <div className="text-center space-y-6 max-w-md w-full">
+                {/* Liste des joueurs - Design amélioré */}
+                <div className="space-y-4">
+                  <h3 className="text-text-primary text-base font-semibold uppercase tracking-wider mb-4 flex items-center justify-center gap-2">
+                    <span className="w-1 h-6 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Players
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {players.map((player, index) => (
                       <div 
                         key={index}
-                        className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between"
+                        className={`bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between border transition-all ${
+                          player.name === playerName 
+                            ? 'border-accent-primary/30 bg-accent-primary/5' 
+                            : 'border-border-secondary/30'
+                        }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            player.name === playerName ? 'bg-accent-primary' : 'bg-text-secondary/50'
+                          <div className={`w-3 h-3 rounded-full transition-all ${
+                            player.name === playerName 
+                              ? 'bg-accent-primary shadow-lg shadow-accent-primary/50' 
+                              : 'bg-text-secondary/50'
                           }`}></div>
-                          <span className="text-text-primary font-medium">{player.name}</span>
+                          <span className={`font-medium ${
+                            player.name === playerName ? 'text-text-primary' : 'text-text-secondary'
+                          }`}>{player.name}</span>
                           {player.name === playerName && (
-                            <span className="text-xs text-text-secondary">(You)</span>
+                            <span className="text-xs px-2 py-0.5 bg-accent-primary/20 text-accent-primary rounded-full font-medium">
+                              You
+                            </span>
                           )}
                         </div>
                         {player.name === playerName && (
-                          <span className="text-xs px-2 py-1 bg-accent-primary/20 text-accent-primary rounded">
-                            Ready
+                          <span className="text-xs px-3 py-1.5 bg-accent-primary/20 text-accent-primary rounded-full font-semibold border border-accent-primary/30">
+                            ✓ Ready
                           </span>
                         )}
                       </div>
@@ -913,19 +924,22 @@ export default function BattleRoom() {
                   </div>
                 </div>
 
-                {/* Message d'attente ou bouton start */}
+                {/* Message d'attente ou bouton start - Design amélioré */}
                 {players.length === 1 ? (
-                  <div className="space-y-3">
-                    <div className="relative w-12 h-12 mx-auto">
-                      <div className="absolute inset-0 border-3 border-accent-primary/20 rounded-full"></div>
-                      <div className="absolute inset-0 border-3 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
+                  <div className="space-y-4 bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 border border-border-secondary/30">
+                    <div className="relative w-16 h-16 mx-auto">
+                      <div className="absolute inset-0 border-4 border-accent-primary/20 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-transparent border-t-accent-primary rounded-full animate-spin"></div>
                     </div>
-                    <p className="text-text-primary text-lg font-medium">
-                      Waiting for opponent...
-                    </p>
-                    <p className="text-text-secondary text-sm">
-                      Share the room ID: <span 
-                        className="font-mono text-accent-primary cursor-pointer hover:text-accent-hover transition-colors"
+                    <div className="space-y-2">
+                      <p className="text-text-primary text-lg font-semibold">
+                        Waiting for opponent...
+                      </p>
+                      <p className="text-text-secondary text-sm">
+                        Share the room ID to invite a friend:
+                      </p>
+                      <div 
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-bg-primary/50 backdrop-blur-sm rounded-lg border border-border-secondary/30 cursor-pointer hover:bg-bg-primary/70 hover:border-accent-primary/30 transition-all group"
                         onClick={async () => {
                           try {
                             await navigator.clipboard.writeText(roomId);
@@ -935,28 +949,37 @@ export default function BattleRoom() {
                           }
                         }}
                         title="Click to copy"
-                      >{roomId}</span>
-                    </p>
+                      >
+                        <span className="font-mono text-accent-primary group-hover:text-accent-hover transition-colors font-semibold">{roomId}</span>
+                        <svg className="w-4 h-4 text-text-secondary group-hover:text-accent-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-text-primary text-lg font-medium">
-                        Both players ready!
-                      </p>
+                  <div className="space-y-4 bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 border border-accent-primary/20">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></div>
+                        <p className="text-text-primary text-lg font-semibold">
+                          Both players ready!
+                        </p>
+                        <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                      </div>
                       {isCreator ? (
                         <p className="text-text-secondary text-sm">
-                          Click start when you're ready to begin
+                          Configure the battle settings below and click start when you're ready
                         </p>
                       ) : (
                         <p className="text-text-secondary text-sm">
-                          Waiting for room creator to start...
+                          Waiting for room creator to start the battle...
                         </p>
                       )}
                     </div>
                     {players.length === 2 && isCreator && (
                       <div className="space-y-4">
-                        {/* Sélecteur de mode */}
+                        {/* Sélecteur de mode - Design harmonisé */}
                         <div>
                           <label className="block text-text-secondary text-sm mb-2 font-medium">
                             Battle Mode
@@ -964,10 +987,11 @@ export default function BattleRoom() {
                           <select
                             value={battleMode}
                             onChange={(e) => setBattleMode(e.target.value)}
-                            className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                           >
-                            <option value="timer" className="bg-bg-primary">Duel Classique (Timer)</option>
-                            <option value="phrases" className="bg-bg-primary">Phrases (Difficulté)</option>
+                            <option value="timer" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Duel Classique (Timer)</option>
+                            <option value="phrases" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Phrases (Difficulté)</option>
                           </select>
                         </div>
 
@@ -980,11 +1004,12 @@ export default function BattleRoom() {
                             <select
                               value={timerDuration}
                               onChange={(e) => setTimerDuration(parseInt(e.target.value))}
-                              className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                              className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                              style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                             >
-                              <option value={60} className="bg-bg-primary">60 seconds</option>
-                              <option value={30} className="bg-bg-primary">30 seconds</option>
-                              <option value={10} className="bg-bg-primary">10 seconds</option>
+                              <option value={60} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>60 seconds</option>
+                              <option value={30} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>30 seconds</option>
+                              <option value={10} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>10 seconds</option>
                             </select>
                           </div>
                         )}
@@ -997,17 +1022,18 @@ export default function BattleRoom() {
                             <select
                               value={phraseDifficulty}
                               onChange={(e) => setPhraseDifficulty(e.target.value)}
-                              className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                              className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                              style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                             >
-                              <option value="easy" className="bg-bg-primary">Facile</option>
-                              <option value="medium" className="bg-bg-primary">Moyen</option>
-                              <option value="hard" className="bg-bg-primary">Difficile</option>
-                              <option value="hardcore" className="bg-bg-primary">Hardcore</option>
+                              <option value="easy" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Facile</option>
+                              <option value="medium" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Moyen</option>
+                              <option value="hard" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Difficile</option>
+                              <option value="hardcore" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Hardcore</option>
                             </select>
                           </div>
                         )}
 
-                        {/* Sélecteur de langue pour l'host */}
+                        {/* Sélecteur de langue pour l'host - Design harmonisé */}
                         <div>
                           <label className="block text-text-secondary text-sm mb-2 font-medium">
                             Select Language
@@ -1015,10 +1041,11 @@ export default function BattleRoom() {
                           <select
                             value={selectedLanguage}
                             onChange={(e) => setSelectedLanguage(e.target.value)}
-                            className="bg-bg-primary/50 backdrop-blur-sm border-none text-text-primary px-4 py-2.5 rounded-lg focus:outline-none focus:bg-bg-primary/70 transition-colors font-medium w-full"
+                            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                           >
                             {Object.entries(languages).map(([code, lang]) => (
-                              <option key={code} value={code} className="bg-bg-primary">
+                              <option key={code} value={code} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                                 {lang.name}
                               </option>
                             ))}
@@ -1051,49 +1078,72 @@ export default function BattleRoom() {
                 </div>
               )}
               
-              {/* Stats des joueurs - design sobre */}
+              {/* Stats des joueurs - Design amélioré et plus visuel */}
               <div className="grid md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-text-primary mb-2 text-sm font-medium">{myPlayer?.name || 'You'}</div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
-                    <div className="text-sm text-text-secondary">{myStats.accuracy}%</div>
-                    <div className="flex-1 ml-2">
-                      <div className="w-full bg-text-secondary/10 rounded-full h-2">
-                        <div 
-                          className="bg-accent-primary h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min(myStats.progress, 100)}%` }}
-                        ></div>
-                      </div>
+                {/* Stats du joueur actuel */}
+                <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-5 border border-accent-primary/30 shadow-lg shadow-accent-primary/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></div>
+                      <span className="text-text-primary text-sm font-semibold">{myPlayer?.name || 'You'}</span>
+                    </div>
+                    <span className="text-xs px-2 py-1 bg-accent-primary/20 text-accent-primary rounded-full font-medium">You</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 mb-3">
+                    <div className="text-3xl font-bold text-accent-primary" style={{ fontFamily: 'JetBrains Mono' }}>{myStats.wpm}</div>
+                    <div className="text-base text-text-secondary font-medium">
+                      <span className="text-text-primary">{myStats.accuracy}</span>% acc
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
+                      <span>Progress</span>
+                      <span className="font-mono">{Math.round(myStats.progress)}%</span>
+                    </div>
+                    <div className="w-full bg-text-secondary/20 rounded-full h-2.5 overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-accent-primary to-accent-secondary h-2.5 rounded-full transition-all duration-300 shadow-sm"
+                        style={{ width: `${Math.min(myStats.progress, 100)}%` }}
+                      ></div>
                     </div>
                   </div>
                 </div>
                 
+                {/* Stats de l'adversaire */}
                 {opponent && (
-                  <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-text-primary text-sm font-medium">{opponent.name}</div>
+                  <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-5 border border-border-secondary/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-text-secondary/50"></div>
+                        <span className="text-text-primary text-sm font-semibold">{opponent.name}</span>
+                      </div>
                       {/* Lien vers le profil de l'adversaire */}
                       {isValidUserId(opponent.userId) && (
                         <button
                           onClick={() => navigateToProfile(navigate, opponent.userId)}
-                          className="text-accent-primary hover:text-accent-hover text-xs font-medium transition-colors"
+                          className="text-xs px-2 py-1 bg-bg-primary/50 hover:bg-accent-primary/20 text-accent-primary hover:text-accent-primary rounded-full font-medium transition-colors border border-border-secondary/30 hover:border-accent-primary/30"
                           title="View opponent profile"
                         >
                           👤 Profile
                         </button>
                       )}
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.wpm}</div>
-                      <div className="text-sm text-text-secondary">{opponentStats.accuracy}%</div>
-                      <div className="flex-1 ml-2">
-                        <div className="w-full bg-text-secondary/10 rounded-full h-2">
-                          <div 
-                            className="bg-text-secondary/50 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(opponentStats.progress, 100)}%` }}
-                          ></div>
-                        </div>
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <div className="text-3xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>{opponentStats.wpm}</div>
+                      <div className="text-base text-text-secondary font-medium">
+                        <span className="text-text-primary">{opponentStats.accuracy}</span>% acc
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
+                        <span>Progress</span>
+                        <span className="font-mono">{Math.round(opponentStats.progress)}%</span>
+                      </div>
+                      <div className="w-full bg-text-secondary/20 rounded-full h-2.5 overflow-hidden">
+                        <div 
+                          className="bg-text-secondary/60 h-2.5 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(opponentStats.progress, 100)}%` }}
+                        ></div>
                       </div>
                     </div>
                   </div>
@@ -1143,12 +1193,15 @@ export default function BattleRoom() {
           )}
             </div>
 
-            {/* Colonne droite : Chat */}
+            {/* Colonne droite : Chat - Design amélioré */}
             <div className="lg:w-80 lg:flex-shrink-0 flex flex-col">
-              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg flex-1 min-h-0 flex flex-col">
+              <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg border border-border-secondary/30 flex-1 min-h-0 flex flex-col shadow-lg">
                 {/* En-tête du chat */}
-                <div className="p-4">
-                  <h3 className="text-text-primary font-semibold" style={{ fontFamily: 'Inter' }}>Chat</h3>
+                <div className="p-4 border-b border-border-secondary/30">
+                  <h3 className="text-text-primary font-semibold flex items-center gap-2" style={{ fontFamily: 'Inter' }}>
+                    <span className="w-1 h-4 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
+                    Chat
+                  </h3>
                 </div>
 
                 {/* Messages du chat */}
@@ -1168,40 +1221,54 @@ export default function BattleRoom() {
                       const isMe = msg.username === playerName || (player?.userId && player.userId === (userId || currentUser?.id));
                       
                       return (
-                        <div key={msg.id} className="flex gap-3">
-                          {/* Avatar cliquable si le joueur a un userId */}
+                        <div key={msg.id} className={`flex gap-3 p-2 rounded-lg transition-all ${isMe ? 'bg-accent-primary/5' : 'hover:bg-bg-primary/20'}`}>
+                          {/* Avatar cliquable si le joueur a un userId - Design amélioré */}
                           {isValidUserId(player?.userId) ? (
                             <button
                               onClick={() => navigateToProfile(navigate, player.userId)}
-                              className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold hover:bg-accent-primary/30 transition-colors cursor-pointer"
+                              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110 ${
+                                isMe 
+                                  ? 'bg-accent-primary/30 text-accent-primary border-2 border-accent-primary/40' 
+                                  : 'bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30 border border-border-secondary/30'
+                              }`}
                               title="View profile"
                             >
                               {msg.username[0].toUpperCase()}
                             </button>
                           ) : (
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold">
+                            <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isMe 
+                                ? 'bg-accent-primary/30 text-accent-primary border-2 border-accent-primary/40' 
+                                : 'bg-accent-primary/20 text-accent-primary border border-border-secondary/30'
+                            }`}>
                               {msg.username[0].toUpperCase()}
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-2 mb-1">
+                            <div className="flex items-baseline gap-2 mb-1.5">
                               {/* Nom d'utilisateur cliquable avec tooltip si le joueur a un userId */}
                               {isValidUserId(player?.userId) && !isMe ? (
                                 <UserTooltip userId={player.userId} username={msg.username}>
                                   <button
                                     onClick={() => navigateToProfile(navigate, player.userId)}
-                                    className="text-text-primary text-sm font-semibold hover:text-accent-primary transition-colors cursor-pointer"
+                                    className={`text-sm font-semibold hover:text-accent-primary transition-colors cursor-pointer ${
+                                      isMe ? 'text-accent-primary' : 'text-text-primary'
+                                    }`}
                                     title="View profile"
                                   >
                                     {msg.username}
                                   </button>
                                 </UserTooltip>
                               ) : (
-                                <span className="text-text-primary text-sm font-semibold">{msg.username}</span>
+                                <span className={`text-sm font-semibold ${isMe ? 'text-accent-primary' : 'text-text-primary'}`}>
+                                  {msg.username} {isMe && <span className="text-xs opacity-70">(you)</span>}
+                                </span>
                               )}
                               <span className="text-text-secondary text-xs">{formatMessageTime(msg.timestamp)}</span>
                             </div>
-                            <div className="text-text-secondary text-sm break-words">{msg.message}</div>
+                            <div className={`text-sm break-words leading-relaxed ${isMe ? 'text-text-primary' : 'text-text-secondary'}`}>
+                              {msg.message}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1209,15 +1276,15 @@ export default function BattleRoom() {
                   )}
                 </div>
 
-                {/* Input du chat */}
-                <form onSubmit={handleSendChatMessage} className="p-4">
+                {/* Input du chat - Design amélioré */}
+                <form onSubmit={handleSendChatMessage} className="p-4 border-t border-border-secondary/30">
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       placeholder="Type a message..."
-                      className="flex-1 px-3 py-2 input-modern text-sm"
+                      className="flex-1 px-4 py-2.5 bg-bg-primary/50 backdrop-blur-sm border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/20 transition-all placeholder:text-text-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={gameStatus === 'playing'}
                     />
                     <button

@@ -607,6 +607,33 @@ code {
   width: 100%;
 }
 
+/* Styles globaux pour les selects - Harmonisation avec le thème sombre */
+select {
+  background-color: var(--bg-secondary, #131825) !important;
+  color: var(--text-primary, #e8ecf3) !important;
+  /* Style personnalisé pour la flèche du select */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3b8' d='M6 9L1 4h10z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 12px !important;
+  padding-right: 2.5rem !important;
+}
+
+/* Styles pour les options des selects - Fond sombre */
+select option {
+  background-color: var(--bg-secondary, #131825) !important;
+  color: var(--text-primary, #e8ecf3) !important;
+  padding: 0.5rem !important;
+}
+
+/* Hover state pour les options */
+select option:hover,
+select option:checked,
+select option:focus {
+  background-color: var(--bg-tertiary, #1a1f2e) !important;
+  color: var(--accent-primary, #8b5cf6) !important;
+}
+
 /* Focus visible pour accessibilité - style moderne et visible */
 *:focus-visible {
   outline: 2px solid var(--accent-primary);

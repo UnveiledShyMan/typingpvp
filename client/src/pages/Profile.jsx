@@ -238,17 +238,25 @@ export default function Profile({ userId: currentUserId }) {
     );
   }
 
-  const rankInfo = getRankFromMMR(user.mmr[selectedLang] || 1000);
-  const winRate = user.stats.totalMatches > 0
+  // Vérifier que user.mmr existe et est un objet valide
+  const userMmr = user?.mmr && typeof user.mmr === 'object' ? user.mmr : {};
+  const currentUserMmr = userMmr[selectedLang] || 1000;
+  
+  const rankInfo = getRankFromMMR(currentUserMmr);
+  const winRate = user?.stats?.totalMatches > 0
     ? ((user.stats.wins / user.stats.totalMatches) * 100).toFixed(1)
     : 0;
   
   // Calculer les stats par langue à partir des matchs
+  // Ajout de vérifications de sécurité pour éviter les erreurs lors du premier rendu
   const calculateLanguageStats = useMemo(() => {
-    if (!soloMatches.length && !multiplayerMatches.length) return null;
+    // Vérifier que les arrays existent et sont valides
+    if (!soloMatches || !multiplayerMatches) return null;
+    if (!Array.isArray(soloMatches) || !Array.isArray(multiplayerMatches)) return null;
+    if (soloMatches.length === 0 && multiplayerMatches.length === 0) return null;
     
     const allMatches = [...soloMatches, ...multiplayerMatches];
-    const langMatches = allMatches.filter(m => m.language === selectedLang);
+    const langMatches = allMatches.filter(m => m && m.language === selectedLang);
     
     if (langMatches.length === 0) return null;
     
@@ -273,43 +281,66 @@ export default function Profile({ userId: currentUserId }) {
   }, [soloMatches, multiplayerMatches, selectedLang]);
   
   // Calculer la progression ELO pour le graphique
+  // Ajout de vérifications de sécurité pour éviter les erreurs lors du premier rendu
   const eloProgressionData = useMemo(() => {
-    if (!soloMatches.length && !multiplayerMatches.length) return [];
+    // Vérifier que les arrays existent et sont valides
+    if (!soloMatches || !multiplayerMatches) return [];
+    if (!Array.isArray(soloMatches) || !Array.isArray(multiplayerMatches)) return [];
+    if (soloMatches.length === 0 && multiplayerMatches.length === 0) return [];
+    
+    // Vérifier que user et user.mmr existent
+    if (!user || !user.mmr || typeof user.mmr !== 'object') return [];
     
     const allMatches = [...soloMatches, ...multiplayerMatches]
-      .filter(m => m.language === selectedLang && m.eloChange !== undefined && m.eloChange !== null)
-      .sort((a, b) => new Date(a.date) - new Date(b.date)); // Trier par date croissante
+      .filter(m => m && m.language === selectedLang && m.eloChange !== undefined && m.eloChange !== null)
+      .sort((a, b) => {
+        try {
+          return new Date(a.date) - new Date(b.date);
+        } catch (e) {
+          return 0;
+        }
+      }); // Trier par date croissante
     
     if (allMatches.length === 0) return [];
     
     // Reconstruire la progression ELO en partant du MMR actuel et en remontant
-    let currentELO = user.mmr[selectedLang] || 1000;
+    // Utiliser user.mmr directement avec vérification de sécurité
+    const userMmrValue = (user?.mmr && typeof user.mmr === 'object' && user.mmr[selectedLang]) 
+      ? user.mmr[selectedLang] 
+      : 1000;
+    let currentELO = userMmrValue;
     const progression = [];
     
     // Parcourir les matchs en ordre inverse pour reconstruire l'ELO
     for (let i = allMatches.length - 1; i >= 0; i--) {
       const match = allMatches[i];
+      if (!match) continue;
       // L'ELO avant ce match = ELO actuel - changement
       currentELO = currentELO - (match.eloChange || 0);
       
-      progression.unshift({
-        date: new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        elo: currentELO,
-        match: i + 1
-      });
+      try {
+        progression.unshift({
+          date: new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          elo: currentELO,
+          match: i + 1
+        });
+      } catch (e) {
+        // Ignorer les dates invalides
+        continue;
+      }
     }
     
     // Ajouter le point final (ELO actuel)
     if (progression.length > 0) {
       progression.push({
         date: 'Now',
-        elo: user.mmr[selectedLang] || 1000,
+        elo: userMmrValue,
         match: allMatches.length + 1
       });
     }
     
     return progression;
-  }, [soloMatches, multiplayerMatches, selectedLang, user.mmr]);
+  }, [soloMatches, multiplayerMatches, selectedLang, user]);
 
   const socialMedia = user.socialMedia || {
     twitter: '',
@@ -396,7 +427,7 @@ export default function Profile({ userId: currentUserId }) {
                     </div>
                     <div className="text-text-secondary">
                       <span className="font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
-                        {user.mmr[selectedLang] || 1000}
+                        {currentUserMmr}
                       </span>
                       <span className="text-xs ml-1">ELO</span>
                     </div>
@@ -650,15 +681,16 @@ export default function Profile({ userId: currentUserId }) {
                 </div>
               </div>
 
-              {/* Language Selector et Stats par Langue */}
+              {/* Language Selector et Stats par Langue - Design harmonisé */}
               <div className="mb-4 sm:mb-6 space-y-4">
                 <select
                   value={selectedLang}
                   onChange={(e) => setSelectedLang(e.target.value)}
-                  className="w-full p-3 bg-bg-primary border border-text-secondary/20 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-medium"
+                  className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                  style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 >
                   {Object.entries(user.mmr || {}).map(([lang]) => (
-                    <option key={lang} value={lang} className="bg-bg-primary">
+                    <option key={lang} value={lang} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                       {lang.toUpperCase()}
                     </option>
                   ))}
@@ -780,28 +812,30 @@ export default function Profile({ userId: currentUserId }) {
                         Match History
                       </h2>
                       
-                      {/* Filtres et tri */}
+                      {/* Filtres et tri - Design harmonisé avec le thème sombre */}
                       <div className="flex items-center gap-3 flex-wrap">
                         {/* Filtre par type */}
                         <select
                           value={matchFilter}
                           onChange={(e) => setMatchFilter(e.target.value)}
-                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
+                          className="px-3 py-2 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 hover:bg-bg-secondary transition-all appearance-none cursor-pointer"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                         >
-                          <option value="all">All Matches</option>
-                          <option value="solo">Solo</option>
-                          <option value="multiplayer">Multiplayer</option>
+                          <option value="all" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>All Matches</option>
+                          <option value="solo" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Solo</option>
+                          <option value="multiplayer" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Multiplayer</option>
                         </select>
                         
                         {/* Filtre par langue */}
                         <select
                           value={matchLanguageFilter}
                           onChange={(e) => setMatchLanguageFilter(e.target.value)}
-                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
+                          className="px-3 py-2 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 hover:bg-bg-secondary transition-all appearance-none cursor-pointer"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                         >
-                          <option value="all">All Languages</option>
+                          <option value="all" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>All Languages</option>
                           {Object.keys(user.mmr || {}).map(lang => (
-                            <option key={lang} value={lang}>
+                            <option key={lang} value={lang} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                               {lang.toUpperCase()}
                             </option>
                           ))}
@@ -811,17 +845,18 @@ export default function Profile({ userId: currentUserId }) {
                         <select
                           value={matchSort}
                           onChange={(e) => setMatchSort(e.target.value)}
-                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50"
+                          className="px-3 py-2 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 hover:bg-bg-secondary transition-all appearance-none cursor-pointer"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                         >
-                          <option value="date">Sort by Date</option>
-                          <option value="wpm">Sort by WPM</option>
-                          <option value="accuracy">Sort by Accuracy</option>
+                          <option value="date" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Sort by Date</option>
+                          <option value="wpm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Sort by WPM</option>
+                          <option value="accuracy" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Sort by Accuracy</option>
                         </select>
                         
-                        {/* Ordre */}
+                        {/* Ordre - Bouton amélioré avec design cohérent */}
                         <button
                           onClick={() => setMatchSortOrder(matchSortOrder === 'desc' ? 'asc' : 'desc')}
-                          className="px-3 py-2 bg-bg-primary/50 border border-border-secondary/30 rounded-lg text-text-primary text-sm hover:bg-bg-primary/70 transition-colors"
+                          className="px-3 py-2 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary text-sm hover:bg-bg-tertiary hover:border-accent-primary/40 transition-all focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
                           title={matchSortOrder === 'desc' ? 'Descending' : 'Ascending'}
                         >
                           {matchSortOrder === 'desc' ? '↓' : '↑'}
@@ -934,13 +969,13 @@ export default function Profile({ userId: currentUserId }) {
                           ))}
                           </div>
                           
-                          {/* Bouton "Load More" pour la pagination */}
+                          {/* Bouton "Load More" pour la pagination - Design harmonisé */}
                           {hasMoreMatches && (
                             <div className="text-center mt-6">
                               <button
                                 onClick={loadMoreMatches}
                                 disabled={loadingMatches}
-                                className="px-6 py-3 bg-bg-primary/50 hover:bg-bg-primary/70 border border-border-secondary/30 rounded-lg text-text-primary text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-3 bg-bg-secondary/80 backdrop-blur-sm hover:bg-bg-tertiary border border-border-secondary/40 hover:border-accent-primary/40 rounded-lg text-text-primary text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
                               >
                                 {loadingMatches ? (
                                   <span className="flex items-center gap-2">
