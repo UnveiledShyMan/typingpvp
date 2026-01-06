@@ -1,7 +1,18 @@
 // Service Socket.io centralisé
 import { io } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Récupérer l'URL de base de l'API
+// IMPORTANT: Socket.IO utilise le path par défaut /socket.io/, donc l'URL ne doit PAS inclure /api
+// Si VITE_API_URL contient /api, on doit l'enlever pour Socket.IO
+let API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Si l'URL se termine par /api, on l'enlève pour Socket.IO
+// Socket.IO se connectera à la racine du serveur, pas à /api/socket.io
+if (API_URL.endsWith('/api')) {
+  API_URL = API_URL.slice(0, -4); // Enlever '/api'
+} else if (API_URL.endsWith('/api/')) {
+  API_URL = API_URL.slice(0, -5); // Enlever '/api/'
+}
 
 /**
  * Crée une nouvelle instance de socket
@@ -23,6 +34,8 @@ export function createSocket() {
     forceNew: false, // Réutiliser les connexions existantes
     // Désactiver Engine.IO v3 pour éviter les problèmes
     allowEIO3: false
+    // Note: Le path Socket.IO par défaut est /socket.io/, pas besoin de le spécifier
+    // sauf si vous utilisez un path personnalisé côté serveur
   });
 
   // Gestion simplifiée des erreurs - éviter les boucles infinies

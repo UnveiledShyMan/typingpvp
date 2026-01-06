@@ -98,8 +98,9 @@ app.use(express.json());
 // Ne pas ajouter de middleware qui pourrait ralentir les requêtes Socket.io
 app.use((req, res, next) => {
   // Ignorer complètement les requêtes Socket.io - laisser Socket.io les gérer directement
-  // Ne pas logger, ne pas modifier - juste passer immédiatement
-  if (req.path.startsWith('/socket.io/')) {
+  // Gérer aussi /api/socket.io au cas où le client essaierait de s'y connecter
+  // (bien que le client devrait utiliser /socket.io/ directement)
+  if (req.path.startsWith('/socket.io/') || req.path.startsWith('/api/socket.io/')) {
     return next(); // Passer immédiatement sans aucune modification
   }
   
@@ -250,13 +251,15 @@ if (process.env.SERVE_CLIENT === 'true') {
   // CRITIQUE: Ne pas intercepter les routes Socket.io - elles sont gérées par Socket.io directement
   app.all('*', (req, res, next) => {
     // Ne pas intercepter les routes Socket.io - Socket.io les gère directement via httpServer
-    if (req.path.startsWith('/socket.io/')) {
+    // Gérer aussi /api/socket.io au cas où (bien que le client devrait utiliser /socket.io/ directement)
+    if (req.path.startsWith('/socket.io/') || req.path.startsWith('/api/socket.io/')) {
       // Laisser Socket.io gérer ces requêtes
       return next();
     }
     
     // Ne pas intercepter les routes API - elles devraient déjà être traitées par les routes définies avant
-    if (req.path.startsWith('/api')) {
+    // MAIS exclure /api/socket.io qui doit être géré par Socket.IO
+    if (req.path.startsWith('/api') && !req.path.startsWith('/api/socket.io/')) {
       // Si on arrive ici, c'est qu'aucune route API n'a matché
       // Logger pour debug
       console.warn(`⚠️ Route API non trouvée: ${req.method} ${req.path}`);
