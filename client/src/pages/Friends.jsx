@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { io } from 'socket.io-client'
+import { getSocket, cleanupSocket } from '../services/socketService'
 import { useToastContext } from '../contexts/ToastContext'
 import { friendsService, authService } from '../services/apiService'
 import { useDebounce } from '../hooks/useDebounce'
@@ -29,7 +29,9 @@ export default function Friends() {
     
     return () => {
       if (socketRef.current) {
-        socketRef.current.disconnect();
+        // Nettoyer les listeners spécifiques à Friends, mais ne pas déconnecter le socket
+        // car il peut être utilisé par d'autres composants
+        cleanupSocket(socketRef.current, ['user-online', 'user-offline', 'register-user']);
       }
     };
   }, []);
@@ -52,36 +54,36 @@ export default function Friends() {
   };
 
   const connectSocket = () => {
-    const apiUrl = API_URL;
-    socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-      upgrade: false,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
-    });
+    // Utiliser le service centralisé de socket qui gère correctement l'URL
+    socketRef.current = getSocket(false);
     
     // Enregistrer l'utilisateur comme en ligne
-    if (currentUser) {
+    if (currentUser && socketRef.current) {
       socketRef.current.emit('register-user', { userId: currentUser.id });
     }
     
-    // Écouter les changements de statut en ligne des amis
-    socketRef.current.on('user-online', ({ userId }) => {
-      setFriends(prevFriends => 
-        prevFriends.map(friend => 
-          friend.id === userId ? { ...friend, isOnline: true } : friend
-        )
-      );
-    });
-    
-    socketRef.current.on('user-offline', ({ userId }) => {
-      setFriends(prevFriends => 
-        prevFriends.map(friend => 
-          friend.id === userId ? { ...friend, isOnline: false } : friend
-        )
-      );
-    });
+    // Nettoyer les anciens listeners pour éviter les doublons
+    if (socketRef.current) {
+      socketRef.current.off('user-online');
+      socketRef.current.off('user-offline');
+      
+      // Écouter les changements de statut en ligne des amis
+      socketRef.current.on('user-online', ({ userId }) => {
+        setFriends(prevFriends => 
+          prevFriends.map(friend => 
+            friend.id === userId ? { ...friend, isOnline: true } : friend
+          )
+        );
+      });
+      
+      socketRef.current.on('user-offline', ({ userId }) => {
+        setFriends(prevFriends => 
+          prevFriends.map(friend => 
+            friend.id === userId ? { ...friend, isOnline: false } : friend
+          )
+        );
+      });
+    }
   };
 
   const fetchFriends = async () => {
@@ -201,8 +203,8 @@ export default function Friends() {
 
     if (!socketRef.current || !socketRef.current.connected) {
       // Réconnecter le socket si nécessaire
-      const apiUrl = API_URL;
-      socketRef.current = io(apiUrl);
+      // Utiliser le service centralisé de socket
+      socketRef.current = getSocket(false);
     }
 
     // Créer une room

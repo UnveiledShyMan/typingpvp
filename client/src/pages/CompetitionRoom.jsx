@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { io } from 'socket.io-client'
+import { getSocket, cleanupSocket } from '../services/socketService'
 import { useToastContext } from '../contexts/ToastContext'
-import { API_URL } from '../config/api.js'
 
 export default function CompetitionRoom() {
   const { competitionId } = useParams();
@@ -30,15 +29,27 @@ export default function CompetitionRoom() {
       return;
     }
 
-    const apiUrl = API_URL;
-    socketRef.current = io(apiUrl, {
-      transports: ['polling'], // Forcer polling pour éviter les problèmes avec Plesk
-      upgrade: false,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
-    });
+    // Utiliser le service centralisé de socket qui gère correctement l'URL
+    socketRef.current = getSocket(false);
     const socket = socketRef.current;
+    
+    if (!socket) {
+      toast.error('Failed to initialize socket connection');
+      return;
+    }
+    
+    // Nettoyer les anciens listeners pour éviter les doublons
+    cleanupSocket(socket, [
+      'competition-joined',
+      'competition-updated',
+      'competition-starting',
+      'competition-countdown',
+      'competition-started',
+      'competition-ended',
+      'competition-leaderboard',
+      'competition-error',
+      'error'
+    ]);
 
     socket.emit('join-competition', { competitionId, userId, username });
 
@@ -88,15 +99,18 @@ export default function CompetitionRoom() {
     });
 
     return () => {
-      socket.off('competition-joined');
-      socket.off('competition-updated');
-      socket.off('competition-starting');
-      socket.off('competition-countdown');
-      socket.off('competition-started');
-      socket.off('competition-leaderboard');
-      socket.off('competition-ended');
-      socket.off('competition-error');
-      socket.disconnect();
+      // Nettoyer les listeners spécifiques à CompetitionRoom, mais ne pas déconnecter le socket
+      // car il peut être utilisé par d'autres composants
+      cleanupSocket(socket, [
+        'competition-joined',
+        'competition-updated',
+        'competition-starting',
+        'competition-countdown',
+        'competition-started',
+        'competition-leaderboard',
+        'competition-ended',
+        'competition-error'
+      ]);
     };
   }, [competitionId, username, userId, navigate]);
 
