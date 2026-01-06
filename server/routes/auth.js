@@ -7,9 +7,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 // Inscription
 router.post('/register', async (req, res) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:9',message:'register entry',data:{username:req.body?.username,email:req.body?.email,hasPassword:!!req.body?.password},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   try {
     const { username, email, password } = req.body;
 
@@ -32,18 +29,9 @@ router.post('/register', async (req, res) => {
     fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:28',message:'before createUser',data:{username,email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     const user = await createUser(username, email, password);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:30',message:'after createUser',data:{userId:user?.id,hasUser:!!user,userKeys:user?Object.keys(user):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     
     // Générer un token JWT
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:33',message:'before jwt sign',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:35',message:'before response',data:{hasToken:!!token,userFields:{id:user?.id,username:user?.username,email:user?.email,avatar:user?.avatar,bio:user?.bio,hasMMR:!!user?.mmr,hasStats:!!user?.stats}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
 
     res.json({
       token,
@@ -58,9 +46,6 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4e8be7e1-4a17-4ae6-97b8-582b4a7c2335',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:48',message:'register catch',data:{errorMessage:error?.message,errorCode:error?.code,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     console.error('Register error:', error);
     // En développement, retourner le message d'erreur complet pour faciliter le debug
     const errorMessage = process.env.NODE_ENV === 'production' 

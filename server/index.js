@@ -21,7 +21,9 @@ import { getUserById, recordMatch, updateUser } from './db.js';
 // Système ELO amélioré activé : K-factor adaptatif selon le nombre de matchs et le niveau
 // Plus précis que ELO standard, meilleure adaptation pour nouveaux joueurs
 import { calculateNewMMR } from './utils/eloImproved.js';
+import { invalidateRankingsCache } from './utils/rankingsCache.js';
 import { MatchmakingQueue } from './utils/matchmakingQueue.js';
+import { initSocketNotifications } from './utils/socketNotifications.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -267,6 +269,20 @@ io.on('connection', (socket) => {
   // Gérer les reconnexions (si le transport se reconnecte)
   socket.conn.on('upgrade', () => {
     console.log(`⬆️ Socket ${socket.id} transport upgraded`);
+  });
+
+  // Enregistrer un utilisateur comme en ligne (pour les notifications)
+  socket.on('register-user', ({ userId }) => {
+    if (!userId) return;
+    
+    // Ajouter le socket à la liste des sockets de cet utilisateur
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, new Set());
+    }
+    onlineUsers.get(userId).add(socket.id);
+    
+    // Notifier les amis que cet utilisateur est en ligne
+    // (géré dans friendsRoutes via setOnlineUsers)
   });
 
   // Créer une nouvelle room
@@ -709,7 +725,13 @@ io.on('connection', (socket) => {
       }]
     });
     
-    console.log(`Match results updated: ${user1.username} (${mmr1} → ${newMMR1}) vs ${user2.username} (${mmr2} → ${newMMR2}), Winner: ${player1Won ? user1.username : user2.username}`);
+    // Invalider le cache des rankings pour cette langue (les ELO ont changé)
+    invalidateRankingsCache(language);
+    
+    // Log seulement en développement
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Match results updated: ${user1.username} (${mmr1} → ${newMMR1}) vs ${user2.username} (${mmr2} → ${newMMR2}), Winner: ${player1Won ? user1.username : user2.username}`);
+    }
     
     return eloChanges;
   }
@@ -1212,6 +1234,17 @@ io.on('connection', (socket) => {
 
   // Déconnexion
   socket.on('disconnect', () => {
+    // Retirer de la liste des utilisateurs en ligne
+    for (const [userId, socketIds] of onlineUsers.entries()) {
+      if (socketIds.has(socket.id)) {
+        socketIds.delete(socket.id);
+        // Si plus aucun socket pour cet utilisateur, retirer de la map
+        if (socketIds.size === 0) {
+          onlineUsers.delete(userId);
+        }
+      }
+    }
+    
     // Retirer de la queue de matchmaking optimisée
     const wasInQueue = matchmakingQueue.hasPlayer(socket.id);
     if (wasInQueue) {
@@ -1300,6 +1333,9 @@ io.on('connection', (socket) => {
     console.log('User disconnected:', socket.id);
   });
 });
+
+// Initialiser les notifications Socket.io pour les routes (après la définition de onlineUsers)
+initSocketNotifications(io, onlineUsers);
 
 // Exporter onlineUsers pour utilisation dans les routes
 export { onlineUsers };

@@ -1,6 +1,7 @@
 import express from 'express';
 import { getUserById, getAllUsers, updateUser } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { notifyFriendRequest, notifyFriendAccepted, notifyFriendRejected } from '../utils/socketNotifications.js';
 
 const router = express.Router();
 
@@ -135,6 +136,13 @@ router.post('/request/:userId', authenticateToken, async (req, res) => {
     await updateUser(currentUser);
     await updateUser(targetUser);
     
+    // Envoyer une notification Socket.io en temps réel
+    notifyFriendRequest(targetUserId, {
+      id: currentUser.id,
+      username: currentUser.username,
+      avatar: currentUser.avatar
+    });
+    
     res.json({ message: 'Friend request sent', user: {
       id: targetUser.id,
       username: targetUser.username,
@@ -192,6 +200,13 @@ router.post('/accept/:userId', authenticateToken, async (req, res) => {
     await updateUser(currentUser);
     await updateUser(senderUser);
     
+    // Envoyer une notification Socket.io en temps réel
+    notifyFriendAccepted(senderUserId, {
+      id: currentUser.id,
+      username: currentUser.username,
+      avatar: currentUser.avatar
+    });
+    
     res.json({ message: 'Friend request accepted', user: {
       id: senderUser.id,
       username: senderUser.username,
@@ -215,7 +230,8 @@ router.delete('/request/:userId', authenticateToken, async (req, res) => {
     }
     
     // Retirer des demandes reçues (refuser)
-    if (currentUser.friendRequests?.received?.includes(targetUserId)) {
+    const wasReceived = currentUser.friendRequests?.received?.includes(targetUserId);
+    if (wasReceived) {
       currentUser.friendRequests.received = currentUser.friendRequests.received.filter(id => id !== targetUserId);
       if (targetUser.friendRequests?.sent) {
         targetUser.friendRequests.sent = targetUser.friendRequests.sent.filter(id => id !== currentUser.id);
@@ -233,6 +249,14 @@ router.delete('/request/:userId', authenticateToken, async (req, res) => {
     // Sauvegarder dans la base de données
     await updateUser(currentUser);
     await updateUser(targetUser);
+    
+    // Si c'était une demande reçue (refus), notifier l'expéditeur
+    if (wasReceived) {
+      notifyFriendRejected(targetUserId, {
+        id: currentUser.id,
+        username: currentUser.username
+      });
+    }
     
     res.json({ message: 'Friend request removed' });
   } catch (error) {

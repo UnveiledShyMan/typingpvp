@@ -31,7 +31,14 @@ export default function Friends() {
       if (socketRef.current) {
         // Nettoyer les listeners spécifiques à Friends, mais ne pas déconnecter le socket
         // car il peut être utilisé par d'autres composants
-        cleanupSocket(socketRef.current, ['user-online', 'user-offline', 'register-user']);
+        cleanupSocket(socketRef.current, [
+          'user-online', 
+          'user-offline', 
+          'register-user',
+          'friend-request-received',
+          'friend-request-accepted',
+          'friend-request-rejected'
+        ]);
       }
     };
   }, []);

@@ -17,6 +17,15 @@ export default function Profile({ userId: currentUserId }) {
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
+  // Valider que userId est présent et valide
+  useEffect(() => {
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      toast.error('Invalid user ID');
+      navigate('/');
+      return;
+    }
+  }, [userId, navigate, toast]);
+  
   // Utiliser React Query pour le cache du profil
   const { data: user, isLoading: loading, refetch: refetchProfile } = useProfile(userId);
   const updateProfileMutation = useUpdateProfile();
@@ -44,6 +53,11 @@ export default function Profile({ userId: currentUserId }) {
   const [matchLanguageFilter, setMatchLanguageFilter] = useState('all'); // 'all' ou code langue spécifique
   const [matchSort, setMatchSort] = useState('date'); // 'date', 'wpm', 'accuracy'
   const [matchSortOrder, setMatchSortOrder] = useState('desc'); // 'asc', 'desc'
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [matchesPerPage] = useState(10);
+  const [hasMoreMatches, setHasMoreMatches] = useState(false);
+  const [loadingMatches, setLoadingMatches] = useState(false);
 
   // Initialiser le formulaire d'édition quand les données sont chargées
   useEffect(() => {

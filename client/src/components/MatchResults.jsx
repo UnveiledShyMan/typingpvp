@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ShareButtons from './ShareButtons';
+import { navigateToProfile, isValidUserId } from '../utils/profileNavigation';
 
 export default function MatchResults({ 
   players, 
@@ -170,9 +171,9 @@ export default function MatchResults({
                 <div className="text-xl font-semibold text-text-primary">{opponent.name}</div>
                 {!myIsWinner && winner && winner.id === opponent.id && <span className="text-2xl">👑</span>}
               </div>
-              {opponent.userId && (
+              {isValidUserId(opponent.userId) && (
                 <button
-                  onClick={() => navigate(`/profile/${opponent.userId}`)}
+                  onClick={() => navigateToProfile(navigate, opponent.userId)}
                   className="text-accent-primary hover:text-accent-hover text-sm font-medium transition-colors flex items-center gap-1"
                   title="View profile"
                 >

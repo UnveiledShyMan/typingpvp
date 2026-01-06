@@ -3,6 +3,8 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getSocket, cleanupSocket } from '../services/socketService'
 import { useToastContext } from '../contexts/ToastContext'
 import ShareButtons from '../components/ShareButtons'
+import UserTooltip from '../components/UserTooltip'
+import { navigateToProfile, isValidUserId } from '../utils/profileNavigation'
 
 export default function CompetitionRoom() {
   const { competitionId } = useParams();
@@ -419,7 +421,7 @@ export default function CompetitionRoom() {
                             {player.userId && player.name !== username ? (
                               <UserTooltip userId={player.userId} username={player.name}>
                                 <button
-                                  onClick={() => navigate(`/profile/${player.userId}`)}
+                                  onClick={() => navigateToProfile(navigate, player.userId)}
                                   className="text-sm font-medium text-text-primary hover:text-accent-primary transition-colors cursor-pointer"
                                   title="View profile"
                                 >

@@ -12,6 +12,7 @@ import { languages } from '../data/languages'
 import { generateText } from '../data/languages'
 import { generatePhraseText } from '../data/phrases'
 import { getSocket, cleanupSocket } from '../services/socketService'
+import { navigateToProfile, isValidUserId } from '../utils/profileNavigation'
 
 export default function BattleRoom() {
   const { roomId } = useParams();
@@ -1065,9 +1066,9 @@ export default function BattleRoom() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-text-primary text-sm font-medium">{opponent.name}</div>
                       {/* Lien vers le profil de l'adversaire */}
-                      {opponent.userId && (
+                      {isValidUserId(opponent.userId) && (
                         <button
-                          onClick={() => navigate(`/profile/${opponent.userId}`)}
+                          onClick={() => navigateToProfile(navigate, opponent.userId)}
                           className="text-accent-primary hover:text-accent-hover text-xs font-medium transition-colors"
                           title="View opponent profile"
                         >
@@ -1161,9 +1162,9 @@ export default function BattleRoom() {
                       return (
                         <div key={msg.id} className="flex gap-3">
                           {/* Avatar cliquable si le joueur a un userId */}
-                          {player?.userId ? (
+                          {isValidUserId(player?.userId) ? (
                             <button
-                              onClick={() => navigate(`/profile/${player.userId}`)}
+                              onClick={() => navigateToProfile(navigate, player.userId)}
                               className="flex-shrink-0 w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary text-xs font-bold hover:bg-accent-primary/30 transition-colors cursor-pointer"
                               title="View profile"
                             >
@@ -1177,10 +1178,10 @@ export default function BattleRoom() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 mb-1">
                               {/* Nom d'utilisateur cliquable avec tooltip si le joueur a un userId */}
-                              {player?.userId && !isMe ? (
+                              {isValidUserId(player?.userId) && !isMe ? (
                                 <UserTooltip userId={player.userId} username={msg.username}>
                                   <button
-                                    onClick={() => navigate(`/profile/${player.userId}`)}
+                                    onClick={() => navigateToProfile(navigate, player.userId)}
                                     className="text-text-primary text-sm font-semibold hover:text-accent-primary transition-colors cursor-pointer"
                                     title="View profile"
                                   >
