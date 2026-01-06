@@ -367,12 +367,49 @@ export default function Profile({ userId: currentUserId, username: currentUserna
     website: ''
   };
 
+  // Préparer les données JSON-LD pour le structured data SEO
+  const profileJsonLd = {
+    '@type': 'ProfilePage',
+    '@id': `https://typingpvp.com/profile/${user.username}`,
+    mainEntity: {
+      '@type': 'Person',
+      '@id': `https://typingpvp.com/profile/${user.username}#person`,
+      name: user.username,
+      description: user.bio || `${user.username}'s typing profile on TypingPVP`,
+      url: `https://typingpvp.com/profile/${user.username}`,
+      ...(user.avatar && { image: user.avatar }),
+      ...(socialMedia.twitter && { sameAs: [`https://twitter.com/${socialMedia.twitter.replace('@', '')}`] }),
+      ...(socialMedia.github && { sameAs: [...(socialMedia.twitter ? [] : []), `https://github.com/${socialMedia.github}`] }),
+      ...(socialMedia.website && { url: socialMedia.website }),
+      knowsAbout: ['Typing', 'Competitive Typing', 'WPM', 'Typing Speed', user.gear || 'Keyboard'],
+      ...(user.stats && {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: winRate,
+          bestRating: '100',
+          worstRating: '0',
+          ratingCount: user.stats.totalMatches || 0
+        }
+      })
+    },
+    ...(rankInfo && {
+      about: {
+        '@type': 'Thing',
+        name: rankInfo.tier,
+        description: `Rank: ${rankInfo.tier} - ${rankInfo.rank}`
+      }
+    })
+  };
+
   return (
     <>
       <SEOHead 
         title={`${user.username} - Profile - TypingPVP`}
         description={user.bio || `View ${user.username}'s typing stats, ELO, and match history`}
         keywords={`${user.username}, typing profile, typing stats, ${user.gear || ''}`}
+        url={`https://typingpvp.com/profile/${user.username}`}
+        type="ProfilePage"
+        jsonLd={profileJsonLd}
       />
       <div className="h-full w-full flex flex-col overflow-hidden">
         <div className="w-full h-full max-w-5xl mx-auto flex-1 min-h-0 overflow-y-auto profile-scroll p-4 sm:p-6">
@@ -700,19 +737,22 @@ export default function Profile({ userId: currentUserId, username: currentUserna
               </div>
 
               {/* Language Selector et Stats par Langue - Design harmonisé */}
+              {/* Afficher le sélecteur seulement s'il y a plusieurs langues disponibles */}
               <div className="mb-4 sm:mb-6 space-y-4">
-                <select
-                  value={selectedLang}
-                  onChange={(e) => setSelectedLang(e.target.value)}
-                  className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
-                  style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                >
-                  {Object.entries(user.mmr || {}).map(([lang]) => (
-                    <option key={lang} value={lang} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                      {lang.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
+                {Object.keys(user.mmr || {}).length > 1 && (
+                  <select
+                    value={selectedLang}
+                    onChange={(e) => setSelectedLang(e.target.value)}
+                    className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                    style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                  >
+                    {Object.entries(user.mmr || {}).map(([lang]) => (
+                      <option key={lang} value={lang} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                        {lang.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 
                 {/* Stats détaillées pour la langue sélectionnée */}
                 {calculateLanguageStats && (

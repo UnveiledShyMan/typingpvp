@@ -75,8 +75,11 @@ export default function BattleRoom() {
   }, [playerName, currentUserFromContext]);
 
   // Récupérer l'utilisateur courant si userId est fourni
+  // Ne pas faire la requête si l'utilisateur n'est pas connecté (évite l'erreur 401)
   useEffect(() => {
-    if (userId || matchmaking || currentUserFromContext) {
+    // Vérifier si un token existe avant de faire la requête
+    const token = localStorage.getItem('token');
+    if ((userId || matchmaking || currentUserFromContext) && token) {
       const fetchUser = async () => {
         try {
           const userData = await authService.getCurrentUser();
@@ -85,13 +88,16 @@ export default function BattleRoom() {
             setPlayerName(userData.username);
           }
         } catch (error) {
-          // Erreur gérée par apiService
+          // Erreur gérée par apiService - silencieuse si 401 (utilisateur non connecté)
           setCurrentUser(null);
         }
       };
       fetchUser();
+    } else {
+      // Pas de token, définir currentUser à null
+      setCurrentUser(null);
     }
-  }, [userId, matchmaking, currentUserFromContext]);
+  }, [userId, matchmaking, currentUserFromContext, playerName]);
 
   // Gérer la soumission du nom
   const handleNameSubmit = () => {
@@ -329,7 +335,9 @@ export default function BattleRoom() {
         setEloChanges(data.eloChanges);
         
         // Rafraîchir les données utilisateur si connecté pour mettre à jour les ELO
-        if (userId || currentUser?.id) {
+        // Vérifier qu'un token existe avant de faire la requête
+        const token = localStorage.getItem('token');
+        if ((userId || currentUser?.id) && token) {
           const refreshUserData = async () => {
             try {
               const userData = await authService.getCurrentUser();
@@ -340,7 +348,7 @@ export default function BattleRoom() {
                 detail: { userId: userData.id } 
               }));
             } catch (error) {
-              // Erreur gérée par apiService
+              // Erreur gérée par apiService - silencieuse si 401 (utilisateur non connecté)
             }
           };
           
@@ -1118,11 +1126,13 @@ export default function BattleRoom() {
                         <span className="text-text-primary text-sm font-semibold">{opponent.name}</span>
                       </div>
                       {/* Lien vers le profil de l'adversaire - Vérifications de sécurité */}
-                      {isValidUserId(opponent.userId) && (
+                      {isValidUserId(opponent.userId) && opponent.name && (
                         <button
                           onClick={() => {
                             try {
-                              navigateToProfile(navigate, opponent.userId, opponent.name);
+                              if (navigate && typeof navigate === 'function') {
+                                navigateToProfile(navigate, opponent.userId, opponent.name);
+                              }
                             } catch (error) {
                               console.error('Error navigating to profile:', error);
                             }
@@ -1229,9 +1239,17 @@ export default function BattleRoom() {
                       return (
                         <div key={msg.id} className={`flex gap-3 p-2 rounded-lg transition-all ${isMe ? 'bg-accent-primary/5' : 'hover:bg-bg-primary/20'}`}>
                           {/* Avatar cliquable si le joueur a un userId - Design amélioré */}
-                          {isValidUserId(player?.userId) ? (
+                          {player && isValidUserId(player.userId) && msg.username ? (
                             <button
-                              onClick={() => navigateToProfile(navigate, player.userId, msg.username)}
+                              onClick={() => {
+                                try {
+                                  if (navigate && typeof navigate === 'function') {
+                                    navigateToProfile(navigate, player.userId, msg.username);
+                                  }
+                                } catch (error) {
+                                  console.error('Error navigating to profile:', error);
+                                }
+                              }}
                               className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110 ${
                                 isMe 
                                   ? 'bg-accent-primary/30 text-accent-primary border-2 border-accent-primary/40' 
@@ -1258,7 +1276,9 @@ export default function BattleRoom() {
                                   <button
                                     onClick={() => {
                                       try {
-                                        navigateToProfile(navigate, player.userId, msg.username);
+                                        if (navigate && typeof navigate === 'function') {
+                                          navigateToProfile(navigate, player.userId, msg.username);
+                                        }
                                       } catch (error) {
                                         console.error('Error navigating to profile:', error);
                                       }

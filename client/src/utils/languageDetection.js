@@ -85,3 +85,24 @@ export function getDefaultLanguage() {
   return detectBrowserLanguage();
 }
 
+/**
+ * Met à jour l'attribut lang du HTML pour le SEO
+ * Cette fonction est appelée automatiquement par le composant SEOHead
+ * mais peut aussi être utilisée manuellement si nécessaire
+ * @param {string} langCode - Code de langue (en, fr, es, etc.)
+ */
+export function updateHTMLLang(langCode) {
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.lang = langCode;
+  }
+}
+
+/**
+ * Initialise la langue dans le HTML au chargement de la page
+ * À appeler une fois au démarrage de l'application
+ */
+export function initializeHTMLLang() {
+  const defaultLang = getDefaultLanguage();
+  updateHTMLLang(defaultLang);
+}
+

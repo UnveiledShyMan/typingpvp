@@ -2,6 +2,10 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import { initializeHTMLLang } from './utils/languageDetection.js'
+
+// Initialiser la langue du HTML pour le SEO (avant le rendu)
+initializeHTMLLang();
 
 // Initialiser les couleurs par défaut (thème dark fixe)
 const initTheme = () => {

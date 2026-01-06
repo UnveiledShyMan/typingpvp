@@ -1,0 +1,39 @@
+# Robots.txt optimisé pour TypingPVP
+# Permet l'indexation complète du site tout en protégeant les ressources privées
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /oauth/
+Disallow: /battle/
+Disallow: /competition/
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://typingpvp.com/sitemap.xml
+
+# Crawl-delay pour éviter la surcharge (optionnel, ajuster si nécessaire)
+Crawl-delay: 1
+
+# Autoriser Googlebot et Bingbot avec des règles spécifiques
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /oauth/
+Disallow: /battle/
+Disallow: /competition/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /oauth/
+Disallow: /battle/
+Disallow: /competition/
+
+# Bloquer les bots malveillants
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+

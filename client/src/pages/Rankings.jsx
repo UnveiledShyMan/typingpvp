@@ -34,12 +34,38 @@ export default function Rankings() {
     return rankInfo?.color || '#646669';
   };
 
+  // Préparer les données JSON-LD pour le structured data SEO
+  const rankingsJsonLd = {
+    '@type': 'ItemList',
+    '@id': `https://typingpvp.com/rankings?lang=${selectedLang}`,
+    name: `${languages[selectedLang]?.name || 'Global'} Typing Rankings`,
+    description: `Global leaderboard for ${languages[selectedLang]?.name || 'typing'} language - Top typists ranked by ELO`,
+    numberOfItems: rankings.length,
+    ...(rankings.length > 0 && {
+      itemListElement: rankings.slice(0, 100).map((player, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        item: {
+          '@type': 'Person',
+          name: player.username,
+          url: `https://typingpvp.com/profile/${player.username}`,
+          ...(player.mmr && {
+            knowsAbout: ['Typing', `${languages[selectedLang]?.name || ''} Typing`]
+          })
+        }
+      }))
+    })
+  };
+
   return (
     <>
       <SEOHead 
-        title="Rankings - TypingPVP"
+        title={`${languages[selectedLang]?.name || 'Global'} Rankings - TypingPVP`}
         description={`Global leaderboard for ${languages[selectedLang]?.name || 'typing'} - Compete with the best typists`}
-        keywords={`typing rankings, leaderboard, ${languages[selectedLang]?.name || ''} typing, competitive typing`}
+        keywords={`typing rankings, leaderboard, ${languages[selectedLang]?.name || ''} typing, competitive typing, ELO leaderboard`}
+        url={`https://typingpvp.com/rankings?lang=${selectedLang}`}
+        type="ItemList"
+        jsonLd={rankingsJsonLd}
       />
       <div className="h-full w-full flex flex-col overflow-hidden">
       <div className="mb-4 sm:mb-6 flex-shrink-0">

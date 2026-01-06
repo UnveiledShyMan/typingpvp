@@ -17,7 +17,7 @@ import meRoutes from './routes/me.js';
 import friendsRoutes, { setOnlineUsers } from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 import discordRoutes from './routes/discord.js';
-import { getUserById, recordMatch, updateUser } from './db.js';
+import { getUserById, recordMatch, updateUser, getAllUsers } from './db.js';
 // Système ELO amélioré activé : K-factor adaptatif selon le nombre de matchs et le niveau
 // Plus précis que ELO standard, meilleure adaptation pour nouveaux joueurs
 import { calculateNewMMR } from './utils/eloImproved.js';
@@ -166,6 +166,105 @@ setOnlineUsers(onlineUsers);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/discord', discordRoutes);
+
+// Route pour générer le sitemap.xml dynamiquement pour le SEO
+// Cette route doit être accessible directement (pas sous /api)
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    const baseUrl = process.env.CLIENT_URL || 'https://typingpvp.com';
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    // Pages statiques principales avec priorité et fréquence de changement
+    const staticPages = [
+      { url: '/', priority: '1.0', changefreq: 'daily' },
+      { url: '/rankings', priority: '0.9', changefreq: 'hourly' },
+      { url: '/terms', priority: '0.3', changefreq: 'monthly' },
+      { url: '/privacy', priority: '0.3', changefreq: 'monthly' },
+      { url: '/legal', priority: '0.3', changefreq: 'monthly' }
+    ];
+
+    // Langues supportées pour les rankings
+    const supportedLanguages = ['en', 'fr', 'es', 'de', 'it', 'pt', 'ru', 'ja', 'zh', 'ko'];
+    
+    // Ajouter les pages de rankings par langue
+    supportedLanguages.forEach(lang => {
+      staticPages.push({
+        url: `/rankings?lang=${lang}`,
+        priority: '0.8',
+        changefreq: 'hourly'
+      });
+    });
+
+    // Récupérer les top utilisateurs pour ajouter leurs profils au sitemap
+    // Limiter à 1000 profils pour éviter un sitemap trop volumineux
+    let topUsers = [];
+    try {
+      // Récupérer tous les utilisateurs (ou une fonction optimisée pour les top users)
+      // Pour l'instant, on utilise getAllUsers mais on pourrait optimiser avec une query limitée
+      const allUsers = await getAllUsers();
+      
+      // Trier par MMR total (somme de tous les MMR) et prendre les top 1000
+      topUsers = allUsers
+        .filter(user => user.username && user.username !== 'undefined')
+        .map(user => {
+          // Calculer le MMR total pour le tri
+          const mmr = user.mmr || {};
+          const totalMMR = Object.values(mmr).reduce((sum, val) => sum + (val || 0), 0);
+          return { ...user, totalMMR };
+        })
+        .sort((a, b) => (b.totalMMR || 0) - (a.totalMMR || 0))
+        .slice(0, 1000);
+    } catch (error) {
+      logger.warn('Erreur lors de la récupération des utilisateurs pour le sitemap:', error);
+      // Continuer sans les profils utilisateurs en cas d'erreur
+    }
+
+    // Générer le XML du sitemap
+    let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+`;
+
+    // Ajouter les pages statiques
+    staticPages.forEach(page => {
+      sitemap += `  <url>
+    <loc>${baseUrl}${page.url}</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>${page.changefreq}</changefreq>
+    <priority>${page.priority}</priority>
+  </url>
+`;
+    });
+
+    // Ajouter les profils utilisateurs
+    topUsers.forEach(user => {
+      if (user.username && user.username !== 'undefined') {
+        const lastModified = user.updated_at ? 
+          new Date(user.updated_at).toISOString().split('T')[0] : 
+          currentDate;
+        
+        sitemap += `  <url>
+    <loc>${baseUrl}/profile/${encodeURIComponent(user.username)}</loc>
+    <lastmod>${lastModified}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+`;
+      }
+    });
+
+    sitemap += `</urlset>`;
+
+    // Définir les headers appropriés pour le XML
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600'); // Cache 1 heure
+    res.send(sitemap);
+  } catch (error) {
+    logger.error('Erreur lors de la génération du sitemap:', error);
+    res.status(500).send('Error generating sitemap');
+  }
+});
 
 // Route de santé pour Socket.io - vérifie que le serveur Socket.io fonctionne
 // IMPORTANT: Cette route doit être AVANT la route catch-all

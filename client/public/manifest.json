@@ -1,0 +1,67 @@
+{
+  "name": "TypingPVP - Competitive Typing Battles",
+  "short_name": "TypingPVP",
+  "description": "Compete in real-time typing battles, improve your speed and accuracy, and climb the global leaderboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "entertainment", "education"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/logo.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "label": "TypingPVP Main Screen"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Play Solo",
+      "short_name": "Solo",
+      "description": "Practice typing solo",
+      "url": "/?mode=solo",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Rankings",
+      "short_name": "Rankings",
+      "description": "View global leaderboard",
+      "url": "/rankings",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "1v1 Battle",
+      "short_name": "Battle",
+      "description": "Challenge a player",
+      "url": "/?mode=battle",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
+
