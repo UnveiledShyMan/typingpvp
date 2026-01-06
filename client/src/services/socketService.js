@@ -46,36 +46,49 @@ export function createSocket() {
   });
   
   // Logger la configuration pour debug
-  if (import.meta.env.DEV) {
-    console.log('🔌 Socket.IO créé avec:', {
+  console.log('🔌 Socket.IO créé avec:', {
+    url: API_URL,
+    path: '/socket.io/',
+    socketId: socket.id || 'connecting...'
+  });
+
+  // Logger les connexions réussies
+  socket.on('connect', () => {
+    console.log('✅ Socket.IO connecté:', {
+      socketId: socket.id,
       url: API_URL,
-      path: '/socket.io/',
-      socketId: socket.id || 'connecting...'
+      path: '/socket.io/'
     });
-  }
+  });
 
   // Gestion simplifiée des erreurs - éviter les boucles infinies
   // Socket.IO gère déjà la reconnexion automatique, on ne doit pas forcer de reconnexion manuelle
   socket.on('connect_error', (error) => {
-    // Ne logger que les erreurs significatives (pas les erreurs de polling normales)
-    if (!error.message.includes('xhr poll error') && !error.message.includes('transport close')) {
-      console.error('❌ Socket.IO connection error:', error.message);
-    }
+    // Logger toutes les erreurs pour debug en production
+    console.error('❌ Socket.IO connection error:', {
+      message: error.message,
+      type: error.type,
+      description: error.description,
+      url: API_URL,
+      path: '/socket.io/'
+    });
     // Ne PAS forcer de reconnexion manuelle - laisser Socket.IO gérer
   });
 
   // Logger les reconnexions réussies
   socket.on('reconnect', (attemptNumber) => {
-    if (attemptNumber > 1) {
-      console.log(`✅ Socket.IO reconnected after ${attemptNumber} attempt(s)`);
-    }
+    console.log(`✅ Socket.IO reconnected after ${attemptNumber} attempt(s)`, {
+      socketId: socket.id,
+      url: API_URL
+    });
   });
 
-  // Logger les tentatives de reconnexion (seulement après la première)
+  // Logger les tentatives de reconnexion
   socket.on('reconnect_attempt', (attemptNumber) => {
-    if (attemptNumber > 3) {
-      console.log(`🔄 Socket.IO reconnection attempt ${attemptNumber}`);
-    }
+    console.log(`🔄 Socket.IO reconnection attempt ${attemptNumber}`, {
+      url: API_URL,
+      path: '/socket.io/'
+    });
   });
 
   return socket;

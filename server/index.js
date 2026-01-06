@@ -294,14 +294,18 @@ if (process.env.SERVE_CLIENT === 'true') {
 // IMPORTANT: Ne pas utiliser /socket.io/test car Socket.io intercepte toutes les requêtes /socket.io/*
 // Utiliser /api/socket-test à la place
 app.get('/api/socket-test', (req, res) => {
+  const socketCount = io.sockets.sockets.size;
   res.json({ 
     message: 'Socket.io endpoint is accessible',
     socketIoPath: '/socket.io/',
     transports: ['polling'],
+    activeConnections: socketCount,
     server: {
       nodeEnv: process.env.NODE_ENV || 'development',
-      clientUrl: process.env.CLIENT_URL || 'not set'
-    }
+      clientUrl: process.env.CLIENT_URL || 'not set',
+      port: process.env.PORT || 3001
+    },
+    note: 'To test Socket.IO connection, use the client application. Direct browser access to /socket.io/ will not work as it requires specific Socket.IO protocol parameters.'
   });
 });
 
