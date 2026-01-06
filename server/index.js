@@ -1508,10 +1508,18 @@ console.log(`📍 Port: ${PORT}, Host: ${HOST}`);
 console.log(`⚠️ Si vous avez plusieurs applications Node.js sur ce serveur, vérifiez que les ports sont différents`);
 
 // Démarrer le serveur avec gestion d'erreur
+// Logger le démarrage pour détecter les redémarrages de Passenger
+console.log('🚀 Démarrage du serveur à:', new Date().toISOString());
+console.log('📊 Process ID:', process.pid);
+console.log('🔧 Node.js version:', process.version);
+console.log('🌍 NODE_ENV:', process.env.NODE_ENV || 'development');
+
 try {
   httpServer.listen(PORT, HOST, () => {
     console.log(`✅ Serveur démarré sur ${HOST}:${PORT}`);
     console.log(`📡 Socket.io configuré (polling uniquement)`);
+    console.log(`⏰ Timestamp démarrage: ${new Date().toISOString()}`);
+    console.log(`🔑 Process PID: ${process.pid}`);
   }).on('error', (error) => {
     console.error('❌ Erreur lors du démarrage du serveur:', error);
     console.error('Code erreur:', error.code);
