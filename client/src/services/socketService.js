@@ -79,7 +79,8 @@ export function createSocket() {
   socket.on('reconnect', (attemptNumber) => {
     console.log(`✅ Socket.IO reconnected after ${attemptNumber} attempt(s)`, {
       socketId: socket.id,
-      url: API_URL
+      url: API_URL,
+      path: '/socket.io/'
     });
   });
 
@@ -87,8 +88,25 @@ export function createSocket() {
   socket.on('reconnect_attempt', (attemptNumber) => {
     console.log(`🔄 Socket.IO reconnection attempt ${attemptNumber}`, {
       url: API_URL,
-      path: '/socket.io/'
+      path: '/socket.io/',
+      timestamp: new Date().toISOString()
     });
+  });
+  
+  // Logger les déconnexions pour comprendre pourquoi les sessions expirent
+  socket.on('disconnect', (reason) => {
+    console.warn('⚠️ Socket.IO disconnected:', {
+      reason: reason,
+      socketId: socket.id,
+      url: API_URL,
+      path: '/socket.io/',
+      timestamp: new Date().toISOString()
+    });
+    
+    // Si la déconnexion est due à une erreur 400 (session invalide), forcer une nouvelle connexion
+    if (reason === 'transport close' || reason === 'ping timeout') {
+      console.warn('💡 Déconnexion due à un problème de transport - Socket.IO va tenter de se reconnecter automatiquement');
+    }
   });
 
   return socket;

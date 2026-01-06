@@ -49,9 +49,10 @@ const io = new Server(httpServer, {
   allowUpgrades: false,
   // Timeouts augmentés pour permettre au reverse proxy de fonctionner correctement
   // pingTimeout: temps max entre un ping et sa réponse (si dépassé, session expirée)
-  pingTimeout: 90000, // 90 secondes (encore augmenté pour les reverse proxies lents)
+  // IMPORTANT: En production avec reverse proxy, augmenter encore plus pour éviter les sessions expirées
+  pingTimeout: 120000, // 120 secondes (2 minutes) pour les reverse proxies très lents
   // pingInterval: temps entre chaque ping envoyé par le serveur
-  pingInterval: 30000, // 30 secondes (augmenté pour réduire la charge)
+  pingInterval: 25000, // 25 secondes (moins fréquent pour réduire la charge, mais assez pour maintenir la connexion)
   // connectTimeout: temps max pour établir une connexion initiale
   connectTimeout: 60000, // 60 secondes (augmenté pour les connexions lentes)
   // Améliorer la gestion des sessions expirées
@@ -320,50 +321,77 @@ io.engine.on('connection_error', (err) => {
   }
 });
 
-// Logger toutes les requêtes Socket.io pour diagnostic (production)
+// Logger toutes les requêtes Socket.io pour diagnostic
+// IMPORTANT: Logger toutes les requêtes pour diagnostiquer les problèmes 400/502
 io.engine.on('request', (req, res) => {
-  // Logger toutes les requêtes en production pour voir si elles arrivent au serveur
-  if (process.env.NODE_ENV === 'production') {
+  const sid = req.query?.sid || 'new';
+  const isError = res.statusCode >= 400;
+  
+  // Logger toutes les requêtes (pas seulement en production) pour debug
+  if (isError || process.env.NODE_ENV === 'production') {
     console.log(`🔌 Socket.io ${req.method} ${req.url}`, {
+      statusCode: res.statusCode,
       origin: req.headers.origin,
       transport: req.query?.transport,
-      sid: req.query?.sid || 'new'
+      sid: sid,
+      timestamp: new Date().toISOString()
     });
   }
   
   // Logger les erreurs avec plus de détails
-  if (res.statusCode >= 400) {
+  if (isError) {
     console.error(`❌ Erreur Socket.io ${req.method} ${req.url}:`, res.statusCode);
     console.error('Headers:', {
       origin: req.headers.origin,
       host: req.headers.host,
-      'user-agent': req.headers['user-agent']?.substring(0, 50)
+      'user-agent': req.headers['user-agent']?.substring(0, 50),
+      'x-forwarded-for': req.headers['x-forwarded-for']
     });
     console.error('Query:', req.query);
     
     // Si c'est une erreur 400 avec un sid (session), c'est probablement une session expirée
     if (res.statusCode === 400 && req.query?.sid) {
-      console.error('⚠️ Session invalide ou expirée pour sid:', req.query.sid);
-      console.error('💡 Le client devrait se reconnecter automatiquement');
+      console.error('⚠️ Erreur 400: Session invalide ou expirée pour sid:', req.query.sid);
       
       // Vérifier si la session existe réellement
-      const session = io.engine.clients.get(req.query.sid);
-      if (!session) {
-        console.error('❌ Session non trouvée dans le serveur - Session expirée ou invalide');
-      } else {
-        console.log('✅ Session trouvée mais requête rejetée - Problème de validation');
+      try {
+        const session = io.engine.clients.get(req.query.sid);
+        if (!session) {
+          console.error('❌ Session non trouvée dans le serveur - Session expirée ou serveur redémarré');
+          console.error('💡 Cause probable: Le serveur a redémarré, la session a expiré (timeout), ou le reverse proxy a mis trop de temps à router la requête');
+          console.error('💡 Solutions possibles:');
+          console.error('   - Vérifier que le serveur Node.js ne redémarre pas fréquemment');
+          console.error('   - Augmenter les timeouts du reverse proxy (nginx/Apache) pour Socket.IO');
+          console.error('   - Vérifier les logs système pour voir si le processus Node.js crash');
+        } else {
+          console.error('✅ Session trouvée mais requête rejetée - Problème de validation côté serveur');
+          console.error('💡 Peut être dû à un problème de synchronisation ou de headers');
+        }
+      } catch (error) {
+        console.error('❌ Erreur lors de la vérification de session:', error.message);
       }
+      
+      // Log supplémentaire pour diagnostiquer
+      console.error('💡 Le client devrait automatiquement créer une nouvelle session');
+      console.error('💡 Statistiques Socket.IO:', {
+        totalClients: io.engine.clients.size,
+        timestamp: new Date().toISOString()
+      });
     }
     
     // Si c'est une erreur 502, c'est probablement un problème de reverse proxy
     if (res.statusCode === 502) {
       console.error('⚠️ Erreur 502: Problème de reverse proxy ou serveur Node.js inaccessible');
+      console.error('💡 Vérifiez que le serveur Node.js est bien démarré et que le reverse proxy peut y accéder');
+      console.error('💡 Vérifiez les timeouts du reverse proxy (doivent être >= 120s)');
     }
   }
   
   // Gérer les erreurs de session expirée de manière plus gracieuse
   res.on('error', (error) => {
     console.error('❌ Erreur de réponse Socket.io:', error.message);
+    console.error('URL:', req.url);
+    console.error('SID:', sid);
   });
 });
 
