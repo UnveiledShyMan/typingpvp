@@ -22,6 +22,12 @@ export default function BattleRoom() {
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
+  // Vérifier que navigate est bien une fonction (sécurité supplémentaire)
+  if (!navigate || typeof navigate !== 'function') {
+    console.error('BattleRoom: navigate is not a valid function');
+    return <div>Error: Navigation not available</div>;
+  }
+  
   // État pour gérer le pseudo si l'utilisateur rejoint via un lien direct
   const [showNameModal, setShowNameModal] = useState(false);
   const [tempPlayerName, setTempPlayerName] = useState('');
@@ -1126,12 +1132,12 @@ export default function BattleRoom() {
                         <span className="text-text-primary text-sm font-semibold">{opponent.name}</span>
                       </div>
                       {/* Lien vers le profil de l'adversaire - Vérifications de sécurité */}
-                      {isValidUserId(opponent.userId) && opponent.name && (
+                      {opponent && isValidUserId(opponent.userId) && opponent.name && (
                         <button
                           onClick={() => {
                             try {
-                              if (navigate && typeof navigate === 'function') {
-                                navigateToProfile(navigate, opponent.userId, opponent.name);
+                              if (navigate && typeof navigate === 'function' && opponent && opponent.userId && opponent.name) {
+                                navigateToProfile(navigate, opponent.userId, opponent.name || opponent.username);
                               }
                             } catch (error) {
                               console.error('Error navigating to profile:', error);
@@ -1233,17 +1239,17 @@ export default function BattleRoom() {
                   ) : (
                     chatMessages.map((msg) => {
                       // Trouver le joueur correspondant au message pour obtenir son userId
-                      const player = players.find(p => p.name === msg.username);
-                      const isMe = msg.username === playerName || (player?.userId && player.userId === (userId || currentUser?.id));
+                      const player = msg && msg.username ? players.find(p => p.name === msg.username) : null;
+                      const isMe = msg && msg.username && (msg.username === playerName || (player?.userId && player.userId === (userId || currentUser?.id)));
                       
                       return (
                         <div key={msg.id} className={`flex gap-3 p-2 rounded-lg transition-all ${isMe ? 'bg-accent-primary/5' : 'hover:bg-bg-primary/20'}`}>
                           {/* Avatar cliquable si le joueur a un userId - Design amélioré */}
-                          {player && isValidUserId(player.userId) && msg.username ? (
+                          {player && isValidUserId(player.userId) && msg && msg.username ? (
                             <button
                               onClick={() => {
                                 try {
-                                  if (navigate && typeof navigate === 'function') {
+                                  if (navigate && typeof navigate === 'function' && player && player.userId && msg && msg.username) {
                                     navigateToProfile(navigate, player.userId, msg.username);
                                   }
                                 } catch (error) {
@@ -1257,7 +1263,7 @@ export default function BattleRoom() {
                               }`}
                               title="View profile"
                             >
-                              {msg.username[0].toUpperCase()}
+                              {msg && msg.username && msg.username.length > 0 ? msg.username[0].toUpperCase() : '?'}
                             </button>
                           ) : (
                             <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -1265,18 +1271,18 @@ export default function BattleRoom() {
                                 ? 'bg-accent-primary/30 text-accent-primary border-2 border-accent-primary/40' 
                                 : 'bg-accent-primary/20 text-accent-primary border border-border-secondary/30'
                             }`}>
-                              {msg.username[0].toUpperCase()}
+                              {msg && msg.username && msg.username.length > 0 ? msg.username[0].toUpperCase() : '?'}
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 mb-1.5">
                               {/* Nom d'utilisateur cliquable avec tooltip si le joueur a un userId - Vérifications de sécurité */}
-                              {player && isValidUserId(player.userId) && !isMe && msg.username ? (
+                              {player && isValidUserId(player.userId) && !isMe && msg && msg.username ? (
                                 <UserTooltip userId={player.userId} username={msg.username}>
                                   <button
                                     onClick={() => {
                                       try {
-                                        if (navigate && typeof navigate === 'function') {
+                                        if (navigate && typeof navigate === 'function' && player && player.userId && msg && msg.username) {
                                           navigateToProfile(navigate, player.userId, msg.username);
                                         }
                                       } catch (error) {
@@ -1288,12 +1294,12 @@ export default function BattleRoom() {
                                     }`}
                                     title="View profile"
                                   >
-                                    {msg.username}
+                                    {msg && msg.username ? msg.username : 'Unknown'}
                                   </button>
                                 </UserTooltip>
                               ) : (
                                 <span className={`text-sm font-semibold ${isMe ? 'text-accent-primary' : 'text-text-primary'}`}>
-                                  {msg.username} {isMe && <span className="text-xs opacity-70">(you)</span>}
+                                  {msg && msg.username ? msg.username : 'Unknown'} {isMe && <span className="text-xs opacity-70">(you)</span>}
                                 </span>
                               )}
                               <span className="text-text-secondary text-xs">{formatMessageTime(msg.timestamp)}</span>
