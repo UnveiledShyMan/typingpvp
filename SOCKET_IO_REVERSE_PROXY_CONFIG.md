@@ -4,6 +4,32 @@
 
 Les erreurs "xhr poll error" et "xhr post error" persistent, indiquant que le reverse proxy (Plesk/Apache) bloque ou timeout les requêtes polling Socket.io.
 
+## ⚠️ Problème Critique : Plusieurs Applications Node.js
+
+**Si vous avez plusieurs applications Node.js sur le même serveur Plesk**, cela peut causer des conflits :
+
+1. **Conflits de ports** : Les deux applications peuvent essayer d'utiliser le même port
+2. **Ressources partagées** : Plesk limite les ressources (CPU, mémoire) par application
+3. **Process killer plus agressif** : Plesk tue les connexions long-running plus agressivement avec plusieurs applications
+4. **Configuration Apache** : Le reverse proxy peut router les requêtes vers la mauvaise application
+
+### Solutions
+
+1. **Vérifier les ports** : Assurez-vous que chaque application Node.js utilise un port différent
+   - Dans Plesk → Domaines → [votre-domaine] → Node.js
+   - Vérifiez la variable d'environnement `PORT` pour chaque application
+   - Les ports doivent être différents (ex: 3001 pour app1, 3002 pour app2)
+
+2. **Vérifier la configuration Apache** : Assurez-vous que le reverse proxy route vers le bon port
+   - Dans Plesk → Domaines → typingpvp.com → Apache & nginx Settings
+   - Vérifiez que `ProxyPass /socket.io/` pointe vers le bon port
+
+3. **Tester avec une seule application** : Désactivez temporairement l'autre application pour tester
+   - Dans Plesk → Domaines → [autre-domaine] → Node.js → Désactiver
+   - Testez si Socket.io fonctionne mieux avec une seule application active
+
+4. **Augmenter les ressources** : Si possible, augmentez les limites de ressources dans Plesk
+
 ## Diagnostic
 
 ### Vérifications à faire

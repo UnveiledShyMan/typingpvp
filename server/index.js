@@ -29,25 +29,26 @@ const httpServer = createServer(app);
 // Configuration Socket.io - optimisée pour Plesk/Apache
 // Plesk tue les connexions long-running, donc on utilise des timeouts très courts
 
-// Configuration Socket.io - optimisée pour Plesk qui tue les connexions long-running
-// Plesk tue automatiquement les connexions long-running, donc on utilise des timeouts très courts
-// et un polling plus fréquent pour éviter que Plesk ne tue les connexions
+// Configuration Socket.io - version simple qui fonctionnait ce matin (3404b51)
+// Retour à la configuration simple qui fonctionnait avant les modifications
+// CORS simple : accepter CLIENT_URL ou localhost, et typingpvp.com en production
+const socketCorsOrigin = process.env.CLIENT_URL || 
+  (process.env.NODE_ENV === 'production' ? 'https://typingpvp.com' : 'http://localhost:5173');
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? true : (process.env.CLIENT_URL || "http://localhost:5173"),
+    origin: socketCorsOrigin,
     methods: ["GET", "POST"],
     credentials: true
   },
   // Forcer polling uniquement pour éviter les problèmes avec Plesk/Apache qui tue les connexions long-running
   transports: ['polling'],
   allowUpgrades: false,
-  // Timeouts très courts pour éviter que Plesk tue les connexions (Plesk vérifie et tue les connexions long-running)
-  pingTimeout: 10000, // 10 secondes - très court pour éviter que Plesk tue la connexion
-  pingInterval: 5000, // 5 secondes - polling plus fréquent pour maintenir la connexion active
+  // Timeouts plus courts pour éviter que Plesk tue les connexions
+  pingTimeout: 20000, // 20 secondes
+  pingInterval: 10000, // 10 secondes
   // Permettre les reconnexions rapides
-  connectTimeout: 10000, // 10 secondes - timeout court pour la connexion initiale
-  // Désactiver la compression HTTP qui peut ralentir les réponses
-  httpCompression: false
+  connectTimeout: 20000 // 20 secondes
 });
 
 // Configuration CORS pour accepter les requêtes depuis le frontend
@@ -350,14 +351,13 @@ io.on('connection', (socket) => {
   console.log(`✅ User connected: ${socket.id} (Total: ${socketConnectionCount})`);
   
   // Heartbeat pour maintenir la connexion active
-  // Intervalle réduit à 5 secondes pour correspondre à pingInterval et éviter que Plesk tue la connexion
   const heartbeatInterval = setInterval(() => {
     if (socket.connected) {
       socket.emit('ping', { timestamp: Date.now() });
     } else {
       clearInterval(heartbeatInterval);
     }
-  }, 5000); // Ping toutes les 5 secondes (compatible avec pingInterval de 5s)
+  }, 10000); // Ping toutes les 10 secondes
   
   // Nettoyer l'intervalle à la déconnexion
   socket.on('disconnect', safeHandler((reason) => {
@@ -643,8 +643,10 @@ io.on('connection', (socket) => {
 
   // Mettre à jour la progression
   // NOTE: Ce handler est appelé très fréquemment (à chaque frappe)
-  // Il est optimisé pour être rapide : seulement des lookups dans des Maps et une émission
-  // Le throttling est géré côté client pour éviter de bloquer le thread principal
+  // IMPORTANT: Throttling côté serveur pour éviter de surcharger la connexion Socket.io
+  // Avec le polling, chaque message doit être envoyé via HTTP, donc on limite la fréquence
+  const updateProgressThrottle = new Map(); // Map<socketId, { lastEmit: number, timeout: NodeJS.Timeout }>
+  
   socket.on('update-progress', (data) => {
     const playerData = players.get(socket.id);
     if (!playerData) return;
@@ -656,19 +658,56 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return;
     
-    // Mise à jour rapide des données du joueur
+    // Mise à jour immédiate des données du joueur (toujours à jour)
     player.progress = data.progress;
     player.wpm = data.wpm || 0;
     player.accuracy = data.accuracy || 100;
     
-    // Envoyer la mise à jour aux autres joueurs (opération légère)
-    // Le client gère le throttling pour éviter les problèmes de performance
-    socket.to(roomId).emit('opponent-update', {
-      playerId: socket.id,
-      progress: player.progress,
-      wpm: player.wpm,
-      accuracy: player.accuracy
-    });
+    // Throttling côté serveur : envoyer les mises à jour maximum toutes les 500ms
+    // Cela évite de surcharger la connexion Socket.io avec le polling
+    const now = Date.now();
+    const throttleData = updateProgressThrottle.get(socket.id);
+    
+    if (!throttleData || (now - throttleData.lastEmit) >= 500) {
+      // Envoyer immédiatement si c'est la première fois ou si 500ms se sont écoulées
+      socket.to(roomId).emit('opponent-update', {
+        playerId: socket.id,
+        progress: player.progress,
+        wpm: player.wpm,
+        accuracy: player.accuracy
+      });
+      
+      if (throttleData && throttleData.timeout) {
+        clearTimeout(throttleData.timeout);
+      }
+      
+      updateProgressThrottle.set(socket.id, { lastEmit: now, timeout: null });
+    } else {
+      // Programmer une mise à jour différée si on est dans la fenêtre de throttling
+      if (throttleData.timeout) {
+        clearTimeout(throttleData.timeout);
+      }
+      
+      const delay = 500 - (now - throttleData.lastEmit);
+      throttleData.timeout = setTimeout(() => {
+        socket.to(roomId).emit('opponent-update', {
+          playerId: socket.id,
+          progress: player.progress,
+          wpm: player.wpm,
+          accuracy: player.accuracy
+        });
+        updateProgressThrottle.set(socket.id, { lastEmit: Date.now(), timeout: null });
+      }, delay);
+    }
+  });
+  
+  // Nettoyer le throttling à la déconnexion
+  socket.on('disconnect', () => {
+    const throttleData = updateProgressThrottle.get(socket.id);
+    if (throttleData && throttleData.timeout) {
+      clearTimeout(throttleData.timeout);
+    }
+    updateProgressThrottle.delete(socket.id);
   });
 
   // Finir la partie
@@ -1435,6 +1474,7 @@ const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interface
 // Logger avant de démarrer le serveur
 console.log('🚀 Tentative de démarrage du serveur HTTP...');
 console.log(`📍 Port: ${PORT}, Host: ${HOST}`);
+console.log(`⚠️ Si vous avez plusieurs applications Node.js sur ce serveur, vérifiez que les ports sont différents`);
 
 // Démarrer le serveur avec gestion d'erreur
 try {
