@@ -953,13 +953,27 @@ export default function BattleRoom() {
                         Share the room ID to invite a friend:
                       </p>
                       <div 
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-bg-primary/50 backdrop-blur-sm rounded-lg border border-border-secondary/30 cursor-pointer hover:bg-bg-primary/70 hover:border-accent-primary/30 transition-all group"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-bg-primary/50 backdrop-blur-sm rounded-xl border border-border-secondary/30 cursor-pointer hover:bg-bg-primary/70 hover:border-accent-primary/30 transition-all group"
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Copy room ID to clipboard"
                         onClick={async () => {
                           try {
                             await navigator.clipboard.writeText(roomId);
                             toast.success('Room ID copied to clipboard!');
                           } catch (err) {
                             toast.error('Failed to copy room ID');
+                          }
+                        }}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            try {
+                              await navigator.clipboard.writeText(roomId);
+                              toast.success('Room ID copied to clipboard!');
+                            } catch (err) {
+                              toast.error('Failed to copy room ID');
+                            }
                           }
                         }}
                         title="Click to copy"
@@ -972,7 +986,7 @@ export default function BattleRoom() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4 bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 border border-accent-primary/20">
+                      <div className="space-y-4 bg-bg-secondary/40 backdrop-blur-sm rounded-xl p-6 border border-accent-primary/20">
                     <div className="space-y-3">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></div>
@@ -1002,6 +1016,7 @@ export default function BattleRoom() {
                             value={battleMode}
                             onChange={(e) => setBattleMode(e.target.value)}
                             className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                            aria-label="Select battle mode"
                             style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                           >
                             <option value="timer" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Duel Classique (Timer)</option>
@@ -1019,6 +1034,7 @@ export default function BattleRoom() {
                               value={timerDuration}
                               onChange={(e) => setTimerDuration(parseInt(e.target.value))}
                               className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                              aria-label="Select duration"
                               style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                             >
                               <option value={60} style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>60 seconds</option>
@@ -1037,6 +1053,7 @@ export default function BattleRoom() {
                               value={phraseDifficulty}
                               onChange={(e) => setPhraseDifficulty(e.target.value)}
                               className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                              aria-label="Select difficulty"
                               style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                             >
                               <option value="easy" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Facile</option>
@@ -1219,7 +1236,7 @@ export default function BattleRoom() {
 
             {/* Colonne droite : Chat - Design amélioré */}
             <div className="lg:w-80 lg:flex-shrink-0 flex flex-col">
-              <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg border border-border-secondary/30 flex-1 min-h-0 flex flex-col shadow-lg">
+              <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-xl border border-border-secondary/30 flex-1 min-h-0 flex flex-col shadow-lg">
                 {/* En-tête du chat */}
                 <div className="p-4 border-b border-border-secondary/30">
                   <h3 className="text-text-primary font-semibold flex items-center gap-2" style={{ fontFamily: 'Inter' }}>
@@ -1317,20 +1334,22 @@ export default function BattleRoom() {
                 </div>
 
                 {/* Input du chat - Design amélioré */}
-                <form onSubmit={handleSendChatMessage} className="p-4 border-t border-border-secondary/30">
+                <form onSubmit={handleSendChatMessage} className="p-4 border-t border-border-secondary/30" aria-label="Send a chat message">
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       placeholder="Type a message..."
-                      className="flex-1 px-4 py-2.5 bg-bg-primary/50 backdrop-blur-sm border border-border-secondary/30 rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/20 transition-all placeholder:text-text-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2.5 bg-bg-primary/50 backdrop-blur-sm border border-border-secondary/30 rounded-xl text-text-primary text-sm focus:outline-none focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/20 transition-all placeholder:text-text-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Chat message"
                       disabled={gameStatus === 'playing'}
                     />
                     <button
                       type="submit"
                       disabled={!chatInput.trim() || gameStatus === 'playing' || sendingMessage}
-                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2"
+                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2"
+                      aria-label="Send message"
                     >
                       {sendingMessage ? (
                         <>
