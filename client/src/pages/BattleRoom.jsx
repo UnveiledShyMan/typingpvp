@@ -591,6 +591,10 @@ export default function BattleRoom() {
               mode: battleMode,
               timerDuration: battleMode === 'timer' ? timerDuration : null,
               difficulty: battleMode === 'phrases' ? phraseDifficulty : null
+            }, (ack) => {
+              if (ack && ack.ok === false) {
+                toast.error(ack.message || 'Unable to start the game. Please refresh the page.');
+              }
             });
           }
         });
@@ -604,6 +608,10 @@ export default function BattleRoom() {
         mode: battleMode,
         timerDuration: battleMode === 'timer' ? timerDuration : null,
         difficulty: battleMode === 'phrases' ? phraseDifficulty : null
+      }, (ack) => {
+        if (ack && ack.ok === false) {
+          toast.error(ack.message || 'Unable to start the game. Please refresh the page.');
+        }
       });
     } catch (error) {
       console.error('Error in handleStartGame:', error);

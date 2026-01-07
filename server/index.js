@@ -191,6 +191,36 @@ function generateTextForLanguage(langCode = 'en', wordCount = 50) {
   return result.join('');
 }
 
+/**
+ * Génère un texte "phrases" côté serveur.
+ * IMPORTANT: Implémentation fallback simple et robuste.
+ * Cela évite un crash serveur si le mode "phrases" est sélectionné.
+ */
+function generatePhraseTextForLanguage(langCode = 'en', difficulty = 'medium', phraseCount = 20) {
+  // Fallback: utiliser des phrases existantes, sinon générer des "phrases" à partir de mots.
+  const basePhrases = Array.isArray(defaultTexts) && defaultTexts.length > 0
+    ? defaultTexts
+    : ['TypingPVP is a competitive typing game.'];
+
+  // Ajuster la longueur selon la difficulté (si on doit générer)
+  const wordsPerPhrase =
+    difficulty === 'easy' ? 8 :
+    difficulty === 'medium' ? 12 :
+    difficulty === 'hard' ? 16 : 20;
+
+  const phrases = [];
+  for (let i = 0; i < phraseCount; i++) {
+    const seed = basePhrases[i % basePhrases.length];
+    if (typeof seed === 'string' && seed.trim().length > 0) {
+      phrases.push(seed.trim());
+    } else {
+      phrases.push(generateTextForLanguage(langCode, wordsPerPhrase));
+    }
+  }
+
+  return phrases.join(' ');
+}
+
 // Routes API
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -651,56 +681,72 @@ io.on('connection', (socket) => {
   });
 
   // Démarrer la partie
-  socket.on('start-game', (data) => {
-    const { roomId, language = 'en', mode = 'timer', timerDuration = 60, difficulty = 'medium' } = data;
-    const room = rooms.get(roomId);
-    
-    if (!room) {
-      socket.emit('start-error', { message: 'Room not found. Please refresh the page.' });
-      logger.warn(`start-game refused: room ${roomId} not found`);
-      return;
+  socket.on('start-game', (data, ack) => {
+    try {
+      const { roomId, language = 'en', mode = 'timer', timerDuration = 60, difficulty = 'medium' } = data || {};
+      const room = rooms.get(roomId);
+
+      // Log minimal pour diagnostic
+      logger.debug(`🎮 start-game request: room=${roomId} by socket=${socket.id} mode=${mode} lang=${language}`);
+
+      if (!room) {
+        const message = 'Room not found. Please refresh the page.';
+        socket.emit('start-error', { message });
+        if (typeof ack === 'function') ack({ ok: false, message });
+        logger.warn(`start-game refused: room ${roomId} not found`);
+        return;
+      }
+      if (room.status !== 'waiting') {
+        const message = 'Game already started or finished.';
+        socket.emit('start-error', { message });
+        if (typeof ack === 'function') ack({ ok: false, message });
+        logger.warn(`start-game refused: room ${roomId} status=${room.status}`);
+        return;
+      }
+      if (!Array.isArray(room.players) || room.players.length < 2) {
+        const message = 'Waiting for opponent to join.';
+        socket.emit('start-error', { message });
+        if (typeof ack === 'function') ack({ ok: false, message });
+        logger.warn(`start-game refused: room ${roomId} players=${room.players?.length || 0}`);
+        return;
+      }
+
+      let newText = '';
+
+      // Générer le texte selon le mode
+      if (mode === 'phrases') {
+        const phraseCount = difficulty === 'easy' ? 15 : difficulty === 'medium' ? 20 : difficulty === 'hard' ? 25 : 30;
+        newText = generatePhraseTextForLanguage(language, difficulty, phraseCount);
+      } else {
+        // Mode timer : générer un texte long comme Solo
+        newText = generateTextForLanguage(language, 300);
+      }
+
+      room.text = newText;
+      room.language = language;
+      room.mode = mode;
+      room.timerDuration = mode === 'timer' ? timerDuration : null;
+      room.difficulty = mode === 'phrases' ? difficulty : null;
+
+      room.status = 'playing';
+      room.startTime = Date.now();
+
+      io.to(roomId).emit('game-started', {
+        startTime: room.startTime,
+        text: newText,
+        mode: mode,
+        timerDuration: room.timerDuration,
+        difficulty: room.difficulty
+      });
+
+      if (typeof ack === 'function') ack({ ok: true });
+      logger.debug(`✅ Game started in room ${roomId}`);
+    } catch (err) {
+      const message = 'Server error while starting the game. Please refresh the page.';
+      logger.error('❌ start-game exception:', err);
+      socket.emit('start-error', { message });
+      if (typeof ack === 'function') ack({ ok: false, message });
     }
-    if (room.status !== 'waiting') {
-      socket.emit('start-error', { message: 'Game already started or finished.' });
-      logger.warn(`start-game refused: room ${roomId} status=${room.status}`);
-      return;
-    }
-    if (!Array.isArray(room.players) || room.players.length < 2) {
-      socket.emit('start-error', { message: 'Waiting for opponent to join.' });
-      logger.warn(`start-game refused: room ${roomId} players=${room.players?.length || 0}`);
-      return;
-    }
-    
-    let newText = '';
-    
-    // Générer le texte selon le mode
-    if (mode === 'phrases') {
-      // Mode phrases : générer plusieurs phrases selon la difficulté
-      const phraseCount = difficulty === 'easy' ? 15 : difficulty === 'medium' ? 20 : difficulty === 'hard' ? 25 : 30;
-      newText = generatePhraseTextForLanguage(language, difficulty, phraseCount);
-    } else {
-      // Mode timer : générer un texte long comme Solo
-      newText = generateTextForLanguage(language, 300); // 300 mots pour avoir assez de texte
-    }
-    
-    room.text = newText;
-    room.language = language;
-    room.mode = mode;
-    room.timerDuration = mode === 'timer' ? timerDuration : null;
-    room.difficulty = mode === 'phrases' ? difficulty : null;
-    
-    room.status = 'playing';
-    room.startTime = Date.now();
-    
-    io.to(roomId).emit('game-started', { 
-      startTime: room.startTime, 
-      text: newText,
-      mode: mode,
-      timerDuration: room.timerDuration,
-      difficulty: room.difficulty
-    });
-    
-    logger.debug(`Game started in room ${roomId}`);
   });
 
   // Mettre à jour la progression
