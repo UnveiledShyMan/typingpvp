@@ -2,6 +2,7 @@ import { useState } from 'react'
 import OAuthButton from '../components/OAuthButton'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
+import { useUser } from '../contexts/UserContext'
 import FormField from '../components/FormField'
 
 export default function Login({ onSuccess, onSwitch }) {
@@ -10,6 +11,7 @@ export default function Login({ onSuccess, onSwitch }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToastContext();
+  const { updateUser, refreshUser } = useUser();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,8 +20,19 @@ export default function Login({ onSuccess, onSwitch }) {
 
     try {
       const data = await authService.login(username, password);
-      if (onSuccess) onSuccess();
+      
+      // Mettre à jour immédiatement l'utilisateur dans le contexte
+      if (data.user) {
+        updateUser(data.user);
+      } else {
+        // Si les données utilisateur ne sont pas dans la réponse, récupérer depuis l'API
+        await refreshUser();
+      }
+      
       toast.success('Connexion réussie !');
+      
+      // Appeler onSuccess après la mise à jour de l'utilisateur
+      if (onSuccess) onSuccess();
     } catch (error) {
       // L'erreur est déjà gérée par apiService (toast automatique)
       // Mais on garde l'erreur locale pour l'affichage dans le formulaire

@@ -1,38 +1,13 @@
 import { Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { API_URL } from '../config/api.js';
+import { useState } from 'react'
+import { useUser } from '../contexts/UserContext'
 
 export default function Header() {
-  const [user, setUser] = useState(null);
+  const { user, logout: contextLogout } = useUser();
   const [showMenu, setShowMenu] = useState(false);
 
-  useEffect(() => {
-    fetchCurrentUser();
-  }, []);
-
-  const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${API_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-      } else {
-        // Token invalide
-        localStorage.removeItem('token');
-      }
-    } catch (error) {
-      console.error('Error fetching user:', error);
-    }
-  };
-
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
+    contextLogout();
     setShowMenu(false);
     window.location.href = '/';
   };
@@ -74,7 +49,7 @@ export default function Header() {
               />
               <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2">
                 <Link
-                  to={`/profile/${user.username || user.id}`}
+                  to={`/profile/${user.username ? user.username : user.id}`}
                   className="block px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
                   onClick={() => setShowMenu(false)}
                 >

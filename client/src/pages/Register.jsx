@@ -2,6 +2,7 @@ import { useState } from 'react'
 import OAuthButton from '../components/OAuthButton'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
+import { useUser } from '../contexts/UserContext'
 import FormField from '../components/FormField'
 
 export default function Register({ onSuccess, onSwitch }) {
@@ -12,6 +13,7 @@ export default function Register({ onSuccess, onSwitch }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToastContext();
+  const { updateUser, refreshUser } = useUser();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,8 +33,19 @@ export default function Register({ onSuccess, onSwitch }) {
 
     try {
       const data = await authService.register(username, email, password);
-      if (onSuccess) onSuccess();
+      
+      // Mettre à jour immédiatement l'utilisateur dans le contexte
+      if (data.user) {
+        updateUser(data.user);
+      } else {
+        // Si les données utilisateur ne sont pas dans la réponse, récupérer depuis l'API
+        await refreshUser();
+      }
+      
       toast.success('Inscription réussie !');
+      
+      // Appeler onSuccess après la mise à jour de l'utilisateur
+      if (onSuccess) onSuccess();
     } catch (error) {
       // L'erreur est déjà gérée par apiService (toast automatique)
       setError(error.message || 'Erreur lors de l\'inscription');

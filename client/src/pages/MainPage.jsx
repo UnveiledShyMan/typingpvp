@@ -416,7 +416,7 @@ export default function MainPage() {
               {activeSection === 'competitions' && <Competitions />}
               {activeSection === 'matchmaking' && <Matchmaking />}
               {activeSection === 'friends' && user && <Friends />}
-              {activeSection === 'profile' && user && <Profile userId={user.id} />}
+              {activeSection === 'profile' && user && <Profile username={user.username} userId={user.id} />}
             </div>
           </Suspense>
         </div>

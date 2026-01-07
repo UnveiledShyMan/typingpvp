@@ -17,26 +17,33 @@ export default function Profile({ userId: currentUserId, username: currentUserna
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
+  // Nettoyer l'identifier (enlever ":1" ou autres suffixes bizarres)
+  const cleanIdentifier = identifier ? String(identifier).split(':')[0].trim() : null;
+  
   // Valider que identifier est présent et valide
   useEffect(() => {
-    if (!identifier || identifier === 'undefined' || identifier === 'null') {
+    if (!cleanIdentifier || cleanIdentifier === 'undefined' || cleanIdentifier === 'null' || cleanIdentifier === '') {
       toast.error('Invalid user identifier');
       navigate('/');
       return;
     }
-  }, [identifier, navigate, toast]);
+  }, [cleanIdentifier, navigate, toast]);
   
   // Utiliser React Query pour le cache du profil (supporte maintenant username)
-  const { data: user, isLoading: loading, refetch: refetchProfile, error } = useProfile(identifier);
+  const { data: user, isLoading: loading, refetch: refetchProfile, error } = useProfile(cleanIdentifier);
   
-  // Si on a chargé un profil avec un ID mais qu'on est sur une route username, 
-  // mettre à jour l'URL pour utiliser le username
+  // Si on a chargé un profil avec un ID mais qu'on est sur une route avec ID, 
+  // mettre à jour l'URL pour utiliser le username si disponible
   useEffect(() => {
-    if (user && user.username && identifier && identifier !== user.username && /^\d+$/.test(String(identifier))) {
-      // Rediriger vers l'URL avec username pour une URL propre
-      navigate(`/profile/${user.username}`, { replace: true });
+    if (user && user.username && cleanIdentifier && cleanIdentifier !== user.username) {
+      // Si l'identifier actuel est un ID (long ou numérique), rediriger vers username
+      const isId = /^\d+$/.test(String(cleanIdentifier)) || String(cleanIdentifier).length > 15;
+      if (isId) {
+        // Rediriger vers l'URL avec username pour une URL propre
+        navigate(`/profile/${user.username}`, { replace: true });
+      }
     }
-  }, [user, identifier, navigate]);
+  }, [user, cleanIdentifier, navigate]);
   const updateProfileMutation = useUpdateProfile();
   
   const [selectedLang, setSelectedLang] = useState('en');
@@ -88,7 +95,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
       // Utiliser user.id pour récupérer les matchs (toujours utiliser ID pour l'API)
       fetchUserMatches(user.id, 1, false);
     }
-  }, [user, identifier]);
+  }, [user, cleanIdentifier]);
 
   useEffect(() => {
     // Écouter les événements de mise à jour ELO après une battle

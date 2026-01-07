@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useToastContext } from '../contexts/ToastContext';
+import { useUser } from '../contexts/UserContext';
 import { post } from '../services/apiService';
 
 /**
@@ -10,6 +11,7 @@ export default function OAuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToastContext();
+  const { updateUser, refreshUser } = useUser();
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -32,13 +34,21 @@ export default function OAuthCallback() {
         // Échanger le code contre un token et les infos utilisateur
         const data = await post('/api/auth/oauth/exchange', { code, provider: 'google' });
         
-        // Sauvegarder le token et rediriger
+        // Sauvegarder le token
         if (data.token) {
           localStorage.setItem('token', data.token);
         }
+        
+        // Mettre à jour immédiatement l'utilisateur dans le contexte
+        if (data.user) {
+          updateUser(data.user);
+        } else {
+          // Si les données utilisateur ne sont pas dans la réponse, récupérer depuis l'API
+          await refreshUser();
+        }
+        
         toast.success('Connexion réussie avec Google !');
         navigate('/');
-        window.location.reload(); // Recharger pour mettre à jour l'état de l'utilisateur
       } catch (error) {
         // Erreur gérée par apiService
         navigate('/');

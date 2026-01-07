@@ -14,19 +14,62 @@ import { profileService } from '../services/apiService';
  * @returns {Object} - { data, isLoading, error, refetch }
  */
 export function useProfile(identifier) {
-  // Détecter si c'est un ID numérique ou un username
-  const isUsername = identifier && !/^\d+$/.test(String(identifier));
+  // Détecter si c'est un ID ou un username
+  // Les IDs nanoid sont généralement longs (21+ caractères) et alphanumériques
+  // Les usernames sont généralement plus courts et peuvent contenir des caractères spéciaux limités
+  // Si c'est un ID numérique pur, utiliser getProfile directement
+  // Sinon, essayer d'abord par username, puis par ID si ça échoue
+  const isNumericId = identifier && /^\d+$/.test(String(identifier));
+  const isLikelyId = identifier && String(identifier).length > 15; // Les IDs nanoid sont généralement longs
   
   return useQuery({
     queryKey: ['profile', identifier],
     queryFn: async () => {
-      // Utiliser getProfileByUsername si c'est un username, sinon getProfile
-      if (isUsername) {
+      // Si c'est un ID numérique pur, utiliser directement getProfile
+      if (isNumericId) {
+        return await profileService.getProfile(identifier);
+      }
+      
+      // Si ça ressemble à un ID (long, alphanumérique), essayer d'abord par ID
+      if (isLikelyId) {
+        try {
+          const data = await profileService.getProfile(identifier);
+          return data;
+        } catch (error) {
+          // Si ça échoue avec 404, essayer par username
+          const errorMsg = error.message?.toLowerCase() || '';
+          const errorStr = String(error).toLowerCase();
+          if (errorMsg.includes('404') || errorMsg.includes('not found') || 
+              errorStr.includes('404') || errorStr.includes('not found')) {
+            try {
+              return await profileService.getProfileByUsername(identifier);
+            } catch (usernameError) {
+              // Si les deux échouent, throw l'erreur originale (404)
+              throw error;
+            }
+          }
+          throw error;
+        }
+      }
+      
+      // Sinon, essayer d'abord par username (cas le plus commun)
+      try {
         const data = await profileService.getProfileByUsername(identifier);
         return data;
-      } else {
-        const data = await profileService.getProfile(identifier);
-        return data;
+      } catch (error) {
+        // Si ça échoue avec 404, essayer par ID
+        const errorMsg = error.message?.toLowerCase() || '';
+        const errorStr = String(error).toLowerCase();
+        if (errorMsg.includes('404') || errorMsg.includes('not found') || 
+            errorStr.includes('404') || errorStr.includes('not found')) {
+          try {
+            return await profileService.getProfile(identifier);
+          } catch (idError) {
+            // Si les deux échouent, throw l'erreur originale (404)
+            throw error;
+          }
+        }
+        throw error;
       }
     },
     // Cache pendant 5 minutes pour les profils
