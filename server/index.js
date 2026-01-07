@@ -74,49 +74,46 @@ const corsOptions = {
 };
 
 // Headers de sécurité avec Helmet
-// Note: La CSP doit permettre Socket.io (WebSockets et polling)
-// Désactiver CSP pour Socket.io (Socket.io ne passe pas par Express, donc Helmet ne l'affecte pas directement)
-// Mais la CSP côté client pourrait bloquer les connexions, donc on la configure pour permettre Socket.io
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://pagead2.googlesyndication.com"],
-      imgSrc: ["'self'", "data:", "https://www.google-analytics.com", "https://www.googletagmanager.com", "https://typingpvp.com", "https://*.googleusercontent.com", "https://*.discordapp.net", "https://*.discord.com"],
-      // connectSrc doit permettre Socket.io (WebSockets et polling HTTP)
-      // 'self' permet les connexions au même domaine (Socket.io)
-      connectSrc: [
-        "'self'",
-        "https://www.google-analytics.com",
-        "https://www.googletagmanager.com",
-        "ws://localhost:3001",
-        "wss://typingpvp.com",
-        "wss://localhost:3001",
-        "http://localhost:5173"
-      ],
-      frameSrc: ["'self'", "https://www.youtube.com", "https://buymeacoffee.com", "https://googleads.g.doubleclick.net", "https://tpc.googlesyndication.com"],
-      mediaSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
-    },
-  },
-  crossOriginEmbedderPolicy: false, // Nécessaire pour Socket.io
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // Permettre les images externes
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  }
-}));
+// TEMPORAIRE: Désactivation de Helmet pour diagnostiquer les erreurs 500
+// TODO: Réactiver Helmet une fois le problème résolu
+// app.use(helmet({
+//   contentSecurityPolicy: {
+//     directives: {
+//       defaultSrc: ["'self'"],
+//       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+//       fontSrc: ["'self'", "https://fonts.gstatic.com"],
+//       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://pagead2.googlesyndication.com"],
+//       imgSrc: ["'self'", "data:", "https://www.google-analytics.com", "https://www.googletagmanager.com", "https://typingpvp.com", "https://*.googleusercontent.com", "https://*.discordapp.net", "https://*.discord.com"],
+//       connectSrc: [
+//         "'self'",
+//         "https://www.google-analytics.com",
+//         "https://www.googletagmanager.com",
+//         "ws://localhost:3001",
+//         "wss://typingpvp.com",
+//         "wss://localhost:3001",
+//         "http://localhost:5173"
+//       ],
+//       frameSrc: ["'self'", "https://www.youtube.com", "https://buymeacoffee.com", "https://googleads.g.doubleclick.net", "https://tpc.googlesyndication.com"],
+//       mediaSrc: ["'self'"],
+//       objectSrc: ["'none'"],
+//       upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+//     },
+//   },
+//   crossOriginEmbedderPolicy: false,
+//   crossOriginResourcePolicy: { policy: "cross-origin" },
+//   hsts: {
+//     maxAge: 31536000,
+//     includeSubDomains: true,
+//     preload: true
+//   }
+// }));
 
-// Middleware pour désactiver Helmet pour les routes Socket.io (si nécessaire)
-// Note: Socket.io ne passe pas par Express, donc ce middleware ne s'applique pas à Socket.io
-// Mais on le garde pour les autres routes si nécessaire
-app.use('/socket.io', (req, res, next) => {
-  // Socket.io gère ses propres headers, donc on ne fait rien ici
-  // Ce middleware ne sera jamais appelé car Socket.io ne passe pas par Express
+// Headers de sécurité de base sans Helmet (temporaire pour diagnostic)
+app.use((req, res, next) => {
+  // Headers de sécurité de base
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
 });
 
