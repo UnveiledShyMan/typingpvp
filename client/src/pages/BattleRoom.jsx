@@ -220,6 +220,13 @@ export default function BattleRoom() {
       setPlayers(data.players);
     });
 
+    // Erreur lors du lancement de la partie (retour serveur)
+    socket.on('start-error', (err) => {
+      const message = (err && err.message) ? err.message : 'Unable to start the game. Please try again.';
+      toast.error(message);
+      setGameStatus('waiting');
+    });
+
     socket.on('game-started', (data) => {
       setGameStatus('playing');
       setStartTime(data.startTime);
@@ -1060,9 +1067,11 @@ export default function BattleRoom() {
                         </div>
                         <button
                           onClick={handleStartGame}
-                          className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/20 w-full"
+                          className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-accent-primary/30 w-full border border-accent-primary/40"
+                          aria-label="Start the battle"
+                          disabled={players.length !== 2}
                         >
-                          Start Battle
+                          {players.length === 2 ? 'Start Battle' : 'Waiting for opponent...'}
                         </button>
                       </div>
                     )}

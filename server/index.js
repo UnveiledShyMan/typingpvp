@@ -655,8 +655,21 @@ io.on('connection', (socket) => {
     const { roomId, language = 'en', mode = 'timer', timerDuration = 60, difficulty = 'medium' } = data;
     const room = rooms.get(roomId);
     
-    if (!room || room.status !== 'waiting') return;
-    if (room.players.length < 2) return;
+    if (!room) {
+      socket.emit('start-error', { message: 'Room not found. Please refresh the page.' });
+      logger.warn(`start-game refused: room ${roomId} not found`);
+      return;
+    }
+    if (room.status !== 'waiting') {
+      socket.emit('start-error', { message: 'Game already started or finished.' });
+      logger.warn(`start-game refused: room ${roomId} status=${room.status}`);
+      return;
+    }
+    if (!Array.isArray(room.players) || room.players.length < 2) {
+      socket.emit('start-error', { message: 'Waiting for opponent to join.' });
+      logger.warn(`start-game refused: room ${roomId} players=${room.players?.length || 0}`);
+      return;
+    }
     
     let newText = '';
     
