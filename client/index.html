@@ -120,6 +120,28 @@
     
     <!-- Preload des ressources critiques pour améliorer les Core Web Vitals -->
     <link rel="preload" href="/logo.png" as="image" type="image/png" />
+    
+    <!-- Google tag (gtag.js) - Toujours présent pour détection, consentement géré par RGPD -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-L1NF892NF7"></script>
+    <script>
+      // Initialiser dataLayer pour que Google puisse détecter la balise
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
+      
+      // Configuration par défaut avec consentement refusé (RGPD)
+      // Le consentement sera mis à jour à 'granted' si l'utilisateur accepte
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied'
+      });
+      
+      gtag('js', new Date());
+      gtag('config', 'G-L1NF892NF7', {
+        anonymize_ip: true,
+        cookie_flags: 'SameSite=None;Secure'
+      });
+    </script>
     <style>
       /* Variables CSS définies immédiatement pour éviter le FOUC (Flash of Unstyled Content) */
       :root {

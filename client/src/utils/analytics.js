@@ -38,35 +38,33 @@ export function initGoogleAnalytics() {
 }
 
 function loadGoogleAnalytics() {
-  // Script gtag.js
-  const script1 = document.createElement('script');
-  script1.async = true;
-  script1.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  document.head.appendChild(script1);
-
-  // Configuration gtag
-  window.dataLayer = window.dataLayer || [];
-  function gtag() {
-    window.dataLayer.push(arguments);
+  // Le script gtag.js est déjà chargé dans index.html
+  // Il suffit de mettre à jour le consentement pour activer le tracking
+  if (window.gtag) {
+    // Mettre à jour le consentement pour activer le tracking
+    gtag('consent', 'update', {
+      analytics_storage: 'granted',
+      ad_storage: 'granted'
+    });
+    
+    // Reconfigurer avec le consentement activé
+    gtag('config', GA_MEASUREMENT_ID, {
+      anonymize_ip: true,
+      cookie_flags: 'SameSite=None;Secure',
+      analytics_storage: 'granted',
+      ad_storage: 'granted'
+    });
   }
-  window.gtag = gtag;
-  
-  gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID, {
-    anonymize_ip: true,
-    cookie_flags: 'SameSite=None;Secure',
-    // Consentement initial
-    analytics_storage: 'granted',
-    ad_storage: 'granted'
-  });
 
   // Écouter les mises à jour de consentement
   window.addEventListener('cookie-consent-updated', (event) => {
     const prefs = event.detail;
-    gtag('consent', 'update', {
-      analytics_storage: prefs.analytics ? 'granted' : 'denied',
-      ad_storage: prefs.marketing ? 'granted' : 'denied'
-    });
+    if (window.gtag) {
+      gtag('consent', 'update', {
+        analytics_storage: prefs.analytics ? 'granted' : 'denied',
+        ad_storage: prefs.marketing ? 'granted' : 'denied'
+      });
+    }
   });
 }
 
