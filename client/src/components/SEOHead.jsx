@@ -34,6 +34,7 @@ const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'ru', 'ja', 'zh
  * @param {string} props.language - Code langue de la page (optionnel, default: détection automatique)
  * @param {Object} props.jsonLd - Données JSON-LD supplémentaires (optionnel)
  * @param {boolean} props.noindex - Désactiver l'indexation (optionnel, default: false)
+ * @param {Array} props.breadcrumbs - Array de {name, url} pour breadcrumbs (optionnel)
  */
 export default function SEOHead({ 
   title = 'TypingPVP - Competitive Typing Battles',
@@ -44,7 +45,8 @@ export default function SEOHead({
   type = 'WebSite',
   language = null,
   jsonLd = null,
-  noindex = false
+  noindex = false,
+  breadcrumbs = null
 }) {
   useEffect(() => {
     // Construire l'URL absolue de l'image et de la page
@@ -212,6 +214,29 @@ export default function SEOHead({
     jsonLdScript.textContent = JSON.stringify(finalJsonLd);
     document.head.appendChild(jsonLdScript);
 
+    // Ajouter BreadcrumbList si fourni
+    if (breadcrumbs && Array.isArray(breadcrumbs) && breadcrumbs.length > 0) {
+      // Supprimer les anciens breadcrumbs
+      document.querySelectorAll('script[data-breadcrumb]').forEach(el => el.remove());
+
+      const breadcrumbJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: breadcrumbs.map((item, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: item.name,
+          item: item.url.startsWith('http') ? item.url : `${baseUrl}${item.url}`
+        }))
+      };
+
+      const breadcrumbScript = document.createElement('script');
+      breadcrumbScript.type = 'application/ld+json';
+      breadcrumbScript.setAttribute('data-breadcrumb', 'true');
+      breadcrumbScript.textContent = JSON.stringify(breadcrumbJsonLd);
+      document.head.appendChild(breadcrumbScript);
+    }
+
     // Mettre à jour l'attribut lang du HTML si nécessaire
     if (typeof document !== 'undefined' && document.documentElement) {
       document.documentElement.lang = detectedLang;
@@ -222,7 +247,7 @@ export default function SEOHead({
       // Optionnel : nettoyer les meta tags dynamiques si nécessaire
       // Pour l'instant, on les garde car elles peuvent être réutilisées
     };
-  }, [title, description, keywords, image, url, type, language, jsonLd, noindex]);
+  }, [title, description, keywords, image, url, type, language, jsonLd, noindex, breadcrumbs]);
 
   return null; // Ce composant ne rend rien
 }

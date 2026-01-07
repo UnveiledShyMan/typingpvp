@@ -43,6 +43,18 @@ export default function Footer() {
               <DiscordIcon className="w-4 h-4" fill="currentColor" />
               <span>Discord</span>
             </a>
+            <span className="text-text-muted/40">•</span>
+            <a
+              href="https://buymeacoffee.com/typingpvp.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-secondary/50 hover:text-accent-primary transition-colors font-light flex items-center gap-1.5"
+              style={{ fontFamily: 'Inter', fontWeight: 300 }}
+              title="Soutenir TypingPVP"
+            >
+              <span>☕</span>
+              <span>Buy Me a Coffee</span>
+            </a>
           </nav>
         </div>
       </div>

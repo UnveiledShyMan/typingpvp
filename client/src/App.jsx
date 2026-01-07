@@ -1,9 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { ToastProvider } from './contexts/ToastContext'
 import { UserProvider } from './contexts/UserContext'
 import { QueryProvider } from './providers/QueryProvider'
 import ErrorBoundary from './components/ErrorBoundary'
+import CookieConsent from './components/CookieConsent'
+import { initGoogleAnalytics } from './utils/analytics'
 import './App.css'
 
 // Lazy loading des routes pour améliorer les performances
@@ -25,6 +27,15 @@ const LoadingSpinner = () => (
 )
 
 function App() {
+  // Initialiser Google Analytics si le consentement a été donné
+  useEffect(() => {
+    // Petit délai pour s'assurer que le DOM est prêt
+    const timer = setTimeout(() => {
+      initGoogleAnalytics();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryProvider>
@@ -46,6 +57,7 @@ function App() {
                 </Routes>
               </Suspense>
             </Router>
+            <CookieConsent />
           </UserProvider>
         </ToastProvider>
       </QueryProvider>
