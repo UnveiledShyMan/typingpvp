@@ -2,15 +2,20 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+console.log('🚀 Démarrage du serveur...');
+
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import helmet from 'helmet';
+// import helmet from 'helmet'; // Temporairement désactivé
 import { nanoid } from 'nanoid';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+
+console.log('📦 Imports de base chargés');
+
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import rankingsRoutes from './routes/rankings.js';
@@ -19,6 +24,9 @@ import friendsRoutes, { setOnlineUsers } from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 import discordRoutes from './routes/discord.js';
 import ogImageRoutes from './routes/og-image.js';
+
+console.log('📦 Routes importées');
+
 import { getUserById, recordMatch, updateUser, getAllUsers } from './db.js';
 // Système ELO amélioré activé : K-factor adaptatif selon le nombre de matchs et le niveau
 // Plus précis que ELO standard, meilleure adaptation pour nouveaux joueurs
@@ -27,6 +35,8 @@ import { invalidateRankingsCache } from './utils/rankingsCache.js';
 import { MatchmakingQueue } from './utils/matchmakingQueue.js';
 import { initSocketNotifications } from './utils/socketNotifications.js';
 import logger from './utils/logger.js';
+
+console.log('📦 Tous les imports chargés');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1522,11 +1532,16 @@ export { onlineUsers };
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0'; // Écouter sur toutes les interfaces pour Plesk
 
+console.log(`🔧 Configuration: PORT=${PORT}, HOST=${HOST}`);
+console.log(`🔧 NODE_ENV=${process.env.NODE_ENV || 'development'}`);
+
 // Démarrer le serveur
+console.log('🚀 Tentative de démarrage du serveur...');
 
 try {
   httpServer.listen(PORT, HOST, () => {
     console.log(`✅ Serveur démarré sur ${HOST}:${PORT}`);
+    logger.info(`✅ Serveur démarré sur ${HOST}:${PORT}`);
   }).on('error', (error) => {
     logger.error('❌ Erreur lors du démarrage du serveur:', error);
     logger.error('Code erreur:', error.code);
