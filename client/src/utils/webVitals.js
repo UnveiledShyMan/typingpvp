@@ -1,9 +1,10 @@
 /**
  * Instrumentation des Core Web Vitals pour Google Analytics 4
- * Mesure LCP, FID/INP, CLS, FCP, TTFB et envoie les données à GA4
+ * Mesure LCP, INP, CLS, FCP, TTFB et envoie les données à GA4
+ * Note: INP (Interaction to Next Paint) remplace FID depuis 2024
  */
 
-import { onCLS, onFCP, onLCP, onFID, onINP, onTTFB } from 'web-vitals';
+import { onCLS, onFCP, onLCP, onINP, onTTFB } from 'web-vitals';
 
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID || 'G-L1NF892NF7';
 
@@ -73,17 +74,8 @@ export function initWebVitals() {
   onLCP(sendToGA4);
 
   // INP - Interaction to Next Paint (remplace FID, bon: < 200ms, améliorable: 200-500ms, mauvais: > 500ms)
-  // Utiliser INP si disponible (Chrome 96+), sinon FID
-  if ('PerformanceObserver' in window && 'supportedEntryTypes' in PerformanceObserver) {
-    if (PerformanceObserver.supportedEntryTypes.includes('event')) {
-      onINP(sendToGA4);
-    } else {
-      // Fallback sur FID pour les navigateurs plus anciens
-      onFID(sendToGA4);
-    }
-  } else {
-    onFID(sendToGA4);
-  }
+  // INP est le métrique Core Web Vitals officiel depuis 2024, remplaçant FID
+  onINP(sendToGA4);
 
   // CLS - Cumulative Layout Shift (bon: < 0.1, améliorable: 0.1-0.25, mauvais: > 0.25)
   onCLS(sendToGA4);
