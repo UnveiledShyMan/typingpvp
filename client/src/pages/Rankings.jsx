@@ -5,6 +5,7 @@ import { useRankings } from '../hooks/useRankings'
 import { TableSkeleton } from '../components/SkeletonLoader'
 import UserTooltip from '../components/UserTooltip'
 import SEOHead from '../components/SEOHead'
+import OptimizedImage from '../components/OptimizedImage'
 
 export default function Rankings() {
   const [selectedLang, setSelectedLang] = useState('en');
@@ -64,6 +65,7 @@ export default function Rankings() {
         description={`Global leaderboard for ${languages[selectedLang]?.name || 'typing'} - Compete with the best typists`}
         keywords={`typing rankings, leaderboard, ${languages[selectedLang]?.name || ''} typing, competitive typing, ELO leaderboard`}
         url={`https://typingpvp.com/rankings?lang=${selectedLang}`}
+        image={`/og-image/rankings/${selectedLang}`}
         type="ItemList"
         jsonLd={rankingsJsonLd}
       />
@@ -80,6 +82,7 @@ export default function Rankings() {
             value={selectedLang}
             onChange={(e) => setSelectedLang(e.target.value)}
             className="rounded-lg px-4 py-3 font-medium focus:outline-none focus:ring-2 focus:ring-accent-primary/20 transition-all appearance-none cursor-pointer"
+            aria-label="Sélectionner la langue pour les rankings"
             style={{
               backgroundColor: 'rgba(10, 14, 26, 0.3)',
               color: 'var(--text-primary, #e8ecf3)',
@@ -125,6 +128,15 @@ export default function Rankings() {
                       onClick={() => {
                         navigate(`/profile/${player.username}`);
                       }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Voir le profil de ${player.username}, rang ${player.rank}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/profile/${player.username}`);
+                        }
+                      }}
                     >
                       <td className="px-6 py-5 text-text-primary font-bold group-hover:text-accent-primary transition-colors" style={{ fontFamily: 'JetBrains Mono' }}>
                         #{player.rank}
@@ -140,12 +152,16 @@ export default function Rankings() {
                               }}
                               className="w-12 h-12 rounded-full object-cover ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer overflow-hidden"
                               title="View profile"
+                              aria-label={`Voir le profil de ${player.username}`}
                             >
-                              <img
+                              <OptimizedImage
                                 src={player.avatar}
-                                alt={player.username}
+                                alt={`Avatar de ${player.username}`}
+                                width={48}
+                                height={48}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
+                                priority={false}
                               />
                             </button>
                           ) : (

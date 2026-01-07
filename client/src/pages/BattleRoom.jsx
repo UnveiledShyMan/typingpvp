@@ -460,30 +460,23 @@ export default function BattleRoom() {
     const socket = socketRef.current;
 
     // CAS NORMAL : Room 1v1 manuelle - doit appeler join-room
+    // Marquer immédiatement qu'on essaie de joindre pour éviter les appels multiples
+    hasJoinedRoomRef.current = true;
+    
     const handleJoinRoom = () => {
-      // Éviter de joindre plusieurs fois
-      if (hasJoinedRoomRef.current) return;
-      hasJoinedRoomRef.current = true;
-
-      if (socket.connected) {
-        console.log('🔌 Joining room:', roomId, 'as', playerName);
-        socket.emit('join-room', { 
-          roomId, 
-          playerName,
-          userId: userId || currentUser?.id || null
-        });
-      } else {
-        // Si pas encore connecté, attendre la connexion
-        console.log('⏳ Waiting for socket connection before joining room...');
-        socket.once('connect', () => {
-          console.log('✅ Socket connected, joining room:', roomId);
-          socket.emit('join-room', { 
-            roomId, 
-            playerName,
-            userId: userId || currentUser?.id || null
-          });
-        });
+      // Vérifier une dernière fois (sécurité supplémentaire)
+      if (!socket || !socket.connected) {
+        console.warn('⚠️ Socket not connected, cannot join room');
+        hasJoinedRoomRef.current = false; // Réinitialiser si pas connecté
+        return;
       }
+
+      console.log('🔌 Joining room:', roomId, 'as', playerName, '(userId:', userId || currentUser?.id || 'guest', ')');
+      socket.emit('join-room', { 
+        roomId, 
+        playerName,
+        userId: userId || currentUser?.id || null
+      });
     };
 
     // Essayer de joindre immédiatement ou après connexion

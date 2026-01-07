@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useUser } from '../contexts/UserContext'
+import OptimizedImage from './OptimizedImage.jsx'
 
 export default function Header() {
   const { user, logout: contextLogout } = useUser();
@@ -25,13 +26,19 @@ export default function Header() {
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            aria-label={`Menu utilisateur pour ${user.username}`}
+            aria-expanded={showMenu}
+            aria-haspopup="true"
           >
             {user.avatar ? (
-              <img
+              <OptimizedImage
                 src={user.avatar}
                 alt={user.username}
-                className="w-10 h-10 rounded-full object-cover border-2 border-border-secondary/30"
+                width={40}
+                height={40}
+                className="rounded-full border-2 border-border-secondary/30"
                 loading="lazy"
+                priority={false}
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-accent-primary/20 border-2 border-border-secondary/30 flex items-center justify-center text-accent-primary font-bold">
@@ -47,17 +54,25 @@ export default function Header() {
                 className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2">
+              <div 
+                className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2"
+                role="menu"
+                aria-label="Menu utilisateur"
+              >
                 <Link
                   to={`/profile/${user.username ? user.username : user.id}`}
                   className="block px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
                   onClick={() => setShowMenu(false)}
+                  role="menuitem"
+                  aria-label="Voir mon profil"
                 >
                   Profile
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
+                  role="menuitem"
+                  aria-label="Se déconnecter"
                 >
                   Logout
                 </button>

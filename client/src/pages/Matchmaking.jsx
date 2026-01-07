@@ -522,7 +522,7 @@ export default function Matchmaking() {
       </Modal>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto profile-scroll">
           <div className="space-y-6 pb-4">
             {/* Language Selector - Design harmonisé */}
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">

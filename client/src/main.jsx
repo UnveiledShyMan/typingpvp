@@ -101,6 +101,24 @@ const initApp = async () => {
   hideLoadingOverlay();
 };
 
+// Enregistrer le Service Worker pour PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('[SW] Service Worker registered:', registration.scope);
+        
+        // Vérifier les mises à jour périodiquement
+        setInterval(() => {
+          registration.update();
+        }, 60000); // Vérifier toutes les minutes
+      })
+      .catch((error) => {
+        console.warn('[SW] Service Worker registration failed:', error);
+      });
+  });
+}
+
 // Initialiser l'application
 initApp();
 

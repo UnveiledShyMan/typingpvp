@@ -97,20 +97,39 @@ export default function AdContainer({
     ) : null;
   }
 
+  // Hauteurs minimales par format pour éviter CLS (Cumulative Layout Shift)
+  const minHeights = {
+    'horizontal': '90px',   // Banner horizontal
+    'vertical': '250px',    // Sidebar vertical
+    'fluid': '100px',       // In-article
+    'auto': '90px'          // Auto (par défaut)
+  };
+  const minHeight = minHeights[format] || minHeights.auto;
+
   return (
-    <div className={`ad-container ${className}`}>
-      <ins
-        ref={adRef}
-        className="adsbygoogle"
-        style={{ 
-          display: 'block',
-          ...(responsive && { width: '100%', height: 'auto' })
-        }}
-        data-ad-client={AD_CLIENT_ID}
-        data-ad-slot={slot}
-        data-ad-format={format}
-        data-full-width-responsive={responsive ? 'true' : 'false'}
-      />
+    <div 
+      className={`ad-container ${className}`}
+      style={{ 
+        minHeight: canShowAds ? minHeight : '0',
+        // Réserver l'espace même si l'annonce n'est pas chargée pour éviter CLS
+        position: 'relative'
+      }}
+    >
+      {canShowAds && (
+        <ins
+          ref={adRef}
+          className="adsbygoogle"
+          style={{ 
+            display: 'block',
+            minHeight: minHeight,
+            ...(responsive && { width: '100%', height: 'auto' })
+          }}
+          data-ad-client={AD_CLIENT_ID}
+          data-ad-slot={slot}
+          data-ad-format={format}
+          data-full-width-responsive={responsive ? 'true' : 'false'}
+        />
+      )}
     </div>
   );
 }

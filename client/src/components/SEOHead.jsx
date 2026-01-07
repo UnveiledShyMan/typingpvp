@@ -51,7 +51,17 @@ export default function SEOHead({
   useEffect(() => {
     // Construire l'URL absolue de l'image et de la page
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://typingpvp.com';
-    const absoluteImageUrl = image.startsWith('http') ? image : `${baseUrl}${image}`;
+    
+    // Si l'image est une route spéciale (profile, rankings), utiliser l'endpoint OG
+    let absoluteImageUrl = image;
+    if (image.startsWith('/og-image/')) {
+      absoluteImageUrl = `${baseUrl}${image}`;
+    } else if (image.startsWith('http')) {
+      absoluteImageUrl = image;
+    } else {
+      absoluteImageUrl = `${baseUrl}${image}`;
+    }
+    
     const absoluteUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
     // Détecter la langue si non fournie
@@ -136,14 +146,36 @@ export default function SEOHead({
     setMetaTag('twitter:site', '@typingpvp');
     setMetaTag('twitter:creator', '@typingpvp');
 
-    // Canonical URL
+    // Canonical URL - Normaliser l'URL pour éviter les doublons
+    // Enlever les paramètres de tracking, fragments, et normaliser les trailing slashes
+    const normalizeUrl = (url) => {
+      try {
+        const urlObj = new URL(url);
+        // Enlever les fragments (#)
+        urlObj.hash = '';
+        // Enlever les paramètres de tracking courants
+        const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', 'ref'];
+        trackingParams.forEach(param => urlObj.searchParams.delete(param));
+        // Normaliser le pathname (enlever trailing slash sauf pour la racine)
+        let pathname = urlObj.pathname;
+        if (pathname !== '/' && pathname.endsWith('/')) {
+          pathname = pathname.slice(0, -1);
+        }
+        urlObj.pathname = pathname;
+        return urlObj.toString();
+      } catch (e) {
+        return url;
+      }
+    };
+    
+    const normalizedUrl = normalizeUrl(absoluteUrl);
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');
       canonical.setAttribute('rel', 'canonical');
       document.head.appendChild(canonical);
     }
-    canonical.setAttribute('href', absoluteUrl);
+    canonical.setAttribute('href', normalizedUrl);
 
     // Hreflang tags pour le SEO international
     // Supprimer les anciens hreflang

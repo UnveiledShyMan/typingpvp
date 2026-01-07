@@ -634,6 +634,27 @@ select option:focus {
   color: var(--accent-primary, #8b5cf6) !important;
 }
 
+/* Skip link pour accessibilité - permet de sauter la navigation */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--accent-primary, #8b5cf6);
+  color: var(--accent-text, #ffffff);
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 10000;
+  border-radius: 0 0 4px 0;
+  font-weight: 600;
+  transition: top 0.3s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--accent-hover, #a78bfa);
+  outline-offset: 2px;
+}
+
 /* Focus visible pour accessibilité - style moderne et visible */
 *:focus-visible {
   outline: 2px solid var(--accent-primary);

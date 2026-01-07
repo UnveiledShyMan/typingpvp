@@ -16,6 +16,7 @@ import { profileService } from '../services/apiService'
 import { useUser } from '../contexts/UserContext'
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 import SEOHead from '../components/SEOHead'
+import OptimizedImage from '../components/OptimizedImage'
 
 // Lazy loading des composants de pages pour améliorer les performances et réduire le bundle initial
 const Solo = lazy(() => import('./Solo'))
@@ -263,14 +264,18 @@ export default function MainPage() {
                   <button
                     onClick={() => setActiveSection('profile')}
                     className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary/70 hover:text-text-primary/90 transition-all"
+                    aria-label="Ouvrir mon profil"
                   >
                     <div className="w-6 h-6 rounded bg-bg-primary/30 overflow-hidden flex items-center justify-center">
                       {user.avatar ? (
-                        <img
+                        <OptimizedImage
                           src={user.avatar}
                           alt={user.username}
+                          width={24}
+                          height={24}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          priority={false}
                         />
                       ) : (
                         <LogoIconSmall 
@@ -285,16 +290,20 @@ export default function MainPage() {
                   <button
                     onClick={() => setActiveSection('profile')}
                     className="hidden md:flex items-center gap-3 hover:opacity-80 transition-opacity group"
+                    aria-label="Ouvrir mon profil"
                   >
                     <span className="text-text-secondary text-sm group-hover:text-text-primary transition-colors">Welcome,</span>
                     <span className="text-text-primary font-medium">{user.username}</span>
                     <div className="w-10 h-10 rounded-lg bg-bg-primary/30 overflow-hidden flex items-center justify-center backdrop-blur-sm transition-opacity group-hover:opacity-80">
                       {user.avatar ? (
-                        <img
+                        <OptimizedImage
                           src={user.avatar}
                           alt={user.username}
+                          width={40}
+                          height={40}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          priority={false}
                         />
                       ) : (
                         <LogoIconSmall 
@@ -405,7 +414,7 @@ export default function MainPage() {
       </header>
 
       {/* Main content avec lazy loading et animation - Parfaitement centré, non scrollable */}
-      <main className="flex-1 overflow-hidden relative" style={{ zIndex: 1 }}>
+      <main id="main-content" className="flex-1 overflow-hidden relative" style={{ zIndex: 1 }} role="main" aria-label="Contenu principal">
         <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Suspense fallback={<LoadingSpinner />}>
             <div key={`${activeSection}-${showSandbox}`} className="h-full overflow-hidden animate-fade-in">

@@ -7,6 +7,7 @@ import { ProfileSkeleton } from '../components/SkeletonLoader'
 import { useProfile, useUpdateProfile } from '../hooks/useProfile'
 import { useUser } from '../contexts/UserContext'
 import SEOHead from '../components/SEOHead'
+import OptimizedImage from '../components/OptimizedImage'
 import logger from '../utils/logger'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
@@ -384,7 +385,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
       name: user.username,
       description: user.bio || `${user.username}'s typing profile on TypingPVP`,
       url: `https://typingpvp.com/profile/${user.username}`,
-      ...(user.avatar && { image: user.avatar }),
+      ...(user.avatar && { image: `/og-image/profile/${user.username}` }),
       ...(socialMedia.twitter && { sameAs: [`https://twitter.com/${socialMedia.twitter.replace('@', '')}`] }),
       ...(socialMedia.github && { sameAs: [...(socialMedia.twitter ? [] : []), `https://github.com/${socialMedia.github}`] }),
       ...(socialMedia.website && { url: socialMedia.website }),
@@ -415,6 +416,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
         description={user.bio || `View ${user.username}'s typing stats, ELO, and match history`}
         keywords={`${user.username}, typing profile, typing stats, ${user.gear || ''}`}
         url={`https://typingpvp.com/profile/${user.username}`}
+        image={`/og-image/profile/${user.username}`}
         type="ProfilePage"
         jsonLd={profileJsonLd}
       />
@@ -438,7 +440,15 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-bg-primary border-4 flex items-center justify-center overflow-hidden shadow-xl"
                   style={{ borderColor: getRankColor(rankInfo) }}>
                   {editForm.avatar ? (
-                    <img src={editForm.avatar} alt={user.username} className="w-full h-full object-cover" loading="lazy" />
+                    <OptimizedImage 
+                      src={editForm.avatar} 
+                      alt={`Avatar de ${user.username}`} 
+                      width={160}
+                      height={160}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      priority={false}
+                    />
                   ) : (
                     <span className="text-6xl md:text-7xl text-accent-primary font-bold">
                       {user.username[0].toUpperCase()}
@@ -447,12 +457,15 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                 </div>
               ) : (
                 user.avatar ? (
-                  <img
+                  <OptimizedImage
                     src={user.avatar}
-                    alt={user.username}
+                    alt={`Avatar de ${user.username}`}
+                    width={160}
+                    height={160}
                     className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover border-4 shadow-2xl"
                     style={{ borderColor: getRankColor(rankInfo) }}
                     loading="lazy"
+                    priority={true}
                   />
                 ) : (
                   <div

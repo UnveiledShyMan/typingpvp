@@ -33,6 +33,14 @@ export default function Footer() {
               Confidentialité
             </Link>
             <span className="text-text-muted/40">•</span>
+            <Link
+              to="/faq"
+              className="text-text-secondary/50 hover:text-text-secondary/80 transition-colors font-light"
+              style={{ fontFamily: 'Inter', fontWeight: 300 }}
+            >
+              FAQ
+            </Link>
+            <span className="text-text-muted/40">•</span>
             <a
               href="https://discord.gg/ztc3gnVmAd"
               target="_blank"
