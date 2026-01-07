@@ -6,6 +6,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
 import { nanoid } from 'nanoid';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -17,6 +18,7 @@ import meRoutes from './routes/me.js';
 import friendsRoutes, { setOnlineUsers } from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 import discordRoutes from './routes/discord.js';
+import ogImageRoutes from './routes/og-image.js';
 import { getUserById, recordMatch, updateUser, getAllUsers } from './db.js';
 // Système ELO amélioré activé : K-factor adaptatif selon le nombre de matchs et le niveau
 // Plus précis que ELO standard, meilleure adaptation pour nouveaux joueurs
@@ -70,6 +72,30 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 };
+
+// Headers de sécurité avec Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      scriptSrc: ["'self'", "https://www.googletagmanager.com", "https://www.google-analytics.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https://www.google-analytics.com", "https://www.googletagmanager.com"],
+      frameSrc: ["'self'", "https://www.google.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Nécessaire pour Socket.io
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Permettre les images externes
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
 
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -159,6 +185,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rankings', rankingsRoutes);
 app.use('/api/me', meRoutes);
+app.use('/og-image', ogImageRoutes); // Route pour images Open Graph dynamiques
 
 // Configurer onlineUsers dans friendsRoutes
 setOnlineUsers(onlineUsers);
@@ -178,6 +205,7 @@ app.get('/sitemap.xml', async (req, res) => {
     const staticPages = [
       { url: '/', priority: '1.0', changefreq: 'daily' },
       { url: '/rankings', priority: '0.9', changefreq: 'hourly' },
+      { url: '/faq', priority: '0.7', changefreq: 'monthly' },
       { url: '/terms', priority: '0.3', changefreq: 'monthly' },
       { url: '/privacy', priority: '0.3', changefreq: 'monthly' },
       { url: '/legal', priority: '0.3', changefreq: 'monthly' }
@@ -237,12 +265,20 @@ app.get('/sitemap.xml', async (req, res) => {
 `;
     });
 
-    // Ajouter les profils utilisateurs
+    // Ajouter les profils utilisateurs avec lastmod précis
     topUsers.forEach(user => {
       if (user.username && user.username !== 'undefined') {
-        const lastModified = user.updated_at ? 
-          new Date(user.updated_at).toISOString().split('T')[0] : 
-          currentDate;
+        // Utiliser updatedAt si disponible, sinon createdAt, sinon date actuelle
+        let lastModified = currentDate;
+        if (user.updatedAt) {
+          lastModified = new Date(user.updatedAt).toISOString().split('T')[0];
+        } else if (user.updated_at) {
+          lastModified = new Date(user.updated_at).toISOString().split('T')[0];
+        } else if (user.createdAt) {
+          lastModified = new Date(user.createdAt).toISOString().split('T')[0];
+        } else if (user.created_at) {
+          lastModified = new Date(user.created_at).toISOString().split('T')[0];
+        }
         
         sitemap += `  <url>
     <loc>${baseUrl}/profile/${encodeURIComponent(user.username)}</loc>
@@ -470,20 +506,43 @@ io.on('connection', (socket) => {
     // CAS SIMPLE : Room normale (non-matchmaking) en attente
     // C'est le cas principal pour les duels 1v1 simples
     if (!room.matchmaking && room.status === 'waiting') {
-      // Vérifier si déjà dans la room (reconnexion)
+      // Vérifier si déjà dans la room (reconnexion ou double appel)
       const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
+        // Si le joueur existe déjà, mettre à jour son socket.id et renvoyer l'état actuel
         existingPlayer.id = socket.id;
+        // Mettre à jour la map des joueurs
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
         socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
-        logger.debug(`Player ${playerName} reconnected to room ${roomId}`);
+        logger.debug(`Player ${playerName} (${userId || 'guest'}) reconnected/updated in room ${roomId}`);
         return;
+      }
+      
+      // Vérifier aussi par socket.id si le socket est déjà associé à un joueur dans cette room
+      // Cela peut arriver si le même socket essaie de rejoindre deux fois
+      const existingPlayerBySocket = Array.from(players.entries()).find(
+        ([sockId, data]) => sockId === socket.id && data.roomId === roomId
+      );
+      if (existingPlayerBySocket) {
+        const [, playerData] = existingPlayerBySocket;
+        const playerInRoom = room.players.find(p => 
+          (userId && p.userId === userId) || 
+          (!userId && p.name === playerName)
+        );
+        if (playerInRoom) {
+          // Le socket est déjà associé à un joueur dans cette room, juste mettre à jour
+          socket.join(roomId);
+          socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+          logger.debug(`Socket ${socket.id} already associated with player in room ${roomId}`);
+          return;
+        }
       }
       
       // Vérifier si la room est pleine (max 2 joueurs pour 1v1)
       if (room.players.length >= 2) {
         socket.emit('error', { message: 'Room is full' });
+        logger.debug(`Room ${roomId} is full (${room.players.length} players)`);
         return;
       }
       
@@ -504,7 +563,7 @@ io.on('connection', (socket) => {
       socket.join(roomId);
       socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
       io.to(roomId).emit('player-joined', { players: room.players });
-      logger.debug(`Player ${playerName} joined room ${roomId}`);
+      logger.debug(`Player ${playerName} (${userId || 'guest'}) joined room ${roomId}. Total players: ${room.players.length}`);
       return;
     }
     
