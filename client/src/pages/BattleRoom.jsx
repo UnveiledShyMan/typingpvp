@@ -214,6 +214,8 @@ export default function BattleRoom() {
     // Les joueurs sont déjà dans la room (ajoutés par createMatchmakingRoom), pas besoin de join-room
     // Cet événement est envoyé juste après la création de la room matchmaking
     socket.on('matchmaking-match-found', (data) => {
+      console.log('🔵 matchmaking-match-found event received at:', new Date().toISOString());
+      console.log('🔵 Raw data:', data);
       try {
         // Vérification de sécurité : s'assurer que toast est disponible
         if (!toast || typeof toast.error !== 'function') {
@@ -278,26 +280,27 @@ export default function BattleRoom() {
         // Cela couvre le cas où on arrive depuis Matchmaking (l'événement peut arriver avant que roomId soit défini)
         if (isMatchmakingMode && currentGameStatus === 'connecting') {
           console.log('✅ Matchmaking match found lors de l\'arrivée depuis Matchmaking (priorité 1):', data.roomId);
-          // Mettre à jour les états de manière sécurisée avec un setTimeout pour éviter de bloquer le rendu
-          setTimeout(() => {
-            try {
-              setText(data.text);
-              setPlayers(validPlayers);
-              setGameStatus('waiting');
-            } catch (stateError) {
-              console.error('❌ Error updating states:', stateError);
-              console.error('❌ State error details:', {
-                name: stateError?.name,
-                message: stateError?.message,
-                stack: stateError?.stack
-              });
-              toast.error('Error updating game state. Please refresh the page.');
+          // Mettre à jour les états directement (React batching les mises à jour automatiquement)
+          try {
+            // Marquer comme ayant rejoint d'abord pour éviter d'appeler join-room
+            hasJoinedRoomRef.current = true;
+            // Mettre à jour les états de manière synchrone
+            setText(data.text);
+            setPlayers(validPlayers);
+            setGameStatus('waiting');
+            // Réinitialiser le scroll du conteneur de texte au début
+            if (textContainerRef.current) {
+              textContainerRef.current.scrollTop = 0;
             }
-          }, 0);
-          if (textContainerRef.current) {
-            textContainerRef.current.scrollTop = 0;
+          } catch (stateError) {
+            console.error('❌ Error updating states:', stateError);
+            console.error('❌ State error details:', {
+              name: stateError?.name,
+              message: stateError?.message,
+              stack: stateError?.stack
+            });
+            toast.error('Error updating game state. Please refresh the page.');
           }
-          hasJoinedRoomRef.current = true;
           return;
         }
         
@@ -305,23 +308,22 @@ export default function BattleRoom() {
         // Cela couvre le cas où l'événement arrive après que roomId soit défini
         if (data.roomId === currentRoomId || data.roomId === roomId) {
           console.log('✅ Matchmaking match found pour la room actuelle (priorité 2):', data.roomId);
-          // Utiliser startTransition pour éviter de bloquer le rendu
-          startTransition(() => {
-            try {
-              setText(data.text);
-              setPlayers(validPlayers);
-              setGameStatus('waiting');
-            } catch (stateError) {
-              console.error('❌ Error updating states:', stateError);
-              toast.error('Error updating game state. Please refresh the page.');
+          // Mettre à jour les états directement (React batching les mises à jour automatiquement)
+          try {
+            // Marquer comme ayant rejoint pour éviter d'appeler join-room
+            hasJoinedRoomRef.current = true;
+            // Mettre à jour les états de manière synchrone
+            setText(data.text);
+            setPlayers(validPlayers);
+            setGameStatus('waiting');
+            // Réinitialiser le scroll du conteneur de texte au début
+            if (textContainerRef.current) {
+              textContainerRef.current.scrollTop = 0;
             }
-          });
-          // Réinitialiser le scroll du conteneur de texte au début
-          if (textContainerRef.current) {
-            textContainerRef.current.scrollTop = 0;
+          } catch (stateError) {
+            console.error('❌ Error updating states:', stateError);
+            toast.error('Error updating game state. Please refresh the page.');
           }
-          // Marquer comme ayant rejoint pour éviter d'appeler join-room
-          hasJoinedRoomRef.current = true;
           return;
         }
         
@@ -358,7 +360,10 @@ export default function BattleRoom() {
         console.warn('⚠️ matchmaking-match-found ignoré:', { 
           dataRoomId: data.roomId, 
           currentRoomId: currentRoomId,
-          reason: 'RoomId mismatch and not in connecting state'
+          roomIdFromParams: roomId,
+          reason: 'RoomId mismatch and not in connecting state',
+          isMatchmakingMode,
+          currentGameStatus
         });
       } catch (error) {
         // Capturer toute erreur dans le handler pour éviter de crasher l'application
@@ -367,9 +372,19 @@ export default function BattleRoom() {
           name: error?.name,
           message: error?.message,
           stack: error?.stack,
+          errorString: error?.toString(),
           data: data
         });
-        toast.error('An error occurred while processing the match. Please try again.');
+        // Afficher l'erreur dans un console.group pour plus de visibilité
+        console.group('🔴 MATCHMAKING MATCH FOUND ERROR');
+        console.error('Error object:', error);
+        console.error('Error message:', error?.message);
+        console.error('Error stack:', error?.stack);
+        console.error('Error data:', data);
+        console.groupEnd();
+        if (toast && typeof toast.error === 'function') {
+          toast.error('An error occurred while processing the match. Please try again.');
+        }
       }
     });
 
@@ -1506,16 +1521,16 @@ export default function BattleRoom() {
 
             {/* Players info */}
             <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-shrink-0">
-              {safePlayers.map((player, index) => (
-                <div key={index} className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full bg-bg-secondary/60 backdrop-blur-sm border border-border-secondary/30">
+              {safePlayers.filter(p => p && p.name && typeof p.name === 'string').map((player, index) => (
+                <div key={player.name || index} className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full bg-bg-secondary/60 backdrop-blur-sm border border-border-secondary/30">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    player.name === playerName 
+                    playerName && player.name === playerName 
                       ? 'bg-accent-primary animate-pulse' 
                       : 'bg-text-secondary/60'
                   }`}></div>
                   <span className={`font-medium truncate max-w-[80px] sm:max-w-[120px] ${
-                    player.name === playerName ? 'text-accent-primary' : 'text-text-secondary'
-                  }`}>{player.name}</span>
+                    playerName && player.name === playerName ? 'text-accent-primary' : 'text-text-secondary'
+                  }`}>{player.name || 'Unknown'}</span>
                 </div>
               ))}
             </div>
@@ -1527,7 +1542,7 @@ export default function BattleRoom() {
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
 
-          {gameStatus === 'waiting' && (
+          {gameStatus === 'waiting' && safePlayers && safePlayers.length > 0 && playerName && (
             <div className="flex-1 flex items-center justify-center min-h-0 overflow-y-auto">
               <div className="text-center space-y-4 sm:space-y-6 max-w-2xl w-full py-4">
                 {/* Liste des joueurs - Design compétitif moderne */}
@@ -1538,9 +1553,9 @@ export default function BattleRoom() {
                     <span className="w-1.5 h-6 bg-gradient-to-b from-accent-primary to-accent-secondary rounded-full"></span>
                   </h3>
                   <div className="space-y-3">
-                    {safePlayers.map((player, index) => (
+                    {safePlayers.filter(p => p && p.name && typeof p.name === 'string').map((player, index) => (
                       <div 
-                        key={index}
+                        key={player.name || index}
                         className={`backdrop-blur-sm rounded-2xl p-5 flex items-center justify-between border-2 transition-all duration-300 transform hover:scale-[1.02] ${
                           player.name === playerName 
                             ? 'bg-gradient-to-r from-accent-primary/20 via-accent-primary/15 to-accent-primary/20 border-accent-primary/50 shadow-xl shadow-accent-primary/20' 
@@ -1555,14 +1570,14 @@ export default function BattleRoom() {
                           }`}></div>
                           <span className={`font-bold text-base ${
                             player.name === playerName ? 'text-text-primary' : 'text-text-secondary'
-                          }`}>{player.name}</span>
-                          {player.name === playerName && (
+                          }`}>{player.name || 'Unknown'}</span>
+                          {playerName && player.name === playerName && (
                             <span className="text-xs px-3 py-1 bg-gradient-to-r from-accent-primary/30 to-accent-secondary/30 text-accent-primary rounded-full font-bold border border-accent-primary/40 shadow-lg">
                               You
                             </span>
                           )}
                         </div>
-                        {player.name === playerName && (
+                        {playerName && player.name === playerName && (
                           <span className="text-xs px-4 py-2 bg-gradient-to-r from-green-500/30 to-green-400/30 text-green-400 rounded-full font-bold border-2 border-green-500/40 shadow-lg flex items-center gap-1">
                             <span>✓</span>
                             <span>Ready</span>
@@ -1748,7 +1763,7 @@ export default function BattleRoom() {
             </div>
           )}
 
-          {gameStatus === 'playing' && (
+          {gameStatus === 'playing' && text && safePlayers && (
             <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden">
               {/* Timer pour le mode timer - Design époustouflant et responsive */}
               {battleMode === 'timer' && timeLeft !== null && (
@@ -1952,15 +1967,15 @@ export default function BattleRoom() {
             </div>
           )}
 
-          {gameStatus === 'finished' && results && (
+          {gameStatus === 'finished' && results && safePlayers && safePlayers.length > 0 && (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <MatchResults
-                players={safePlayers}
+                players={safePlayers.filter(p => p && p.name)}
                 results={results}
-                eloChanges={eloChanges}
-                playerName={playerName}
-                userId={userId}
-                currentUser={currentUser}
+                eloChanges={eloChanges || {}}
+                playerName={playerName || ''}
+                userId={userId || null}
+                currentUser={currentUser || null}
                 onPlayAgain={() => {
                   // Demander un rematch si on est dans une room (pas de matchmaking)
                   if (!location.state?.matchmaking && socketRef.current && socketRef.current.connected && roomId) {

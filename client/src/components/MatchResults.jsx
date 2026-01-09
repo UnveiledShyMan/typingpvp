@@ -18,12 +18,12 @@ const formatAccuracy = (value) => {
 };
 
 function MatchResults({ 
-  players, 
-  results, 
-  eloChanges, 
-  playerName, 
-  userId, 
-  currentUser,
+  players = [], 
+  results = {}, 
+  eloChanges = {}, 
+  playerName = '', 
+  userId = null, 
+  currentUser = null,
   onPlayAgain,
   onBackToLobby,
   rematchReady = false,
@@ -32,6 +32,17 @@ function MatchResults({
   const navigate = useNavigate();
   const [showResults, setShowResults] = useState(false);
   const [winner, setWinner] = useState(null);
+  
+  // Validation des props critiques
+  if (!Array.isArray(players)) {
+    console.error('❌ MatchResults: players must be an array, received:', typeof players);
+    players = [];
+  }
+  
+  if (typeof results !== 'object' || results === null) {
+    console.error('❌ MatchResults: results must be an object, received:', typeof results);
+    results = {};
+  }
   
   // Animation d'entrée
   useEffect(() => {
@@ -43,34 +54,61 @@ function MatchResults({
   useEffect(() => {
     if (!results || !players || players.length < 2) return;
     
-    const player1 = players[0];
-    const player2 = players[1];
-    const result1 = results[player1.id];
-    const result2 = results[player2.id];
-    
-    if (!result1 || !result2) {
+    try {
+      const player1 = players[0];
+      const player2 = players[1];
+      
+      // Protection : vérifier que les joueurs ont un id valide
+      if (!player1 || !player2) {
+        console.warn('⚠️ MatchResults: Invalid players data');
+        return;
+      }
+      
+      const player1Id = player1.id || player1.name || 'player1';
+      const player2Id = player2.id || player2.name || 'player2';
+      
+      const result1 = results[player1Id];
+      const result2 = results[player2Id];
+      
+      if (!result1 || !result2) {
+        setWinner(null);
+        return;
+      }
+      
+      // Gagnant = meilleur WPM, en cas d'égalité meilleure accuracy
+      if (result1.wpm > result2.wpm || 
+          (result1.wpm === result2.wpm && result1.accuracy > result2.accuracy)) {
+        setWinner(player1);
+      } else {
+        setWinner(player2);
+      }
+    } catch (error) {
+      console.error('❌ Error determining winner in MatchResults:', error);
       setWinner(null);
-      return;
-    }
-    
-    // Gagnant = meilleur WPM, en cas d'égalité meilleure accuracy
-    if (result1.wpm > result2.wpm || 
-        (result1.wpm === result2.wpm && result1.accuracy > result2.accuracy)) {
-      setWinner(player1);
-    } else {
-      setWinner(player2);
     }
   }, [results, players]);
   
-  if (!results || !players) return null;
+  if (!results || !players || players.length === 0) return null;
   
-  const myPlayer = players.find(p => 
-    p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id))
+  // Protection : s'assurer que players est un tableau valide
+  const safePlayers = Array.isArray(players) ? players.filter(p => p && (p.name || p.id)) : [];
+  if (safePlayers.length === 0) return null;
+  
+  const myPlayer = safePlayers.find(p => 
+    (p.name && p.name === playerName) || (p.userId && p.userId === (userId || currentUser?.id))
   );
-  const myResult = myPlayer ? results[myPlayer.id] : null;
-  const myIsWinner = winner && myPlayer && winner.id === myPlayer.id;
-  const opponent = players.find(p => p.id !== myPlayer?.id);
-  const opponentResult = opponent ? results[opponent.id] : null;
+  
+  // Protection : utiliser player.id ou player.name comme clé pour results
+  const myPlayerKey = myPlayer ? (myPlayer.id || myPlayer.name) : null;
+  const myResult = myPlayerKey ? results[myPlayerKey] : null;
+  const myIsWinner = winner && myPlayer && (winner.id === myPlayer.id || winner.name === myPlayer.name);
+  const opponent = safePlayers.find(p => {
+    const pKey = p.id || p.name;
+    const myKey = myPlayer?.id || myPlayer?.name;
+    return pKey && myKey && pKey !== myKey;
+  });
+  const opponentKey = opponent ? (opponent.id || opponent.name) : null;
+  const opponentResult = opponentKey ? results[opponentKey] : null;
   
   return (
     <div className={`h-full flex items-center justify-center py-2 sm:py-4 transition-all duration-700 ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -154,13 +192,13 @@ function MatchResults({
                   </div>
                 )}
               </div>
-              {eloChanges && eloChanges[myPlayer.id] !== undefined && (
+              {myPlayerKey && eloChanges && eloChanges[myPlayerKey] !== undefined && (
                 <div className={`text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border-2 ${
-                  eloChanges[myPlayer.id] >= 0 
+                  eloChanges[myPlayerKey] >= 0 
                     ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow-lg shadow-green-500/20' 
                     : 'bg-red-500/20 text-red-400 border-red-500/40 shadow-lg shadow-red-500/20'
                 }`}>
-                  {eloChanges[myPlayer.id] >= 0 ? '+' : ''}{eloChanges[myPlayer.id]} ELO
+                  {eloChanges[myPlayerKey] >= 0 ? '+' : ''}{eloChanges[myPlayerKey]} ELO
                 </div>
               )}
             </div>
@@ -230,22 +268,22 @@ function MatchResults({
         {opponent && opponentResult && (
           <div
             className={`relative backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border-2 transition-all duration-500 transform ${
-              !myIsWinner && winner && winner.id === opponent.id
+              !myIsWinner && winner && opponent && ((winner.id && opponent.id && winner.id === opponent.id) || (winner.name && opponent.name && winner.name === opponent.name))
                 ? 'bg-gradient-to-br from-accent-primary/30 via-accent-primary/15 to-accent-primary/5 border-accent-primary/60 shadow-2xl shadow-accent-primary/40 scale-[1.02]'
                 : 'bg-gradient-to-br from-bg-secondary/60 via-bg-secondary/40 to-bg-secondary/60 border-border-secondary/40 hover:border-border-secondary/60'
             }`}
           >
             {/* Effet de glow pour le gagnant */}
-            {!myIsWinner && winner && winner.id === opponent.id && (
+            {!myIsWinner && winner && opponent && ((winner.id && opponent.id && winner.id === opponent.id) || (winner.name && opponent.name && winner.name === opponent.name)) && (
               <div className="absolute inset-0 rounded-3xl bg-accent-primary/10 blur-2xl"></div>
             )}
             <div className="relative">
               <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <div className={`text-lg sm:text-xl font-bold ${
-                    !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
-                  }`}>{opponent.name}</div>
-                  {!myIsWinner && winner && winner.id === opponent.id && (
+                    !myIsWinner && winner && opponent && ((winner.id && opponent.id && winner.id === opponent.id) || (winner.name && opponent.name && winner.name === opponent.name)) ? 'text-accent-primary' : 'text-text-primary'
+                  }`}>{opponent.name || 'Opponent'}</div>
+                  {!myIsWinner && winner && opponent && ((winner.id && opponent.id && winner.id === opponent.id) || (winner.name && opponent.name && winner.name === opponent.name)) && (
                     <div className="relative">
                       <span className="text-xl sm:text-2xl animate-bounce">👑</span>
                       <div className="absolute inset-0 text-xl sm:text-2xl animate-ping opacity-20">👑</div>
@@ -263,13 +301,13 @@ function MatchResults({
                     <span className="hidden sm:inline">Profile</span>
                   </button>
                 )}
-                {eloChanges && eloChanges[opponent.id] !== undefined && (
+                {opponentKey && eloChanges && eloChanges[opponentKey] !== undefined && (
                   <div className={`text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border-2 ${
-                    eloChanges[opponent.id] >= 0 
+                    eloChanges[opponentKey] >= 0 
                       ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow-lg shadow-green-500/20' 
                       : 'bg-red-500/20 text-red-400 border-red-500/40 shadow-lg shadow-red-500/20'
                   }`}>
-                    {eloChanges[opponent.id] >= 0 ? '+' : ''}{eloChanges[opponent.id]} ELO
+                    {eloChanges[opponentKey] >= 0 ? '+' : ''}{eloChanges[opponentKey]} ELO
                   </div>
                 )}
               </div>
@@ -416,7 +454,7 @@ function MatchResults({
                 wpm: myResult.wpm,
                 accuracy: myResult.accuracy,
                 isWinner: true,
-                eloChange: eloChanges?.[myPlayer.id]
+                eloChange: myPlayerKey ? eloChanges?.[myPlayerKey] : undefined
               }}
               type="battle"
             />
