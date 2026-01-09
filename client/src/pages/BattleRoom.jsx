@@ -228,30 +228,63 @@ export default function BattleRoom() {
     });
 
     socket.on('game-started', (data) => {
-      setGameStatus('playing');
-      setStartTime(data.startTime);
-      startTimeRef.current = data.startTime; // Stocker aussi dans la ref
-      setTypingStartTime(null); // Réinitialiser le temps de début de frappe
-      typingStartTimeRef.current = null; // Réinitialiser aussi la ref
-      setOpponentTypingStartTime(null); // Réinitialiser le temps de début de frappe de l'adversaire
-      opponentTypingStartTimeRef.current = null; // Réinitialiser aussi la ref
-      // Mettre à jour le texte si une nouvelle langue a été choisie
-      if (data.text) {
-        setText(data.text);
-      }
-      // Mettre à jour le mode et les paramètres
-      if (data.mode) {
-        setBattleMode(data.mode);
-      }
-      if (data.timerDuration) {
-        setTimerDuration(data.timerDuration);
-        setTimeLeft(data.timerDuration);
-      }
-      if (data.difficulty) {
-        setPhraseDifficulty(data.difficulty);
-      }
-      setInput(''); // Réinitialiser l'input
-      lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
+      try {
+        // Vérification de sécurité : s'assurer que data existe
+        if (!data) {
+          console.error('❌ game-started: data is undefined or null');
+          toast.error('Invalid game data received. Please refresh the page.');
+          setGameStatus('waiting');
+          return;
+        }
+
+        // Log pour debugging (seulement en développement)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🎮 game-started received:', data);
+        }
+
+        setGameStatus('playing');
+        
+        // Vérifier que startTime existe avant de l'utiliser
+        if (data.startTime !== undefined && data.startTime !== null) {
+          setStartTime(data.startTime);
+          startTimeRef.current = data.startTime; // Stocker aussi dans la ref
+        } else {
+          // Utiliser Date.now() comme fallback si startTime n'est pas fourni
+          const fallbackStartTime = Date.now();
+          setStartTime(fallbackStartTime);
+          startTimeRef.current = fallbackStartTime;
+          console.warn('⚠️ game-started: startTime missing, using fallback');
+        }
+        
+        setTypingStartTime(null); // Réinitialiser le temps de début de frappe
+        typingStartTimeRef.current = null; // Réinitialiser aussi la ref
+        setOpponentTypingStartTime(null); // Réinitialiser le temps de début de frappe de l'adversaire
+        opponentTypingStartTimeRef.current = null; // Réinitialiser aussi la ref
+        
+        // Mettre à jour le texte si une nouvelle langue a été choisie
+        // IMPORTANT: Vérifier que le texte est valide (non vide, string)
+        if (data.text && typeof data.text === 'string' && data.text.trim().length > 0) {
+          setText(data.text);
+        } else {
+          console.error('❌ game-started: Invalid or missing text:', data.text);
+          toast.error('Invalid game text received. Please refresh the page.');
+          setGameStatus('waiting');
+          return;
+        }
+        
+        // Mettre à jour le mode et les paramètres
+        if (data.mode) {
+          setBattleMode(data.mode);
+        }
+        if (data.timerDuration !== undefined && data.timerDuration !== null) {
+          setTimerDuration(data.timerDuration);
+          setTimeLeft(data.timerDuration);
+        }
+        if (data.difficulty) {
+          setPhraseDifficulty(data.difficulty);
+        }
+        setInput(''); // Réinitialiser l'input
+        lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
       
       // Arrêter l'interval précédent s'il existe
       if (progressIntervalRef.current) {
@@ -263,68 +296,90 @@ export default function BattleRoom() {
         statsUpdateRef.current = null;
       }
       
-      // Démarrer le timer si mode timer
-      if (data.mode === 'timer' && data.timerDuration) {
-        setTimeLeft(data.timerDuration);
-        timerIntervalRef.current = setInterval(() => {
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              // Finir automatiquement quand le timer atteint 0
-              if (socketRef.current) {
-                // Utiliser la ref pour accéder à la valeur actuelle dans le callback
-                const typingStart = typingStartTimeRef.current;
-                if (typingStart && input.length > 0) {
-                  const finalTime = (Date.now() - typingStart) / 1000 / 60;
-                  const wordsTyped = input.trim().split(/\s+/).filter(w => w.length > 0).length;
-                  const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
-                  const finalAccuracy = input.length > 0 ? Math.round(((input.length - errors) / input.length) * 100) : 100;
-                  socketRef.current.emit('finish-game', {
-                    wpm: finalWpm,
-                    accuracy: finalAccuracy
-                  });
-                } else {
-                  // Si l'utilisateur n'a pas commencé à taper, envoyer 0
-                  socketRef.current.emit('finish-game', {
-                    wpm: 0,
-                    accuracy: 100
-                  });
+        // Démarrer le timer si mode timer
+        if (data.mode === 'timer' && data.timerDuration) {
+          setTimeLeft(data.timerDuration);
+          timerIntervalRef.current = setInterval(() => {
+            setTimeLeft((prev) => {
+              if (prev <= 1) {
+                // Finir automatiquement quand le timer atteint 0
+                if (socketRef.current) {
+                  // Utiliser les refs pour accéder aux valeurs actuelles dans le callback
+                  // IMPORTANT: Ne pas utiliser les valeurs de closure (input, errors) car elles sont obsolètes
+                  const typingStart = typingStartTimeRef.current;
+                  const currentInput = inputRef.current?.value || '';
+                  const currentErrors = lastErrorCountRef.current || 0;
+                  
+                  if (typingStart && currentInput.length > 0) {
+                    const finalTime = (Date.now() - typingStart) / 1000 / 60;
+                    const wordsTyped = currentInput.trim().split(/\s+/).filter(w => w.length > 0).length;
+                    const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
+                    const finalAccuracy = currentInput.length > 0 ? Math.round(((currentInput.length - currentErrors) / currentInput.length) * 100) : 100;
+                    socketRef.current.emit('finish-game', {
+                      wpm: finalWpm,
+                      accuracy: finalAccuracy
+                    });
+                  } else {
+                    // Si l'utilisateur n'a pas commencé à taper, envoyer 0
+                    socketRef.current.emit('finish-game', {
+                      wpm: 0,
+                      accuracy: 100
+                    });
+                  }
                 }
+                if (timerIntervalRef.current) {
+                  clearInterval(timerIntervalRef.current);
+                  timerIntervalRef.current = null;
+                }
+                return 0;
               }
-              if (timerIntervalRef.current) {
-                clearInterval(timerIntervalRef.current);
-                timerIntervalRef.current = null;
-              }
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-      
-      // L'enregistrement des stats se fera dans handleInputChange et opponent-update
-      // Pas besoin d'interval ici car on met à jour à chaque frappe
-      
-      if (inputRef.current) {
-        inputRef.current.focus();
+              return prev - 1;
+            });
+          }, 1000);
+        }
+        
+        // L'enregistrement des stats se fera dans handleInputChange et opponent-update
+        // Pas besoin d'interval ici car on met à jour à chaque frappe
+        
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      } catch (error) {
+        // Capturer toute erreur dans le handler game-started
+        console.error('❌ Error in game-started handler:', error);
+        console.error('Error stack:', error.stack);
+        toast.error('An error occurred while starting the game. Please refresh the page.');
+        setGameStatus('waiting');
       }
     });
 
     // Handler pour opponent-update
     // Ce handler est appelé très fréquemment (à chaque frappe de l'adversaire)
     socket.on('opponent-update', (data) => {
-      // Mettre à jour les stats immédiatement
-      // Utiliser une ref pour éviter de chercher dans players à chaque fois
-      setOpponentStats({
-        wpm: data.wpm,
-        accuracy: data.accuracy,
-        progress: data.progress
-      });
-      
-      // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
-      // Utiliser TOUJOURS le startTime de la partie pour synchroniser les deux joueurs
-      if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTimeRef.current && startTimeRef.current) {
-        setOpponentTypingStartTime(startTimeRef.current);
-        opponentTypingStartTimeRef.current = startTimeRef.current;
+      try {
+        // Vérification de sécurité : s'assurer que data existe
+        if (!data) {
+          console.warn('⚠️ opponent-update: data is undefined or null');
+          return;
+        }
+
+        // Mettre à jour les stats immédiatement
+        // Utiliser une ref pour éviter de chercher dans players à chaque fois
+        setOpponentStats({
+          wpm: data.wpm || 0,
+          accuracy: data.accuracy || 100,
+          progress: data.progress || 0
+        });
+        
+        // Détecter la première frappe de l'adversaire (quand wpm > 0 ou progress > 0)
+        // Utiliser TOUJOURS le startTime de la partie pour synchroniser les deux joueurs
+        if ((data.wpm > 0 || data.progress > 0) && !opponentTypingStartTimeRef.current && startTimeRef.current) {
+          setOpponentTypingStartTime(startTimeRef.current);
+          opponentTypingStartTimeRef.current = startTimeRef.current;
+        }
+      } catch (error) {
+        console.error('❌ Error in opponent-update handler:', error);
+        // Ne pas bloquer l'application pour une erreur dans opponent-update
       }
     });
 
@@ -620,18 +675,25 @@ export default function BattleRoom() {
   };
 
   const handleInputChange = useCallback((e) => {
-    if (gameStatus !== 'playing') return;
-    
-    const value = e.target.value;
-    
-    // Définir le temps de début de frappe à la première frappe
-    if (value.length > 0 && !typingStartTime) {
-      const now = Date.now();
-      setTypingStartTime(now);
-      typingStartTimeRef.current = now; // Mettre à jour aussi la ref
-    }
-    
-    if (value.length <= text.length) {
+    try {
+      if (gameStatus !== 'playing') return;
+      
+      // Vérification de sécurité : s'assurer que text est valide
+      if (!text || typeof text !== 'string') {
+        console.warn('⚠️ handleInputChange: text is invalid, ignoring input');
+        return;
+      }
+      
+      const value = e.target.value;
+      
+      // Définir le temps de début de frappe à la première frappe
+      if (value.length > 0 && !typingStartTime) {
+        const now = Date.now();
+        setTypingStartTime(now);
+        typingStartTimeRef.current = now; // Mettre à jour aussi la ref
+      }
+      
+      if (value.length <= text.length) {
       // Mise à jour immédiate de l'input pour réduire l'input lag
       setInput(value);
       
@@ -688,7 +750,8 @@ export default function BattleRoom() {
           const accuracy = value.length > 0 
             ? Math.round((correctChars / value.length) * 100)
             : 100;
-          const progress = Math.round((value.length / text.length) * 100);
+          // Vérification de sécurité : éviter division par zéro
+          const progress = text.length > 0 ? Math.round((value.length / text.length) * 100) : 0;
           
           setMyStats({ wpm, accuracy, progress });
           
@@ -707,55 +770,67 @@ export default function BattleRoom() {
         // Optimisation : utiliser requestAnimationFrame pour décaler le scroll et éviter les lags
         if (textContainerRef.current) {
           requestAnimationFrame(() => {
-            const container = textContainerRef.current;
-            if (!container) return;
-            
-            const currentCharElement = container.querySelector(`span:nth-child(${value.length + 1})`);
-            if (currentCharElement) {
-              const containerRect = container.getBoundingClientRect();
-              const charRect = currentCharElement.getBoundingClientRect();
-              const charTop = charRect.top - containerRect.top + container.scrollTop;
-              const charBottom = charTop + charRect.height;
+            try {
+              const container = textContainerRef.current;
+              if (!container) return;
               
-              // Scroll si le caractère courant est en dehors de la zone visible
-              if (charTop < container.scrollTop + 50) {
-                container.scrollTop = Math.max(0, charTop - 50);
-              } else if (charBottom > container.scrollTop + container.clientHeight - 50) {
-                container.scrollTop = charBottom - container.clientHeight + 50;
+              const currentCharElement = container.querySelector(`span:nth-child(${value.length + 1})`);
+              if (currentCharElement) {
+                const containerRect = container.getBoundingClientRect();
+                const charRect = currentCharElement.getBoundingClientRect();
+                const charTop = charRect.top - containerRect.top + container.scrollTop;
+                const charBottom = charTop + charRect.height;
+                
+                // Scroll si le caractère courant est en dehors de la zone visible
+                if (charTop < container.scrollTop + 50) {
+                  container.scrollTop = Math.max(0, charTop - 50);
+                } else if (charBottom > container.scrollTop + container.clientHeight - 50) {
+                  container.scrollTop = charBottom - container.clientHeight + 50;
+                }
               }
+            } catch (scrollError) {
+              // Ignorer les erreurs de scroll pour ne pas bloquer l'application
+              console.warn('⚠️ Error in auto-scroll:', scrollError);
             }
           });
         }
       }
 
-      // Vérifier si terminé
-      if (value === text && typingStartTime) {
-        // Utiliser typingStartTime pour le calcul du WPM final (temps réel de frappe)
-        const finalTime = (Date.now() - typingStartTimeRef.current) / 1000 / 60;
-        const correctChars = text.length - errorCount;
-        const wordsTyped = correctChars / 5;
-        const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
-        const finalAccuracy = Math.round((correctChars / text.length) * 100);
-        
-        // Notification de fin
-        toast.success('You finished! Waiting for opponent...', 2000);
-        
-        // Vérifier que le socket est connecté avant d'émettre
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit('finish-game', {
-            wpm: finalWpm,
-            accuracy: finalAccuracy
-          });
-        } else if (socketRef.current) {
-          // Si pas connecté, attendre la reconnexion
-          socketRef.current.once('connect', () => {
+        // Vérifier si terminé
+        if (value === text && typingStartTime) {
+          // Utiliser typingStartTime pour le calcul du WPM final (temps réel de frappe)
+          const finalTime = (Date.now() - typingStartTimeRef.current) / 1000 / 60;
+          const correctChars = text.length - errorCount;
+          const wordsTyped = correctChars / 5;
+          const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
+          const finalAccuracy = Math.round((correctChars / text.length) * 100);
+          
+          // Notification de fin
+          toast.success('You finished! Waiting for opponent...', 2000);
+          
+          // Vérifier que le socket est connecté avant d'émettre
+          if (socketRef.current && socketRef.current.connected) {
             socketRef.current.emit('finish-game', {
               wpm: finalWpm,
               accuracy: finalAccuracy
             });
-          });
+          } else if (socketRef.current) {
+            // Si pas connecté, attendre la reconnexion
+            socketRef.current.once('connect', () => {
+              socketRef.current.emit('finish-game', {
+                wpm: finalWpm,
+                accuracy: finalAccuracy
+              });
+            });
+          }
         }
       }
+    } catch (error) {
+      // Capturer toute erreur dans handleInputChange pour éviter de crasher l'application
+      console.error('❌ Error in handleInputChange:', error);
+      console.error('Error stack:', error.stack);
+      // Ne pas afficher de toast pour éviter de spammer l'utilisateur
+      // L'erreur est loggée pour le debugging
     }
   }, [gameStatus, text, input, typingStartTime, errors]);
 
@@ -792,29 +867,41 @@ export default function BattleRoom() {
 
   // OPTIMISATION : Mémoriser renderText avec useMemo pour éviter de recalculer à chaque render
   // Cela améliore significativement les performances lors de la frappe
+  // IMPORTANT: Ajouter des vérifications de sécurité pour éviter les erreurs si text est undefined
   const renderText = useMemo(() => {
-    return text.split('').map((char, index) => {
-      if (index < input.length) {
-        const isCorrect = input[index] === char;
-        return (
-          <span key={index} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
-            {char}
-          </span>
-        );
-      } else if (index === input.length) {
-        return (
-          <span key={index} className="char-current">
-            {char}
-          </span>
-        );
-      } else {
-        return (
-          <span key={index} className="char-pending">
-            {char}
-          </span>
-        );
-      }
-    });
+    // Vérification de sécurité : s'assurer que text est valide
+    if (!text || typeof text !== 'string') {
+      console.warn('⚠️ renderText: text is invalid, using empty string');
+      return <span className="text-text-secondary">Loading text...</span>;
+    }
+    
+    try {
+      return text.split('').map((char, index) => {
+        if (index < input.length) {
+          const isCorrect = input[index] === char;
+          return (
+            <span key={index} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
+              {char}
+            </span>
+          );
+        } else if (index === input.length) {
+          return (
+            <span key={index} className="char-current">
+              {char}
+            </span>
+          );
+        } else {
+          return (
+            <span key={index} className="char-pending">
+              {char}
+            </span>
+          );
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error in renderText:', error);
+      return <span className="text-text-secondary">Error rendering text. Please refresh the page.</span>;
+    }
   }, [text, input]);
 
   const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));

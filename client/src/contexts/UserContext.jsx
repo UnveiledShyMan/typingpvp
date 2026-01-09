@@ -41,12 +41,18 @@ export function UserProvider({ children }) {
     setError(null);
     
     try {
-      const userData = await authService.getCurrentUser();
+      // Utiliser silent: true pour ne pas afficher de toast d'erreur lors du chargement initial
+      // C'est normal si le token est invalide ou expiré, pas besoin d'alerter l'utilisateur
+      const userData = await authService.getCurrentUser({ silent: true });
       setUser(userData);
     } catch (error) {
-      // Token invalide ou expiré
+      // Token invalide ou expiré - ne pas afficher d'erreur lors du chargement initial
+      // C'est normal si l'utilisateur n'est pas connecté
       setUser(null);
-      localStorage.removeItem('token');
+      // Ne supprimer le token que s'il était présent (évite les suppressions inutiles)
+      if (localStorage.getItem('token')) {
+        localStorage.removeItem('token');
+      }
     } finally {
       setLoading(false);
     }

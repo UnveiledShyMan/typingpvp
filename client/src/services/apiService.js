@@ -23,6 +23,10 @@ async function request(endpoint, options = {}, retryCount = 0) {
   const token = localStorage.getItem('token');
   const maxRetries = 2;
   
+  // Option pour supprimer le toast d'erreur (utile pour le chargement initial silencieux)
+  const silent = options.silent || false;
+  delete options.silent; // Retirer de options pour ne pas l'envoyer au serveur
+  
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -45,8 +49,9 @@ async function request(endpoint, options = {}, retryCount = 0) {
           logoutHandler();
         }
         // Afficher un toast seulement si l'utilisateur avait un token (session expirée)
+        // ET si ce n'est pas une requête silencieuse (chargement initial)
         // Sinon, c'est juste qu'il n'est pas connecté (pas d'erreur à afficher)
-        if (errorHandler && hadToken) {
+        if (errorHandler && hadToken && !silent) {
           errorHandler('Session expirée. Veuillez vous reconnecter.', 'error');
         }
         throw new Error('Unauthorized - Session expirée');
@@ -59,9 +64,14 @@ async function request(endpoint, options = {}, retryCount = 0) {
       // Utiliser le message détaillé si disponible, sinon l'erreur générique
       const errorMessage = error.message || error.error || `Erreur HTTP ${response.status}`;
       
-      // Afficher l'erreur via toast si handler disponible
-      if (errorHandler) {
-        errorHandler(errorMessage, 'error');
+      // Afficher l'erreur via toast si handler disponible ET si ce n'est pas silencieux
+      // Ne pas afficher pour les 404 sur /api/me lors du chargement initial (utilisateur non connecté)
+      if (errorHandler && !silent) {
+        // Ne pas afficher "User not found" pour les 404 sur /api/me (chargement initial)
+        const isInitialLoad = endpoint === '/api/me' && response.status === 404;
+        if (!isInitialLoad) {
+          errorHandler(errorMessage, 'error');
+        }
       }
       
       throw new Error(errorMessage);
@@ -163,8 +173,9 @@ export const authService = {
     return data;
   },
   
-  async getCurrentUser() {
-    return get('/api/me');
+  async getCurrentUser(options = {}) {
+    // Passer les options (comme silent) à la fonction get
+    return get('/api/me', options);
   },
   
   logout() {
