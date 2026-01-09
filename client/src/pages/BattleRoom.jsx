@@ -74,7 +74,7 @@ export default function BattleRoom() {
   const socketRef = useRef(null);
   const textContainerRef = useRef(null);
   const hasJoinedRoomRef = useRef(false); // Ref pour éviter de joindre plusieurs fois
-  const listenersSetupRef = useRef(false); // Ref pour éviter de configurer les listeners plusieurs fois
+  const listenersSetupRef = useRef(null); // Ref pour stocker la configuration des listeners (roomId-matchmaking)
   const lastErrorCountRef = useRef(0); // Ref pour le calcul incrémental des erreurs (optimisation O(1))
   const statsUpdateRef = useRef(null); // Ref pour throttler les calculs de stats avec requestAnimationFrame
   // Refs pour éviter les closures obsolètes dans les listeners socket
@@ -155,9 +155,16 @@ export default function BattleRoom() {
   }, []); // Exécuter une seule fois au montage
 
   // Mettre à jour les refs quand les valeurs changent (pour éviter les closures obsolètes dans les listeners)
+  // IMPORTANT: Mettre à jour matchmakingRef AVANT de configurer les listeners
   useEffect(() => {
     matchmakingRef.current = matchmaking;
-  }, [matchmaking]);
+    // Si matchmaking change, réinitialiser le flag pour reconfigurer les listeners
+    // Utiliser des valeurs par défaut pour éviter les problèmes avec undefined
+    const currentConfig = `${roomId || 'no-room'}-${matchmaking || false}`;
+    if (listenersSetupRef.current && listenersSetupRef.current !== currentConfig) {
+      listenersSetupRef.current = null;
+    }
+  }, [matchmaking, roomId]);
   
   useEffect(() => {
     gameStatusRef.current = gameStatus;
@@ -177,6 +184,7 @@ export default function BattleRoom() {
 
   // Configurer les listeners socket une seule fois
   // IMPORTANT: Nettoyer les anciens listeners avant d'ajouter les nouveaux pour éviter les doublons
+  // Réinitialiser le flag si on change de room ou de mode matchmaking pour reconfigurer les listeners
   useEffect(() => {
     if (!socketRef.current) {
       return;
@@ -184,15 +192,8 @@ export default function BattleRoom() {
 
     const socket = socketRef.current;
     
-    // Si les listeners ont déjà été configurés, ne pas les reconfigurer
-    // Mais nettoyer d'abord pour éviter les doublons
-    if (listenersSetupRef.current) {
-      return;
-    }
-    
-    listenersSetupRef.current = true;
-    
-    // Nettoyer les anciens listeners pour éviter les doublons
+    // Nettoyer les anciens listeners AVANT de vérifier le flag
+    // Cela évite les doublons si le composant est remonté avec un nouveau roomId ou matchmaking
     const eventsToClean = [
       'matchmaking-match-found',
       'room-joined',
@@ -207,6 +208,16 @@ export default function BattleRoom() {
       'reconnect'
     ];
     eventsToClean.forEach(event => socket.off(event));
+    
+    // Si les listeners ont déjà été configurés pour cette configuration, ne pas les reconfigurer
+    // Vérifier que la configuration n'a pas changé (roomId ou matchmaking)
+    // Utiliser des valeurs par défaut pour éviter les problèmes avec undefined
+    const currentConfig = `${roomId || 'no-room'}-${matchmaking || false}`;
+    if (listenersSetupRef.current && listenersSetupRef.current === currentConfig) {
+      return;
+    }
+    
+    listenersSetupRef.current = currentConfig;
 
     // Configurer tous les listeners socket
     
@@ -827,11 +838,13 @@ export default function BattleRoom() {
       }
     });
 
-    // Nettoyage des listeners sera fait dans le premier useEffect
+    // Nettoyage des listeners sera fait dans le premier useEffect (cleanupSocket)
+    // Ne pas réinitialiser le flag ici car on veut garder la trace de la configuration
     return () => {
-      listenersSetupRef.current = false;
+      // Les listeners seront nettoyés par cleanupSocket dans le premier useEffect
+      // Ne pas réinitialiser listenersSetupRef ici car on veut le garder pour éviter les doublons
     };
-  }, []); // Exécuter une seule fois
+  }, [roomId, matchmaking]); // Reconfigurer si roomId ou matchmaking change (même si undefined)
 
   // Joindre la room une fois que le playerName est défini
   // IMPORTANT : Pour les rooms matchmaking, ne PAS appeler join-room car les joueurs sont déjà dans la room
