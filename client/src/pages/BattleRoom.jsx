@@ -18,7 +18,12 @@ export default function BattleRoom() {
   const location = useLocation();
   const navigate = useNavigate();
   // Protection : s'assurer que location.state existe avant de destructurer
-  const locationState = location.state || {};
+  // IMPORTANT: Initialiser locationStateRef avec location.state directement pour éviter les erreurs TDZ
+  // Le problème "Cannot access 'Ye' before initialization" vient du fait que le minificateur peut réorganiser
+  // les variables et créer un problème d'ordre. En initialisant directement avec location.state (qui est stable),
+  // on évite ce problème.
+  const locationState = location?.state || {};
+  const locationStateRef = useRef(locationState);
   const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = locationState;
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
@@ -29,11 +34,10 @@ export default function BattleRoom() {
     return <div>Error: Navigation not available</div>;
   }
   
-  // Ref pour location.state pour éviter les problèmes de closure
-  const locationStateRef = useRef(locationState);
+  // Mettre à jour la ref quand location.state change
   useEffect(() => {
-    locationStateRef.current = location.state || {};
-  }, [location.state]);
+    locationStateRef.current = location?.state || {};
+  }, [location?.state]);
   
   // État pour gérer le pseudo si l'utilisateur rejoint via un lien direct
   const [showNameModal, setShowNameModal] = useState(false);
@@ -1240,7 +1244,9 @@ export default function BattleRoom() {
       if (e.key === 'Enter' && gameStatus === 'finished' && results) {
         e.preventDefault();
         // Appeler la même fonction que le bouton "Play Again" (rematch si possible)
-        if (!location.state?.matchmaking && socketRef.current && socketRef.current.connected && roomId) {
+        // Utiliser locationStateRef.current au lieu de location.state pour éviter les problèmes d'initialisation
+        const currentLocationStateForRematch = locationStateRef.current || location.state || {};
+        if (!currentLocationStateForRematch.matchmaking && socketRef.current && socketRef.current.connected && roomId) {
           // Demander un rematch si on est dans une room (pas de matchmaking)
           if (!rematchReady) {
             setRematchReady(true);
@@ -1249,7 +1255,7 @@ export default function BattleRoom() {
           }
         } else {
           // Relancer le matchmaking automatiquement
-          if (location.state?.matchmaking) {
+          if (currentLocationStateForRematch.matchmaking) {
             handlePlayAgainMatchmaking();
           } else {
             navigate('/battle');
@@ -1275,7 +1281,7 @@ export default function BattleRoom() {
     
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gameStatus, navigate, location.state, results, rematchReady, roomId, handlePlayAgainMatchmaking]);
+  }, [gameStatus, navigate, results, rematchReady, roomId, handlePlayAgainMatchmaking]); // Retirer location.state des dépendances pour éviter les problèmes d'initialisation
 
   // OPTIMISATION : Mémoriser renderText avec useMemo pour éviter de recalculer à chaque render
   // Cela améliore significativement les performances lors de la frappe
@@ -1990,21 +1996,23 @@ export default function BattleRoom() {
                 userId={userId || null}
                 currentUser={currentUser || null}
                 onPlayAgain={() => {
-                  // Demander un rematch si on est dans une room (pas de matchmaking)
-                  if (!location.state?.matchmaking && socketRef.current && socketRef.current.connected && roomId) {
-                    if (!rematchReady) {
-                      setRematchReady(true);
-                      socketRef.current.emit('request-rematch', { roomId });
-                      toast.info('Waiting for opponent to accept rematch...');
-                    }
-                  } else {
-                    // Relancer le matchmaking automatiquement
-                    if (location.state?.matchmaking) {
-                      handlePlayAgainMatchmaking();
-                    } else {
-                      navigate('/battle');
-                    }
-                  }
+        // Demander un rematch si on est dans une room (pas de matchmaking)
+        // Utiliser locationStateRef.current au lieu de location.state pour éviter les problèmes d'initialisation
+        const currentLocationState = locationStateRef.current || location.state || {};
+        if (!currentLocationState.matchmaking && socketRef.current && socketRef.current.connected && roomId) {
+          if (!rematchReady) {
+            setRematchReady(true);
+            socketRef.current.emit('request-rematch', { roomId });
+            toast.info('Waiting for opponent to accept rematch...');
+          }
+        } else {
+          // Relancer le matchmaking automatiquement
+          if (currentLocationState.matchmaking) {
+            handlePlayAgainMatchmaking();
+          } else {
+            navigate('/battle');
+          }
+        }
                 }}
                 onBackToLobby={() => navigate('/')}
                 rematchReady={rematchReady}
