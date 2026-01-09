@@ -97,7 +97,7 @@ function MatchResults({
           )}
         </div>
         
-        <h2 className={`text-5xl font-bold mb-3 relative z-10 ${
+        <h2 className={`text-3xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-3 relative z-10 ${
           myIsWinner 
             ? 'text-accent-primary drop-shadow-lg' 
             : winner 
@@ -240,19 +240,19 @@ function MatchResults({
               <div className="absolute inset-0 rounded-3xl bg-accent-primary/10 blur-2xl"></div>
             )}
             <div className="relative">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className={`text-2xl font-bold ${
-                  !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
-                }`}>{opponent.name}</div>
-                {!myIsWinner && winner && winner.id === opponent.id && (
-                  <div className="relative">
-                    <span className="text-3xl animate-bounce">👑</span>
-                    <div className="absolute inset-0 text-3xl animate-ping opacity-20">👑</div>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-2">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className={`text-xl sm:text-2xl font-bold ${
+                    !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
+                  }`}>{opponent.name}</div>
+                  {!myIsWinner && winner && winner.id === opponent.id && (
+                    <div className="relative">
+                      <span className="text-2xl sm:text-3xl animate-bounce">👑</span>
+                      <div className="absolute inset-0 text-2xl sm:text-3xl animate-ping opacity-20">👑</div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
                 {isValidUserId(opponent.userId) && (
                   <button
                     onClick={() => navigateToProfile(navigate, opponent.userId, opponent.name)}
@@ -273,12 +273,12 @@ function MatchResults({
                   </div>
                 )}
               </div>
-            </div>
+              </div>
             
             {/* Stats principales - Design amélioré */}
-            <div className="space-y-6">
-              <div className="flex items-baseline gap-4">
-                <span className={`text-6xl font-bold ${
+            <div className="space-y-4 sm:space-y-6">
+              <div className="flex items-baseline gap-3 sm:gap-4">
+                <span className={`text-4xl sm:text-5xl md:text-6xl font-bold ${
                   !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
                 }`} style={{ 
                   fontFamily: 'JetBrains Mono',
@@ -286,7 +286,7 @@ function MatchResults({
                 }}>
                   {opponentResult.wpm}
                 </span>
-                <span className="text-text-secondary text-lg font-medium">WPM</span>
+                <span className="text-text-secondary text-base sm:text-lg font-medium">WPM</span>
               </div>
               
               {/* Stats détaillées - Design amélioré avec icônes */}
@@ -334,6 +334,7 @@ function MatchResults({
                   </>
                 )}
               </div>
+            </div>
             </div>
           </div>
         )}
@@ -502,7 +503,7 @@ function MatchResults({
           </div>
         </div>
       </div>
-      </div>
+    </div>
     </div>
   );
 }
