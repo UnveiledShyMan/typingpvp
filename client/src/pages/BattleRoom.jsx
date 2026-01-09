@@ -179,6 +179,31 @@ export default function BattleRoom() {
     // Les joueurs sont déjà dans la room (ajoutés par createMatchmakingRoom), pas besoin de join-room
     // Cet événement est envoyé juste après la création de la room matchmaking
     socket.on('matchmaking-match-found', (data) => {
+      // Vérification de sécurité : s'assurer que data existe et contient les propriétés nécessaires
+      if (!data) {
+        console.error('❌ matchmaking-match-found: data is undefined or null');
+        toast.error('Invalid match data received. Please try again.');
+        return;
+      }
+      
+      if (!data.roomId) {
+        console.error('❌ matchmaking-match-found: data.roomId is missing');
+        toast.error('Invalid room ID received. Please try again.');
+        return;
+      }
+      
+      if (!data.text || typeof data.text !== 'string' || data.text.trim().length === 0) {
+        console.error('❌ matchmaking-match-found: data.text is invalid');
+        toast.error('Invalid game text received. Please try again.');
+        return;
+      }
+      
+      if (!data.players || !Array.isArray(data.players) || data.players.length === 0) {
+        console.error('❌ matchmaking-match-found: data.players is invalid');
+        toast.error('Invalid players data received. Please try again.');
+        return;
+      }
+      
       console.log('📨 matchmaking-match-found reçu:', { 
         dataRoomId: data.roomId, 
         currentRoomId: roomId, 
@@ -221,6 +246,17 @@ export default function BattleRoom() {
       // Ne naviguer que si on a déjà rejoint une room ET qu'on n'est pas en "connecting"
       if (roomId && data.roomId !== roomId && hasJoinedRoomRef.current && gameStatus !== 'connecting') {
         console.log('✅ Nouveau match trouvé depuis une room existante, navigation vers la nouvelle room:', data.roomId);
+        // Vérification de sécurité pour navigate et playerName
+        if (!navigate || typeof navigate !== 'function') {
+          console.error('❌ navigate is not available');
+          toast.error('Navigation error. Please refresh the page.');
+          return;
+        }
+        if (!playerName) {
+          console.error('❌ playerName is not defined');
+          toast.error('Player name missing. Please refresh the page.');
+          return;
+        }
         navigate(`/battle/${data.roomId}`, {
           state: {
             playerName: playerName,
@@ -805,8 +841,9 @@ export default function BattleRoom() {
       });
       
       // Vérifications de base
-      if (players.length !== 2) {
-        console.warn('⚠️ Cannot start game: waiting for opponent', { playersCount: players.length });
+      const currentPlayers = Array.isArray(players) ? players : [];
+      if (currentPlayers.length !== 2) {
+        console.warn('⚠️ Cannot start game: waiting for opponent', { playersCount: currentPlayers.length });
         toast.warning('Waiting for opponent...');
         return;
       }
@@ -1212,8 +1249,10 @@ export default function BattleRoom() {
     }
   }, [text, input]);
 
-  const myPlayer = players.find(p => p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id)));
-  const opponent = players.find(p => p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
+  // Vérification de sécurité : s'assurer que players est un tableau
+  const safePlayers = Array.isArray(players) ? players : [];
+  const myPlayer = safePlayers.find(p => p && (p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id))));
+  const opponent = safePlayers.find(p => p && p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
 
   // Écran de chargement
   if (gameStatus === 'connecting' || !playerName) {
@@ -1360,7 +1399,7 @@ export default function BattleRoom() {
 
             {/* Players info */}
             <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-shrink-0">
-              {players.map((player, index) => (
+              {safePlayers.map((player, index) => (
                 <div key={index} className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full bg-bg-secondary/60 backdrop-blur-sm border border-border-secondary/30">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     player.name === playerName 
@@ -1392,7 +1431,7 @@ export default function BattleRoom() {
                     <span className="w-1.5 h-6 bg-gradient-to-b from-accent-primary to-accent-secondary rounded-full"></span>
                   </h3>
                   <div className="space-y-3">
-                    {players.map((player, index) => (
+                    {safePlayers.map((player, index) => (
                       <div 
                         key={index}
                         className={`backdrop-blur-sm rounded-2xl p-5 flex items-center justify-between border-2 transition-all duration-300 transform hover:scale-[1.02] ${
@@ -1428,7 +1467,7 @@ export default function BattleRoom() {
                 </div>
 
                 {/* Message d'attente ou bouton start - Design compétitif moderne */}
-                {players.length === 1 ? (
+                {safePlayers.length === 1 ? (
                   <div className="space-y-4 sm:space-y-6 bg-gradient-to-br from-bg-secondary/70 via-bg-secondary/50 to-bg-secondary/70 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 border-2 border-border-secondary/40 shadow-2xl">
                     <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto">
                       <div className="absolute inset-0 border-4 border-accent-primary/20 rounded-full"></div>
@@ -1503,7 +1542,7 @@ export default function BattleRoom() {
                         </div>
                       )}
                     </div>
-                    {players.length === 2 && isCreator && (
+                    {safePlayers.length === 2 && isCreator && (
                       <div className="space-y-3 sm:space-y-4 overflow-visible">
                         {/* Sélecteur de mode - Design harmonisé */}
                         <div>
@@ -1584,13 +1623,13 @@ export default function BattleRoom() {
                           onClick={handleStartGame}
                           className="bg-gradient-to-r from-accent-primary via-accent-primary to-accent-secondary hover:from-accent-hover hover:via-accent-hover hover:to-accent-hover text-accent-text font-bold py-3 sm:py-4 px-8 sm:px-10 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-2xl shadow-accent-primary/40 w-full border-2 border-accent-primary/50 text-base sm:text-lg relative overflow-hidden group"
                           aria-label="Start the battle"
-                          disabled={players.length !== 2}
+                          disabled={safePlayers.length !== 2}
                         >
                           {/* Effet de brillance au survol */}
                           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></span>
                           <span className="relative z-10 flex items-center justify-center gap-2">
                             <span>⚔️</span>
-                            <span>{players.length === 2 ? 'Start Battle' : 'Waiting for opponent...'}</span>
+                            <span>{safePlayers.length === 2 ? 'Start Battle' : 'Waiting for opponent...'}</span>
                             <span>⚔️</span>
                           </span>
                         </button>
