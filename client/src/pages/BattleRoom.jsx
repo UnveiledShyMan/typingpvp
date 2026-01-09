@@ -18,13 +18,15 @@ export default function BattleRoom() {
   const location = useLocation();
   const navigate = useNavigate();
   // Protection : s'assurer que location.state existe avant de destructurer
-  // IMPORTANT: Éviter l'optional chaining et les références circulaires pour éviter les erreurs TDZ
+  // IMPORTANT: Éviter complètement les références circulaires et l'optional chaining pour éviter les erreurs TDZ
   // Le problème "Cannot access 'Ye' before initialization" vient du fait que le minificateur peut réorganiser
-  // les variables et créer un problème d'ordre. En évitant l'optional chaining et en initialisant avec
-  // une valeur par défaut stable, on évite ce problème.
-  const locationStateValue = (location && location.state) || {};
-  const locationStateRef = useRef(locationStateValue);
-  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = locationStateValue;
+  // les variables et créer un problème d'ordre. En initialisant locationStateRef avec une valeur par défaut
+  // stable (objet vide), puis en mettant à jour dans un useEffect, on évite ce problème.
+  const locationStateRef = useRef({});
+  
+  // Extraire location.state de manière sûre sans créer de référence circulaire
+  const currentLocationState = (location && location.state) ? location.state : {};
+  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = currentLocationState;
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
@@ -34,10 +36,16 @@ export default function BattleRoom() {
     return <div>Error: Navigation not available</div>;
   }
   
+  // Mettre à jour la ref immédiatement avec la valeur actuelle (en dehors du useEffect pour éviter TDZ)
+  // Puis la mettre à jour dans un useEffect quand location.state change
+  if (currentLocationState && Object.keys(currentLocationState).length > 0) {
+    locationStateRef.current = currentLocationState;
+  }
+  
   // Mettre à jour la ref quand location.state change
   // Éviter l'optional chaining dans les dépendances pour éviter les problèmes de minification
   useEffect(() => {
-    const newLocationState = (location && location.state) || {};
+    const newLocationState = (location && location.state) ? location.state : {};
     locationStateRef.current = newLocationState;
   }, [location]);
   
@@ -86,21 +94,32 @@ export default function BattleRoom() {
   const lastErrorCountRef = useRef(0); // Ref pour le calcul incrémental des erreurs (optimisation O(1))
   const statsUpdateRef = useRef(null); // Ref pour throttler les calculs de stats avec requestAnimationFrame
   // Refs pour éviter les closures obsolètes dans les listeners socket
-  // IMPORTANT: Initialiser les refs avec des valeurs par défaut STABLES pour éviter les problèmes TDZ
-  // Utiliser directement les valeurs depuis locationStateValue pour éviter les problèmes d'ordre d'initialisation
-  // Les refs seront mises à jour dans les useEffect suivants quand les états changent
-  // Ne pas utiliser de variables destructurées dans l'initialisation car le minificateur peut les réorganiser
-  // Utiliser directement les valeurs depuis locationStateValue avec des valeurs par défaut explicites
-  const safeMatchmakingValue = locationStateValue.matchmaking === true ? true : false;
-  const safeUserIdValue = locationStateValue.userId || null;
-  const safeRoomIdForRef = roomId || '';
-  const safePlayerNameForRef = initialPlayerName || '';
-  
-  const matchmakingRef = useRef(safeMatchmakingValue);
+  // IMPORTANT: Initialiser TOUTES les refs avec des valeurs par défaut STABLES pour éviter les problèmes TDZ
+  // Ne pas utiliser de variables destructurées ou calculées dans l'initialisation car le minificateur
+  // peut les réorganiser et créer un problème d'ordre. Les valeurs seront mises à jour dans les useEffect suivants.
+  const matchmakingRef = useRef(false); // Valeur par défaut, sera mise à jour
   const gameStatusRef = useRef('connecting'); // gameStatus n'existe pas encore, valeur par défaut
-  const roomIdRef = useRef(safeRoomIdForRef);
-  const playerNameRef = useRef(safePlayerNameForRef);
-  const userIdRef = useRef(safeUserIdValue);
+  const roomIdRef = useRef(''); // roomId sera mis à jour dans useEffect
+  const playerNameRef = useRef(''); // playerName sera mis à jour dans useEffect
+  const userIdRef = useRef(null); // userId sera mis à jour dans useEffect
+  
+  // Initialiser immédiatement les refs avec les valeurs actuelles (hors useEffect pour éviter TDZ)
+  // IMPORTANT: Utiliser les valeurs directement depuis currentLocationState pour éviter les problèmes d'ordre
+  // Ne pas utiliser les variables destructurées directement car elles peuvent créer un problème TDZ
+  // lors de la minification si le minificateur réorganise les variables
+  try {
+    matchmakingRef.current = (currentLocationState && currentLocationState.matchmaking === true) ? true : false;
+    roomIdRef.current = roomId || '';
+    playerNameRef.current = (currentLocationState && currentLocationState.playerName) || initialPlayerName || '';
+    userIdRef.current = (currentLocationState && currentLocationState.userId) || userId || null;
+  } catch (initError) {
+    console.error('❌ Error initializing refs:', initError);
+    // Si erreur, utiliser des valeurs par défaut sûres
+    matchmakingRef.current = false;
+    roomIdRef.current = '';
+    playerNameRef.current = '';
+    userIdRef.current = null;
+  }
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
