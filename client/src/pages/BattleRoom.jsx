@@ -18,13 +18,13 @@ export default function BattleRoom() {
   const location = useLocation();
   const navigate = useNavigate();
   // Protection : s'assurer que location.state existe avant de destructurer
-  // IMPORTANT: Initialiser locationStateRef avec location.state directement pour éviter les erreurs TDZ
+  // IMPORTANT: Éviter l'optional chaining et les références circulaires pour éviter les erreurs TDZ
   // Le problème "Cannot access 'Ye' before initialization" vient du fait que le minificateur peut réorganiser
-  // les variables et créer un problème d'ordre. En initialisant directement avec location.state (qui est stable),
-  // on évite ce problème.
-  const locationState = location?.state || {};
-  const locationStateRef = useRef(locationState);
-  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = locationState;
+  // les variables et créer un problème d'ordre. En évitant l'optional chaining et en initialisant avec
+  // une valeur par défaut stable, on évite ce problème.
+  const locationStateValue = (location && location.state) || {};
+  const locationStateRef = useRef(locationStateValue);
+  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = locationStateValue;
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
@@ -35,14 +35,18 @@ export default function BattleRoom() {
   }
   
   // Mettre à jour la ref quand location.state change
+  // Éviter l'optional chaining dans les dépendances pour éviter les problèmes de minification
   useEffect(() => {
-    locationStateRef.current = location?.state || {};
-  }, [location?.state]);
+    const newLocationState = (location && location.state) || {};
+    locationStateRef.current = newLocationState;
+  }, [location]);
   
   // État pour gérer le pseudo si l'utilisateur rejoint via un lien direct
   const [showNameModal, setShowNameModal] = useState(false);
   const [tempPlayerName, setTempPlayerName] = useState('');
-  const [playerName, setPlayerName] = useState(initialPlayerName || currentUserFromContext?.username || '');
+  // Éviter l'optional chaining dans useState pour éviter les problèmes TDZ lors de la minification
+  const safePlayerNameForState = initialPlayerName || (currentUserFromContext && currentUserFromContext.username) || '';
+  const [playerName, setPlayerName] = useState(safePlayerNameForState);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   
   // État pour le mode de battle
@@ -82,11 +86,21 @@ export default function BattleRoom() {
   const lastErrorCountRef = useRef(0); // Ref pour le calcul incrémental des erreurs (optimisation O(1))
   const statsUpdateRef = useRef(null); // Ref pour throttler les calculs de stats avec requestAnimationFrame
   // Refs pour éviter les closures obsolètes dans les listeners socket
-  const matchmakingRef = useRef(matchmaking); // Ref pour matchmaking dans les listeners
-  const gameStatusRef = useRef(gameStatus); // Ref pour gameStatus dans les listeners
-  const roomIdRef = useRef(roomId); // Ref pour roomId dans les listeners
-  const playerNameRef = useRef(playerName); // Ref pour playerName dans les listeners
-  const userIdRef = useRef(userId); // Ref pour userId dans les listeners
+  // IMPORTANT: Initialiser les refs avec des valeurs par défaut STABLES pour éviter les problèmes TDZ
+  // Utiliser directement les valeurs depuis locationStateValue pour éviter les problèmes d'ordre d'initialisation
+  // Les refs seront mises à jour dans les useEffect suivants quand les états changent
+  // Ne pas utiliser de variables destructurées dans l'initialisation car le minificateur peut les réorganiser
+  // Utiliser directement les valeurs depuis locationStateValue avec des valeurs par défaut explicites
+  const safeMatchmakingValue = locationStateValue.matchmaking === true ? true : false;
+  const safeUserIdValue = locationStateValue.userId || null;
+  const safeRoomIdForRef = roomId || '';
+  const safePlayerNameForRef = initialPlayerName || '';
+  
+  const matchmakingRef = useRef(safeMatchmakingValue);
+  const gameStatusRef = useRef('connecting'); // gameStatus n'existe pas encore, valeur par défaut
+  const roomIdRef = useRef(safeRoomIdForRef);
+  const playerNameRef = useRef(safePlayerNameForRef);
+  const userIdRef = useRef(safeUserIdValue);
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -160,8 +174,10 @@ export default function BattleRoom() {
 
   // Mettre à jour les refs quand les valeurs changent (pour éviter les closures obsolètes dans les listeners)
   // IMPORTANT: Mettre à jour matchmakingRef AVANT de configurer les listeners
+  // IMPORTANT: Mettre à jour toutes les refs dès le premier render pour éviter les problèmes TDZ
   useEffect(() => {
-    matchmakingRef.current = matchmaking;
+    // Mettre à jour matchmakingRef immédiatement
+    matchmakingRef.current = matchmaking || false;
     // Si matchmaking change, réinitialiser le flag pour reconfigurer les listeners
     // Utiliser des valeurs par défaut pour éviter les problèmes avec undefined
     const currentConfig = `${roomId || 'no-room'}-${matchmaking || false}`;
@@ -170,20 +186,24 @@ export default function BattleRoom() {
     }
   }, [matchmaking, roomId]);
   
+  // Mettre à jour gameStatusRef dès le premier render
   useEffect(() => {
-    gameStatusRef.current = gameStatus;
+    gameStatusRef.current = gameStatus || 'connecting';
   }, [gameStatus]);
   
+  // Mettre à jour roomIdRef dès le premier render
   useEffect(() => {
-    roomIdRef.current = roomId;
+    roomIdRef.current = roomId || '';
   }, [roomId]);
   
+  // Mettre à jour playerNameRef dès le premier render
   useEffect(() => {
-    playerNameRef.current = playerName;
+    playerNameRef.current = playerName || '';
   }, [playerName]);
   
+  // Mettre à jour userIdRef dès le premier render
   useEffect(() => {
-    userIdRef.current = userId;
+    userIdRef.current = userId || null;
   }, [userId]);
 
   // Configurer les listeners socket une seule fois
@@ -277,8 +297,9 @@ export default function BattleRoom() {
         const currentRoomId = roomIdRef.current;
         
         // Vérifier si on est en mode matchmaking (location.state peut ne pas être encore défini)
-        const locationStateForMatch = locationStateRef.current || location.state || {};
-        const isMatchmakingMode = currentMatchmaking === true || locationStateForMatch.matchmaking === true;
+        // Éviter l'optional chaining pour éviter les problèmes de minification
+        const currentLocationStateForListener = locationStateRef.current || (location && location.state) || {};
+        const isMatchmakingMode = currentMatchmaking === true || currentLocationStateForListener.matchmaking === true;
         
         console.log('📨 matchmaking-match-found reçu:', { 
           dataRoomId: data.roomId, 
@@ -286,7 +307,7 @@ export default function BattleRoom() {
           roomIdFromParams: roomId,
           hasJoined: hasJoinedRoomRef.current,
           matchmaking: currentMatchmaking,
-          matchmakingFromState: locationStateForMatch.matchmaking,
+          matchmakingFromState: currentLocationStateForListener.matchmaking,
           isMatchmakingMode: isMatchmakingMode,
           gameStatus: currentGameStatus
         });
@@ -1245,7 +1266,8 @@ export default function BattleRoom() {
         e.preventDefault();
         // Appeler la même fonction que le bouton "Play Again" (rematch si possible)
         // Utiliser locationStateRef.current au lieu de location.state pour éviter les problèmes d'initialisation
-        const currentLocationStateForRematch = locationStateRef.current || location.state || {};
+        // Éviter l'optional chaining pour éviter les problèmes de minification
+        const currentLocationStateForRematch = locationStateRef.current || (location && location.state) || {};
         if (!currentLocationStateForRematch.matchmaking && socketRef.current && socketRef.current.connected && roomId) {
           // Demander un rematch si on est dans une room (pas de matchmaking)
           if (!rematchReady) {
@@ -1998,7 +2020,8 @@ export default function BattleRoom() {
                 onPlayAgain={() => {
         // Demander un rematch si on est dans une room (pas de matchmaking)
         // Utiliser locationStateRef.current au lieu de location.state pour éviter les problèmes d'initialisation
-        const currentLocationState = locationStateRef.current || location.state || {};
+        // Éviter l'optional chaining pour éviter les problèmes de minification
+        const currentLocationState = locationStateRef.current || (location && location.state) || {};
         if (!currentLocationState.matchmaking && socketRef.current && socketRef.current.connected && roomId) {
           if (!rematchReady) {
             setRematchReady(true);
