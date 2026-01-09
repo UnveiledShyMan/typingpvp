@@ -24,22 +24,44 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     // Logger l'erreur pour le debugging avec plus de détails
     // IMPORTANT: Toujours logger même en production pour le debugging
+    // Utiliser console.group pour regrouper les logs et les rendre plus visibles
+    console.group('🔴 ERRORBOUNDARY CAUGHT ERROR - TIMESTAMP:', new Date().toISOString());
     console.error('❌ ErrorBoundary caught an error:', error);
+    console.error('❌ Error name:', error?.name);
     console.error('❌ Error message:', error?.message);
+    console.error('❌ Error toString:', error?.toString());
     console.error('❌ Error stack:', error?.stack);
     console.error('❌ Component stack:', errorInfo?.componentStack);
     console.error('❌ Full error info:', errorInfo);
-    console.error('❌ Error name:', error?.name);
-    console.error('❌ Error toString:', error?.toString());
+    console.error('❌ Error keys:', Object.keys(error || {}));
+    console.error('❌ ErrorInfo keys:', Object.keys(errorInfo || {}));
     
-    // Afficher aussi dans un alert pour être sûr que l'utilisateur voit l'erreur
-    // (seulement en développement pour ne pas spammer les utilisateurs)
-    if (process.env.NODE_ENV === 'development') {
-      console.group('🔴 ERROR DETAILS');
-      console.error('Error:', error);
-      console.error('Error Info:', errorInfo);
-      console.groupEnd();
+    // Afficher aussi les props et state actuels si disponibles
+    try {
+      console.error('❌ Current state:', this.state);
+      console.error('❌ Current props:', this.props);
+    } catch (e) {
+      console.error('❌ Could not log state/props:', e);
     }
+    
+    // Forcer l'affichage dans un alert aussi pour être sûr qu'on voit l'erreur
+    // Même en production pour le debugging
+    try {
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      const componentStack = errorInfo?.componentStack || 'No component stack';
+      const fullError = `${errorMessage}\n\nComponent Stack:\n${componentStack}`;
+      console.error('❌ FULL ERROR FOR ALERT:', fullError);
+      // Ne pas utiliser alert() car ça bloque, mais logguer très visiblement
+      console.error('='.repeat(80));
+      console.error('ERROR DETAILS (COPY THIS):');
+      console.error('='.repeat(80));
+      console.error(fullError);
+      console.error('='.repeat(80));
+    } catch (e) {
+      console.error('❌ Error formatting error details:', e);
+    }
+    
+    console.groupEnd();
     
     this.setState({
       error,
@@ -53,7 +75,13 @@ class ErrorBoundary extends React.Component {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    console.log('🔄 ErrorBoundary: Try Again clicked');
+    console.log('🔄 Current error:', this.state.error);
+    console.log('🔄 Attempting to reset ErrorBoundary state and redirect...');
+    
+    // Au lieu de juste réinitialiser, rediriger vers la page principale pour éviter que l'erreur se reproduise
+    // Cela évite le problème où l'erreur se reproduit immédiatement après le reset
+    window.location.href = '/';
   };
 
   render() {
@@ -86,16 +114,36 @@ class ErrorBoundary extends React.Component {
                 </button>
               </div>
 
-              {/* Afficher les détails de l'erreur en développement */}
-              {process.env.NODE_ENV === 'development' && this.state.error && (
-                <details className="mt-6 text-left">
-                  <summary className="cursor-pointer text-text-secondary hover:text-text-primary text-sm mb-2">
-                    Error Details (Development Only)
+              {/* Afficher TOUJOURS les détails de l'erreur pour le debugging (même en production) */}
+              {this.state.error && (
+                <details className="mt-6 text-left" open>
+                  <summary className="cursor-pointer text-text-secondary hover:text-text-primary text-sm mb-2 font-bold">
+                    Error Details (Click to expand/collapse) - CHECK CONSOLE FOR MORE INFO
                   </summary>
-                  <pre className="bg-bg-primary/50 p-4 rounded text-xs text-red-400 overflow-auto max-h-64">
-                    {this.state.error.toString()}
-                    {this.state.errorInfo?.componentStack}
-                  </pre>
+                  <div className="bg-bg-primary/50 p-4 rounded text-xs text-red-400 overflow-auto max-h-64 space-y-2">
+                    <div>
+                      <strong>Error Name:</strong> {this.state.error?.name || 'Unknown'}
+                    </div>
+                    <div>
+                      <strong>Error Message:</strong> {this.state.error?.message || this.state.error?.toString() || 'No message'}
+                    </div>
+                    {this.state.error?.stack && (
+                      <div>
+                        <strong>Error Stack:</strong>
+                        <pre className="mt-1 whitespace-pre-wrap text-xs">{this.state.error.stack}</pre>
+                      </div>
+                    )}
+                    {this.state.errorInfo?.componentStack && (
+                      <div>
+                        <strong>Component Stack:</strong>
+                        <pre className="mt-1 whitespace-pre-wrap text-xs">{this.state.errorInfo.componentStack}</pre>
+                      </div>
+                    )}
+                    <div className="mt-4 pt-4 border-t border-border-secondary/30">
+                      <strong>Full Error Object:</strong>
+                      <pre className="mt-1 whitespace-pre-wrap text-xs">{JSON.stringify(this.state.error, Object.getOwnPropertyNames(this.state.error), 2)}</pre>
+                    </div>
+                  </div>
                 </details>
               )}
             </div>

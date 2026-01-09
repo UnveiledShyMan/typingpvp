@@ -96,7 +96,14 @@ function App() {
               <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                   <Route path="/" element={<MainPage />} />
-                  <Route path="/battle/:roomId" element={<BattleRoom />} />
+                  <Route 
+                    path="/battle/:roomId" 
+                    element={
+                      <ErrorBoundary key="battle-room-error-boundary">
+                        <BattleRoom />
+                      </ErrorBoundary>
+                    } 
+                  />
                   <Route path="/competition/:competitionId" element={<CompetitionRoom />} />
                   <Route path="/oauth/callback" element={<OAuthCallback />} />
                   <Route path="/terms" element={<TermsOfService />} />
