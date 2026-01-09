@@ -69,6 +69,12 @@ export default function BattleRoom() {
   const listenersSetupRef = useRef(false); // Ref pour éviter de configurer les listeners plusieurs fois
   const lastErrorCountRef = useRef(0); // Ref pour le calcul incrémental des erreurs (optimisation O(1))
   const statsUpdateRef = useRef(null); // Ref pour throttler les calculs de stats avec requestAnimationFrame
+  // Refs pour éviter les closures obsolètes dans les listeners socket
+  const matchmakingRef = useRef(matchmaking); // Ref pour matchmaking dans les listeners
+  const gameStatusRef = useRef(gameStatus); // Ref pour gameStatus dans les listeners
+  const roomIdRef = useRef(roomId); // Ref pour roomId dans les listeners
+  const playerNameRef = useRef(playerName); // Ref pour playerName dans les listeners
+  const userIdRef = useRef(userId); // Ref pour userId dans les listeners
 
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -140,6 +146,27 @@ export default function BattleRoom() {
     };
   }, []); // Exécuter une seule fois au montage
 
+  // Mettre à jour les refs quand les valeurs changent (pour éviter les closures obsolètes dans les listeners)
+  useEffect(() => {
+    matchmakingRef.current = matchmaking;
+  }, [matchmaking]);
+  
+  useEffect(() => {
+    gameStatusRef.current = gameStatus;
+  }, [gameStatus]);
+  
+  useEffect(() => {
+    roomIdRef.current = roomId;
+  }, [roomId]);
+  
+  useEffect(() => {
+    playerNameRef.current = playerName;
+  }, [playerName]);
+  
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
   // Configurer les listeners socket une seule fois
   // IMPORTANT: Nettoyer les anciens listeners avant d'ajouter les nouveaux pour éviter les doublons
   useEffect(() => {
@@ -179,103 +206,121 @@ export default function BattleRoom() {
     // Les joueurs sont déjà dans la room (ajoutés par createMatchmakingRoom), pas besoin de join-room
     // Cet événement est envoyé juste après la création de la room matchmaking
     socket.on('matchmaking-match-found', (data) => {
-      // Vérification de sécurité : s'assurer que data existe et contient les propriétés nécessaires
-      if (!data) {
-        console.error('❌ matchmaking-match-found: data is undefined or null');
-        toast.error('Invalid match data received. Please try again.');
-        return;
-      }
-      
-      if (!data.roomId) {
-        console.error('❌ matchmaking-match-found: data.roomId is missing');
-        toast.error('Invalid room ID received. Please try again.');
-        return;
-      }
-      
-      if (!data.text || typeof data.text !== 'string' || data.text.trim().length === 0) {
-        console.error('❌ matchmaking-match-found: data.text is invalid');
-        toast.error('Invalid game text received. Please try again.');
-        return;
-      }
-      
-      if (!data.players || !Array.isArray(data.players) || data.players.length === 0) {
-        console.error('❌ matchmaking-match-found: data.players is invalid');
-        toast.error('Invalid players data received. Please try again.');
-        return;
-      }
-      
-      console.log('📨 matchmaking-match-found reçu:', { 
-        dataRoomId: data.roomId, 
-        currentRoomId: roomId, 
-        hasJoined: hasJoinedRoomRef.current,
-        matchmaking: matchmaking,
-        gameStatus: gameStatus
-      });
-      
-      // Si le roomId correspond à la room actuelle, traiter l'événement normalement
-      if (data.roomId === roomId) {
-        console.log('✅ Matchmaking match found pour la room actuelle:', data.roomId);
-        setText(data.text);
-        setPlayers(data.players);
-        setGameStatus('waiting');
-        // Réinitialiser le scroll du conteneur de texte au début
-        if (textContainerRef.current) {
-          textContainerRef.current.scrollTop = 0;
-        }
-        // Marquer comme ayant rejoint pour éviter d'appeler join-room
-        hasJoinedRoomRef.current = true;
-        return;
-      }
-      
-      // Si on est en mode matchmaking et en "connecting", c'est qu'on arrive depuis Matchmaking
-      // Dans ce cas, traiter l'événement même si roomId n'est pas encore défini ou différent
-      // (l'événement peut arriver avant que la navigation soit complète)
-      if (matchmaking && gameStatus === 'connecting') {
-        console.log('✅ Matchmaking match found lors de l\'arrivée depuis Matchmaking:', data.roomId);
-        setText(data.text);
-        setPlayers(data.players);
-        setGameStatus('waiting');
-        if (textContainerRef.current) {
-          textContainerRef.current.scrollTop = 0;
-        }
-        hasJoinedRoomRef.current = true;
-        return;
-      }
-      
-      // Si c'est une nouvelle room ET qu'on est déjà dans une partie active (Play Again)
-      // Ne naviguer que si on a déjà rejoint une room ET qu'on n'est pas en "connecting"
-      if (roomId && data.roomId !== roomId && hasJoinedRoomRef.current && gameStatus !== 'connecting') {
-        console.log('✅ Nouveau match trouvé depuis une room existante, navigation vers la nouvelle room:', data.roomId);
-        // Vérification de sécurité pour navigate et playerName
-        if (!navigate || typeof navigate !== 'function') {
-          console.error('❌ navigate is not available');
-          toast.error('Navigation error. Please refresh the page.');
+      try {
+        // Vérification de sécurité : s'assurer que data existe et contient les propriétés nécessaires
+        if (!data) {
+          console.error('❌ matchmaking-match-found: data is undefined or null');
+          toast.error('Invalid match data received. Please try again.');
           return;
         }
-        if (!playerName) {
-          console.error('❌ playerName is not defined');
-          toast.error('Player name missing. Please refresh the page.');
+        
+        if (!data.roomId) {
+          console.error('❌ matchmaking-match-found: data.roomId is missing');
+          toast.error('Invalid room ID received. Please try again.');
           return;
         }
-        navigate(`/battle/${data.roomId}`, {
-          state: {
-            playerName: playerName,
-            userId: userId || currentUser?.id || null,
-            isCreator: false,
-            matchmaking: true,
-            ranked: data.ranked !== undefined ? data.ranked : (ranked !== undefined ? ranked : true),
-            existingSocket: true
-          }
+        
+        if (!data.text || typeof data.text !== 'string' || data.text.trim().length === 0) {
+          console.error('❌ matchmaking-match-found: data.text is invalid');
+          toast.error('Invalid game text received. Please try again.');
+          return;
+        }
+        
+        if (!data.players || !Array.isArray(data.players) || data.players.length === 0) {
+          console.error('❌ matchmaking-match-found: data.players is invalid');
+          toast.error('Invalid players data received. Please try again.');
+          return;
+        }
+        
+        // Utiliser les refs pour avoir les valeurs à jour
+        const currentMatchmaking = matchmakingRef.current;
+        const currentGameStatus = gameStatusRef.current;
+        const currentRoomId = roomIdRef.current;
+        
+        console.log('📨 matchmaking-match-found reçu:', { 
+          dataRoomId: data.roomId, 
+          currentRoomId: currentRoomId, 
+          hasJoined: hasJoinedRoomRef.current,
+          matchmaking: currentMatchmaking,
+          gameStatus: currentGameStatus
         });
-        return;
+        
+        // Si le roomId correspond à la room actuelle, traiter l'événement normalement
+        if (data.roomId === currentRoomId) {
+          console.log('✅ Matchmaking match found pour la room actuelle:', data.roomId);
+          setText(data.text);
+          setPlayers(data.players);
+          setGameStatus('waiting');
+          // Réinitialiser le scroll du conteneur de texte au début
+          if (textContainerRef.current) {
+            textContainerRef.current.scrollTop = 0;
+          }
+          // Marquer comme ayant rejoint pour éviter d'appeler join-room
+          hasJoinedRoomRef.current = true;
+          return;
+        }
+        
+        // Si on est en mode matchmaking et en "connecting", c'est qu'on arrive depuis Matchmaking
+        // Dans ce cas, traiter l'événement même si roomId n'est pas encore défini ou différent
+        // (l'événement peut arriver avant que la navigation soit complète)
+        if (currentMatchmaking && currentGameStatus === 'connecting') {
+          console.log('✅ Matchmaking match found lors de l\'arrivée depuis Matchmaking:', data.roomId);
+          setText(data.text);
+          setPlayers(data.players);
+          setGameStatus('waiting');
+          if (textContainerRef.current) {
+            textContainerRef.current.scrollTop = 0;
+          }
+          hasJoinedRoomRef.current = true;
+          return;
+        }
+        
+        // Si c'est une nouvelle room ET qu'on est déjà dans une partie active (Play Again)
+        // Ne naviguer que si on a déjà rejoint une room ET qu'on n'est pas en "connecting"
+        if (currentRoomId && data.roomId !== currentRoomId && hasJoinedRoomRef.current && currentGameStatus !== 'connecting') {
+          console.log('✅ Nouveau match trouvé depuis une room existante, navigation vers la nouvelle room:', data.roomId);
+          // Vérification de sécurité pour navigate et playerName
+          if (!navigate || typeof navigate !== 'function') {
+            console.error('❌ navigate is not available');
+            toast.error('Navigation error. Please refresh the page.');
+            return;
+          }
+          const currentPlayerName = playerNameRef.current || playerName;
+          if (!currentPlayerName) {
+            console.error('❌ playerName is not defined');
+            toast.error('Player name missing. Please refresh the page.');
+            return;
+          }
+          navigate(`/battle/${data.roomId}`, {
+            state: {
+              playerName: currentPlayerName,
+              userId: userIdRef.current || userId || currentUser?.id || null,
+              isCreator: false,
+              matchmaking: true,
+              ranked: data.ranked !== undefined ? data.ranked : (ranked !== undefined ? ranked : true),
+              existingSocket: true
+            }
+          });
+          return;
+        }
+        
+        // Cas par défaut : ignorer l'événement si le roomId ne correspond pas
+        console.warn('⚠️ matchmaking-match-found ignoré:', { 
+          dataRoomId: data.roomId, 
+          currentRoomId: currentRoomId,
+          reason: 'RoomId mismatch and not in connecting state'
+        });
+      } catch (error) {
+        // Capturer toute erreur dans le handler pour éviter de crasher l'application
+        console.error('❌ Error in matchmaking-match-found handler:', error);
+        console.error('❌ Error details:', {
+          name: error?.name,
+          message: error?.message,
+          stack: error?.stack,
+          data: data
+        });
+        toast.error('An error occurred while processing the match. Please try again.');
       }
-      
-      // Cas par défaut : ignorer l'événement si le roomId ne correspond pas
-      console.warn('⚠️ matchmaking-match-found ignoré:', { 
-        dataRoomId: data.roomId, 
-        currentRoomId: roomId,
-        reason: 'RoomId mismatch and not in connecting state'
-      });
     });
 
     socket.on('room-joined', (data) => {
