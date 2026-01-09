@@ -30,6 +30,13 @@ export default function Solo() {
   const matchRecordedRef = useRef(false); // Pour éviter d'enregistrer plusieurs fois
 
   useEffect(() => {
+    // IMPORTANT: Ne pas réinitialiser si le test est terminé
+    // Cela permet de garder les résultats affichés même si l'utilisateur change la langue/mode
+    // L'utilisateur doit cliquer sur "test again" ou appuyer sur 'R' pour réinitialiser
+    if (finished) {
+      return;
+    }
+    
     // Générer le texte initial
     const initialText = mode === 'numbers' 
       ? generateNumbers(MIN_TEXT_LENGTH)
@@ -51,7 +58,7 @@ export default function Solo() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-  }, [selectedLang, mode]);
+  }, [selectedLang, mode, finished]);
 
   useEffect(() => {
     if (inputRef.current && !finished && timeLeft === TIME_LIMIT) {
@@ -485,7 +492,7 @@ export default function Solo() {
             />
           </div>
         ) : (
-          <div className="w-full h-full flex flex-col justify-center space-y-4 sm:space-y-6 overflow-hidden">
+          <div className="w-full h-full flex flex-col justify-center space-y-4 sm:space-y-6 overflow-y-auto min-h-0">
             {/* Résultats finaux */}
             <div className="bg-bg-secondary rounded-lg p-6 sm:p-8 border border-text-secondary/20 shadow-lg">
               <h2 className="text-2xl sm:text-3xl font-bold text-text-primary mb-4 sm:mb-6 text-center" style={{ fontFamily: 'Inter' }}>Test Complete</h2>

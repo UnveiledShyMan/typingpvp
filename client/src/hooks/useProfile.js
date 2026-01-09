@@ -22,9 +22,22 @@ export function useProfile(identifier) {
   const isNumericId = identifier && /^\d+$/.test(String(identifier));
   const isLikelyId = identifier && String(identifier).length > 15; // Les IDs nanoid sont généralement longs
   
+  // IMPORTANT: Détecter si c'est clairement un username (contient des espaces ou caractères spéciaux)
+  // Les usernames peuvent contenir des espaces et caractères spéciaux (é, è, etc.)
+  // Les IDs nanoid sont alphanumériques uniquement (pas d'espaces, pas de caractères accentués)
+  const hasSpaces = identifier && String(identifier).includes(' ');
+  const hasSpecialChars = identifier && /[^a-zA-Z0-9_-]/.test(String(identifier));
+  const isLikelyUsername = hasSpaces || hasSpecialChars;
+  
   return useQuery({
     queryKey: ['profile', identifier],
     queryFn: async () => {
+      // IMPORTANT: Si c'est clairement un username (espaces ou caractères spéciaux),
+      // utiliser getProfileByUsername directement, même si c'est long
+      if (isLikelyUsername) {
+        return await profileService.getProfileByUsername(identifier);
+      }
+      
       // Si c'est un ID numérique pur, utiliser directement getProfile
       if (isNumericId) {
         return await profileService.getProfile(identifier);
@@ -53,11 +66,20 @@ export function useProfile(identifier) {
       }
       
       // Sinon, essayer d'abord par username (cas le plus commun)
+      // IMPORTANT: Si c'est clairement un username (espaces ou caractères spéciaux),
+      // ne pas essayer getProfile car ça ne fonctionnera pas
       try {
         const data = await profileService.getProfileByUsername(identifier);
         return data;
       } catch (error) {
-        // Si ça échoue avec 404, essayer par ID
+        // Si c'est clairement un username, ne pas essayer getProfile
+        // car getProfile utilise /api/users/${id} qui ne fonctionne pas pour les usernames
+        if (isLikelyUsername) {
+          // C'est un username, donc getProfile ne fonctionnera pas
+          throw error;
+        }
+        
+        // Si ça échoue avec 404 et que ce n'est PAS clairement un username, essayer par ID
         const errorMsg = error.message?.toLowerCase() || '';
         const errorStr = String(error).toLowerCase();
         if (errorMsg.includes('404') || errorMsg.includes('not found') || 

@@ -533,9 +533,26 @@ io.on('connection', (socket) => {
     // Pour les rooms matchmaking, join-room est utilisé SEULEMENT pour les reconnexions
     // Les nouveaux joueurs arrivent via matchmaking-match-found (déjà dans la room)
     if (room.matchmaking) {
+      // IMPORTANT: Vérifier que la room est dans un état valide
+      // Si la room est vide ou dans un état invalide, la supprimer et refuser la connexion
+      if (room.players.length === 0 || !room.text || typeof room.text !== 'string' || room.text.trim().length === 0) {
+        logger.warn(`⚠️ Matchmaking room ${roomId} is in invalid state (empty or no text), deleting it`);
+        rooms.delete(roomId);
+        socket.emit('error', { message: 'Room is no longer available. Please start a new matchmaking.' });
+        return;
+      }
+      
       const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
         // RECONNEXION : Le joueur existe déjà dans la room matchmaking
+        // Vérifier que le texte est toujours valide
+        if (!room.text || typeof room.text !== 'string' || room.text.trim().length === 0) {
+          logger.warn(`⚠️ Matchmaking room ${roomId} has invalid text, deleting it`);
+          rooms.delete(roomId);
+          socket.emit('error', { message: 'Room is no longer available. Please start a new matchmaking.' });
+          return;
+        }
+        
         existingPlayer.id = socket.id;
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
@@ -566,37 +583,39 @@ io.on('connection', (socket) => {
     // CAS SIMPLE : Room normale (non-matchmaking) en attente
     // C'est le cas principal pour les duels 1v1 simples
     if (!room.matchmaking && room.status === 'waiting') {
-      // Vérifier si déjà dans la room (reconnexion ou double appel)
+      // IMPORTANT: Vérifier d'abord si le socket est déjà associé à un joueur dans cette room
+      // Cela évite les doublons si join-room est appelé plusieurs fois rapidement
+      const existingPlayerBySocket = Array.from(players.entries()).find(
+        ([sockId, data]) => sockId === socket.id && data.roomId === roomId
+      );
+      if (existingPlayerBySocket) {
+        // Le socket est déjà associé à un joueur dans cette room
+        const [, playerData] = existingPlayerBySocket;
+        const playerInRoom = room.players.find(p => p.id === socket.id || 
+          (userId && p.userId === userId) || 
+          (!userId && p.name === playerName && p.id === socket.id)
+        );
+        if (playerInRoom) {
+          // Le joueur existe déjà dans la room avec ce socket, juste mettre à jour et renvoyer l'état
+          socket.join(roomId);
+          socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+          logger.debug(`Socket ${socket.id} already in room ${roomId}, returning current state`);
+          return;
+        }
+      }
+      
+      // Vérifier si déjà dans la room par userId/playerName (reconnexion avec nouveau socket)
       const existingPlayer = findExistingPlayer(room, userId, playerName);
       if (existingPlayer) {
-        // Si le joueur existe déjà, mettre à jour son socket.id et renvoyer l'état actuel
+        // Si le joueur existe déjà (reconnexion), mettre à jour son socket.id
         existingPlayer.id = socket.id;
         // Mettre à jour la map des joueurs
         players.set(socket.id, { roomId, player: existingPlayer });
         socket.join(roomId);
         socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        io.to(roomId).emit('player-joined', { players: room.players });
         logger.debug(`Player ${playerName} (${userId || 'guest'}) reconnected/updated in room ${roomId}`);
         return;
-      }
-      
-      // Vérifier aussi par socket.id si le socket est déjà associé à un joueur dans cette room
-      // Cela peut arriver si le même socket essaie de rejoindre deux fois
-      const existingPlayerBySocket = Array.from(players.entries()).find(
-        ([sockId, data]) => sockId === socket.id && data.roomId === roomId
-      );
-      if (existingPlayerBySocket) {
-        const [, playerData] = existingPlayerBySocket;
-        const playerInRoom = room.players.find(p => 
-          (userId && p.userId === userId) || 
-          (!userId && p.name === playerName)
-        );
-        if (playerInRoom) {
-          // Le socket est déjà associé à un joueur dans cette room, juste mettre à jour
-          socket.join(roomId);
-          socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
-          logger.debug(`Socket ${socket.id} already associated with player in room ${roomId}`);
-          return;
-        }
       }
       
       // Vérifier si la room est pleine (max 2 joueurs pour 1v1)
@@ -606,7 +625,24 @@ io.on('connection', (socket) => {
         return;
       }
       
-      // Ajouter le joueur (cas simple)
+      // IMPORTANT: Vérifier une dernière fois qu'on n'ajoute pas un doublon
+      // Cela peut arriver si join-room est appelé deux fois très rapidement
+      const duplicateCheck = room.players.find(p => 
+        (userId && p.userId === userId) || 
+        (!userId && !p.userId && p.name === playerName)
+      );
+      if (duplicateCheck) {
+        // Le joueur existe déjà dans la room, mettre à jour le socket.id et renvoyer l'état
+        duplicateCheck.id = socket.id;
+        players.set(socket.id, { roomId, player: duplicateCheck });
+        socket.join(roomId);
+        socket.emit('room-joined', { roomId, text: room.text, players: room.players, chatMessages: room.chatMessages || [] });
+        io.to(roomId).emit('player-joined', { players: room.players });
+        logger.debug(`Player ${playerName} (${userId || 'guest'}) already in room ${roomId}, updated socket.id`);
+        return;
+      }
+      
+      // Ajouter le joueur (cas simple - nouveau joueur)
       const player = {
         id: socket.id,
         userId: userId || null,
@@ -835,10 +871,13 @@ io.on('connection', (socket) => {
     player.wpm = data.wpm || 0;
     player.accuracy = data.accuracy || 100;
     
+    // Stocker les résultats complets incluant les erreurs et les caractères si disponibles
     room.results[socket.id] = {
       wpm: player.wpm,
       accuracy: player.accuracy,
-      time: player.finishTime
+      time: player.finishTime,
+      errors: data.errors !== undefined ? data.errors : 0,
+      characters: data.characters !== undefined ? data.characters : 0
     };
     
     // Vérifier si tous les joueurs ont terminé
@@ -1102,26 +1141,78 @@ io.on('connection', (socket) => {
     
     // Si un match est trouvé, créer une room
     if (bestMatch) {
-      createMatchmakingRoom(socketId, player, bestMatch.socketId, bestMatch.player, language, ranked);
+      // IMPORTANT: Vérifier que les deux joueurs sont toujours dans la queue avant de créer la room
+      // Cela évite les problèmes de race condition si un joueur quitte pendant la recherche
+      if (matchmakingQueue.hasPlayer(socketId) && matchmakingQueue.hasPlayer(bestMatch.socketId)) {
+        createMatchmakingRoom(socketId, player, bestMatch.socketId, bestMatch.player, language, ranked);
+      } else {
+        // Un des joueurs a quitté, réessayer pour le joueur restant
+        logger.debug(`Match found but one player left queue, retrying for ${socketId}`);
+        // Réessayer après un court délai pour éviter les boucles infinies
+        setTimeout(() => {
+          if (matchmakingQueue.hasPlayer(socketId)) {
+            findMatch(socketId, language, mmr, ranked);
+          }
+        }, 100);
+      }
     } else {
       // Pas de match trouvé immédiatement, mais le joueur reste dans la queue
       // Le matchmaking sera réessayé quand un autre joueur rejoint
+      logger.debug(`No match found for ${socketId}, waiting in queue`);
     }
   }
 
   // Créer une room depuis le matchmaking
   async function createMatchmakingRoom(socketId1, player1, socketId2, player2, language, ranked = true) {
-    // Retirer les joueurs de la queue optimisée
-    matchmakingQueue.removePlayer(socketId1);
-    matchmakingQueue.removePlayer(socketId2);
+    try {
+      // IMPORTANT: Vérifier que les deux joueurs sont toujours dans la queue avant de créer la room
+      // Cela évite les problèmes si un joueur a quitté entre-temps
+      if (!matchmakingQueue.hasPlayer(socketId1) || !matchmakingQueue.hasPlayer(socketId2)) {
+        logger.warn(`⚠️ Cannot create matchmaking room: one or both players left queue (${socketId1}, ${socketId2})`);
+        // Retirer les joueurs restants de la queue s'ils sont encore là
+        if (matchmakingQueue.hasPlayer(socketId1)) {
+          matchmakingQueue.removePlayer(socketId1);
+        }
+        if (matchmakingQueue.hasPlayer(socketId2)) {
+          matchmakingQueue.removePlayer(socketId2);
+        }
+        return;
+      }
+      
+      // IMPORTANT: Vérifier que les sockets sont toujours connectés
+      const socket1 = io.sockets.sockets.get(socketId1);
+      const socket2 = io.sockets.sockets.get(socketId2);
+      if (!socket1 || !socket2 || !socket1.connected || !socket2.connected) {
+        logger.warn(`⚠️ Cannot create matchmaking room: one or both sockets disconnected (${socketId1}, ${socketId2})`);
+        matchmakingQueue.removePlayer(socketId1);
+        matchmakingQueue.removePlayer(socketId2);
+        return;
+      }
+      
+      // Retirer les joueurs de la queue optimisée
+      matchmakingQueue.removePlayer(socketId1);
+      matchmakingQueue.removePlayer(socketId2);
+      
+      // Récupérer les noms d'utilisateurs
+      const user1 = player1.userId ? await getUserById(player1.userId) : null;
+      const user2 = player2.userId ? await getUserById(player2.userId) : null;
     
-    // Récupérer les noms d'utilisateurs
-    const user1 = player1.userId ? await getUserById(player1.userId) : null;
-    const user2 = player2.userId ? await getUserById(player2.userId) : null;
-    
-    // Créer une nouvelle room
+    // Créer une nouvelle room avec un ID unique
     const roomId = nanoid(8);
+    // IMPORTANT: Générer un nouveau texte pour chaque room
+    // Vérifier que le texte est valide (non vide, string)
     const text = getRandomText();
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      logger.error(`❌ Failed to generate valid text for matchmaking room`);
+      // Notifier les joueurs de l'erreur
+      if (socket1) {
+        socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+      }
+      if (socket2) {
+        socket2.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+      }
+      return;
+    }
     
     const room = {
       id: roomId,
@@ -1133,6 +1224,9 @@ io.on('connection', (socket) => {
       language: language,
       matchmaking: true,
       ranked: ranked, // Indicateur si c'est un match ranked ou unrated
+      mode: 'timer', // Mode par défaut pour matchmaking (timer)
+      timerDuration: 60, // Durée par défaut pour matchmaking (60 secondes)
+      difficulty: null, // Pas de difficulté pour le mode timer
       chatMessages: [] // Historique du chat pour la room
     };
     
@@ -1164,32 +1258,101 @@ io.on('connection', (socket) => {
     
     room.players.push(player1Data, player2Data);
     
-    // Rejoindre les sockets à la room
-    const socket1 = io.sockets.sockets.get(socketId1);
-    const socket2 = io.sockets.sockets.get(socketId2);
+    // IMPORTANT: Vérifier à nouveau que les sockets sont toujours connectés avant de les ajouter
+    // Cela évite d'ajouter des sockets déconnectés à la room
+    const socket1Final = io.sockets.sockets.get(socketId1);
+    const socket2Final = io.sockets.sockets.get(socketId2);
     
-    if (socket1) {
-      socket1.join(roomId);
-      players.set(socketId1, { roomId, player: player1Data });
-      socket1.emit('matchmaking-match-found', { roomId, text, players: room.players, ranked: ranked });
-    }
-    
-    if (socket2) {
-      socket2.join(roomId);
-      players.set(socketId2, { roomId, player: player2Data });
-      socket2.emit('matchmaking-match-found', { roomId, text, players: room.players, ranked: ranked });
-    }
-    
-    // Démarrer automatiquement après 3 secondes
-    setTimeout(() => {
-      if (room.status === 'waiting' && room.players.length === 2) {
-        room.status = 'playing';
-        room.startTime = Date.now();
-        io.to(roomId).emit('game-started', { startTime: room.startTime });
+    if (!socket1Final || !socket2Final || !socket1Final.connected || !socket2Final.connected) {
+      logger.warn(`⚠️ Cannot add players to matchmaking room: one or both sockets disconnected`);
+      // Nettoyer la room créée
+      rooms.delete(roomId);
+      // Notifier les joueurs s'ils sont encore connectés
+      if (socket1Final && socket1Final.connected) {
+        socket1Final.emit('matchmaking-error', { message: 'Opponent disconnected. Please try again.' });
       }
-    }, 3000);
+      if (socket2Final && socket2Final.connected) {
+        socket2Final.emit('matchmaking-error', { message: 'Opponent disconnected. Please try again.' });
+      }
+      return;
+    }
     
-    console.log(`Matchmaking match created: Room ${roomId} with players ${player1Data.name} and ${player2Data.name}`);
+    // Rejoindre les sockets à la room
+    socket1Final.join(roomId);
+    players.set(socketId1, { roomId, player: player1Data });
+    socket1Final.emit('matchmaking-match-found', { roomId, text, players: room.players, ranked: ranked });
+    
+    socket2Final.join(roomId);
+    players.set(socketId2, { roomId, player: player2Data });
+    socket2Final.emit('matchmaking-match-found', { roomId, text, players: room.players, ranked: ranked });
+    
+      // Démarrer automatiquement après 3 secondes
+      setTimeout(() => {
+        const currentRoom = rooms.get(roomId);
+        if (!currentRoom) {
+          logger.warn(`⚠️ Room ${roomId} not found when trying to start game`);
+          return;
+        }
+        
+        // IMPORTANT: Vérifier que la room est toujours valide avant de démarrer
+        // Vérifier que le texte existe et est valide
+        if (!currentRoom.text || typeof currentRoom.text !== 'string' || currentRoom.text.trim().length === 0) {
+          logger.error(`❌ Cannot start matchmaking game: room ${roomId} has invalid text`);
+          // Nettoyer la room et notifier les joueurs
+          rooms.delete(roomId);
+          io.to(roomId).emit('matchmaking-error', { message: 'Game text is invalid. Please start a new matchmaking.' });
+          return;
+        }
+        
+        if (currentRoom.status === 'waiting' && currentRoom.players.length === 2) {
+          // Vérifier que les deux joueurs sont toujours connectés
+          const connectedPlayers = currentRoom.players.filter(p => {
+            const playerSocket = io.sockets.sockets.get(p.id);
+            return playerSocket && playerSocket.connected;
+          });
+          
+          if (connectedPlayers.length < 2) {
+            logger.warn(`⚠️ Cannot start matchmaking game: not all players connected (${connectedPlayers.length}/2)`);
+            // Nettoyer la room si un joueur s'est déconnecté
+            rooms.delete(roomId);
+            io.to(roomId).emit('matchmaking-error', { message: 'Opponent disconnected. Please start a new matchmaking.' });
+            return;
+          }
+          
+          currentRoom.status = 'playing';
+          currentRoom.startTime = Date.now();
+          // Envoyer toutes les informations nécessaires pour game-started
+          // IMPORTANT: Inclure le texte, le mode, etc. pour que le client puisse démarrer correctement
+          io.to(roomId).emit('game-started', { 
+            startTime: currentRoom.startTime,
+            text: currentRoom.text, // Inclure le texte généré
+            mode: 'timer', // Mode par défaut pour matchmaking (timer)
+            timerDuration: 60, // Durée par défaut pour matchmaking (60 secondes)
+            difficulty: null // Pas de difficulté pour le mode timer
+          });
+          logger.debug(`✅ Matchmaking game started in room ${roomId}`);
+        } else {
+          logger.warn(`⚠️ Cannot start matchmaking game: room ${roomId} status=${currentRoom.status}, players=${currentRoom.players.length}`);
+        }
+      }, 3000);
+      
+      logger.debug(`✅ Matchmaking match created: Room ${roomId} with players ${player1Data.name} and ${player2Data.name}`);
+    } catch (error) {
+      logger.error(`❌ Error creating matchmaking room:`, error);
+      // En cas d'erreur, retirer les joueurs de la queue et notifier
+      matchmakingQueue.removePlayer(socketId1);
+      matchmakingQueue.removePlayer(socketId2);
+      
+      const socket1 = io.sockets.sockets.get(socketId1);
+      const socket2 = io.sockets.sockets.get(socketId2);
+      
+      if (socket1) {
+        socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+      }
+      if (socket2) {
+        socket2.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+      }
+    }
   }
 
   // COMPETITION SYSTEM
@@ -1537,14 +1700,12 @@ io.on('connection', (socket) => {
           // Pour les rooms non-finished, vérifier si on doit supprimer
           if (room.status !== 'finished' && room.players.length === 0) {
             if (room.matchmaking) {
-              // Délai de grâce pour les rooms matchmaking (reconnexion possible)
-              setTimeout(() => {
-                const checkRoom = rooms.get(playerData.roomId);
-                if (checkRoom && checkRoom.players.length === 0 && checkRoom.status !== 'finished') {
-                  rooms.delete(playerData.roomId);
-                  console.log(`Matchmaking room ${playerData.roomId} deleted after grace period`);
-                }
-              }, 30000); // 30 secondes
+              // IMPORTANT: Pour les rooms matchmaking vides, supprimer immédiatement
+              // Le délai de grâce n'est pas nécessaire car si les deux joueurs ont quitté,
+              // la room ne peut plus être utilisée et doit être supprimée
+              // Cela évite qu'un joueur soit redirigé vers une ancienne room vide
+              rooms.delete(playerData.roomId);
+              logger.debug(`Matchmaking room ${playerData.roomId} deleted immediately (empty and not finished)`);
             } else {
               // Suppression immédiate pour les rooms normales (pas finished)
               rooms.delete(playerData.roomId);

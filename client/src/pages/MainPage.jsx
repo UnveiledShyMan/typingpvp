@@ -17,6 +17,7 @@ import { useUser } from '../contexts/UserContext'
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 import SEOHead from '../components/SEOHead'
 import OptimizedImage from '../components/OptimizedImage'
+import { useNavigate } from 'react-router-dom'
 
 // Lazy loading des composants de pages pour améliorer les performances et réduire le bundle initial
 const Solo = lazy(() => import('./Solo'))
@@ -36,6 +37,169 @@ const LoadingSpinner = () => (
     <div className="text-text-secondary">Loading...</div>
   </div>
 )
+
+// Composant menu utilisateur avec déconnexion
+function UserMenu({ user, onProfileClick }) {
+  const [showMenu, setShowMenu] = useState(false);
+  const { logout } = useUser();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    setShowMenu(false);
+    navigate('/');
+  };
+
+  return (
+    <div className="relative">
+      {/* Profile button dans la nav pour mobile avec menu */}
+      <div className="md:hidden relative">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary/70 hover:text-text-primary/90 transition-all"
+          aria-label="Menu utilisateur"
+          aria-expanded={showMenu}
+        >
+          <div className="w-6 h-6 rounded bg-bg-primary/30 overflow-hidden flex items-center justify-center">
+            {user.avatar ? (
+              <OptimizedImage
+                src={user.avatar}
+                alt={user.username}
+                width={24}
+                height={24}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                priority={false}
+              />
+            ) : (
+              <LogoIconSmall 
+                className="w-4 h-4 text-accent-primary/80" 
+                stroke="currentColor"
+              />
+            )}
+          </div>
+        </button>
+        
+        {/* Menu déroulant mobile */}
+        {showMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowMenu(false)}
+            />
+            <div 
+              className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2"
+              role="menu"
+              aria-label="Menu utilisateur"
+            >
+              <button
+                onClick={() => {
+                  onProfileClick();
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Profile</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Logout</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Desktop user menu */}
+      <div className="hidden md:block relative">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
+          aria-label="Menu utilisateur"
+          aria-expanded={showMenu}
+        >
+          <span className="text-text-secondary text-sm group-hover:text-text-primary transition-colors">Welcome,</span>
+          <span className="text-text-primary font-medium">{user.username}</span>
+          <div className="w-10 h-10 rounded-lg bg-bg-primary/30 overflow-hidden flex items-center justify-center backdrop-blur-sm transition-opacity group-hover:opacity-80">
+            {user.avatar ? (
+              <OptimizedImage
+                src={user.avatar}
+                alt={user.username}
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                priority={false}
+              />
+            ) : (
+              <LogoIconSmall 
+                className="w-6 h-6 text-accent-primary" 
+                stroke="currentColor"
+              />
+            )}
+          </div>
+          <svg
+            className={`w-4 h-4 text-text-secondary transition-transform ${showMenu ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Menu déroulant */}
+        {showMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowMenu(false)}
+            />
+            <div 
+              className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary/95 backdrop-blur-md border border-border-secondary/50 rounded-lg shadow-xl z-50 py-2"
+              role="menu"
+              aria-label="Menu utilisateur"
+            >
+              <button
+                onClick={() => {
+                  onProfileClick();
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Profile</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Logout</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function MainPage() {
   const [activeSection, setActiveSection] = useState('solo');
@@ -259,61 +423,7 @@ export default function MainPage() {
               </button>
               
               {user ? (
-                <>
-                  {/* Profile button dans la nav pour mobile */}
-                  <button
-                    onClick={() => setActiveSection('profile')}
-                    className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary/70 hover:text-text-primary/90 transition-all"
-                    aria-label="Ouvrir mon profil"
-                  >
-                    <div className="w-6 h-6 rounded bg-bg-primary/30 overflow-hidden flex items-center justify-center">
-                      {user.avatar ? (
-                        <OptimizedImage
-                          src={user.avatar}
-                          alt={user.username}
-                          width={24}
-                          height={24}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          priority={false}
-                        />
-                      ) : (
-                        <LogoIconSmall 
-                          className="w-4 h-4 text-accent-primary/80" 
-                          stroke="currentColor"
-                        />
-                      )}
-                    </div>
-                  </button>
-                  
-                  {/* Desktop user display */}
-                  <button
-                    onClick={() => setActiveSection('profile')}
-                    className="hidden md:flex items-center gap-3 hover:opacity-80 transition-opacity group"
-                    aria-label="Ouvrir mon profil"
-                  >
-                    <span className="text-text-secondary text-sm group-hover:text-text-primary transition-colors">Welcome,</span>
-                    <span className="text-text-primary font-medium">{user.username}</span>
-                    <div className="w-10 h-10 rounded-lg bg-bg-primary/30 overflow-hidden flex items-center justify-center backdrop-blur-sm transition-opacity group-hover:opacity-80">
-                      {user.avatar ? (
-                        <OptimizedImage
-                          src={user.avatar}
-                          alt={user.username}
-                          width={40}
-                          height={40}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          priority={false}
-                        />
-                      ) : (
-                        <LogoIconSmall 
-                          className="w-6 h-6 text-accent-primary" 
-                          stroke="currentColor"
-                        />
-                      )}
-                    </div>
-                  </button>
-                </>
+                <UserMenu user={user} onProfileClick={() => setActiveSection('profile')} />
               ) : (
                 <div className="flex items-center gap-3">
                   <button

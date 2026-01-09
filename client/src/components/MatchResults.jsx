@@ -317,31 +317,36 @@ function MatchResults({
         )}
         
         {/* Boutons d'action */}
-        <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="flex flex-col items-center gap-4">
           {onPlayAgain && (
-            <button
-              onClick={onPlayAgain}
-              className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-colors text-lg"
-            >
-              🎮 Play Again
-            </button>
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={onPlayAgain}
+                className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-3 px-8 rounded-lg transition-colors text-lg"
+              >
+                🎮 Play Again
+              </button>
+              <p className="text-text-secondary text-xs">Press ENTER to play again</p>
+            </div>
           )}
           
-          {onBackToLobby && (
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {onBackToLobby && (
+              <button
+                onClick={onBackToLobby}
+                className="bg-bg-primary/50 hover:bg-bg-primary/70 border border-border-secondary/30 text-text-primary font-semibold py-3 px-6 rounded-lg transition-colors"
+              >
+                ← Back to Lobby
+              </button>
+            )}
+            
             <button
-              onClick={onBackToLobby}
+              onClick={() => navigate('/')}
               className="bg-bg-primary/50 hover:bg-bg-primary/70 border border-border-secondary/30 text-text-primary font-semibold py-3 px-6 rounded-lg transition-colors"
             >
-              ← Back to Lobby
+              🏠 Home
             </button>
-          )}
-          
-          <button
-            onClick={() => navigate('/')}
-            className="bg-bg-primary/50 hover:bg-bg-primary/70 border border-border-secondary/30 text-text-primary font-semibold py-3 px-6 rounded-lg transition-colors"
-          >
-            🏠 Home
-          </button>
+          </div>
         </div>
       </div>
     </div>

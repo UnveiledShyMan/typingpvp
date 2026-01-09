@@ -422,6 +422,25 @@ export default function Profile({ userId: currentUserId, username: currentUserna
       />
       <div className="h-full w-full flex flex-col overflow-hidden">
         <div className="w-full h-full max-w-5xl mx-auto flex-1 min-h-0 overflow-y-auto profile-scroll p-4 sm:p-6">
+          {/* Bouton de retour vers la page d'accueil */}
+          <div className="mb-4 sm:mb-6">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors group"
+              aria-label="Retour à l'accueil"
+            >
+              <svg 
+                className="w-5 h-5 transition-transform group-hover:-translate-x-1" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm font-medium">Back to home</span>
+            </button>
+          </div>
+          
           {/* Header avec avatar et infos principales - Style osu! */}
           <div className="relative mb-6 sm:mb-8">
             {/* Bannière de fond avec gradient */}

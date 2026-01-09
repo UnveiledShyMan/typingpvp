@@ -199,6 +199,8 @@ export default function BattleRoom() {
 
     socket.on('room-joined', (data) => {
       console.log('✅ Room joined:', data);
+      // IMPORTANT: Marquer qu'on a rejoint pour éviter les appels multiples à join-room
+      hasJoinedRoomRef.current = true;
       setText(data.text);
       setPlayers(data.players);
       // Ne pas changer le statut si on rejoint une room finished (le statut sera mis à jour par game-finished)
@@ -263,14 +265,18 @@ export default function BattleRoom() {
         
         // Mettre à jour le texte si une nouvelle langue a été choisie
         // IMPORTANT: Vérifier que le texte est valide (non vide, string)
+        // Pour les rooms matchmaking, le texte peut déjà être défini via matchmaking-match-found
+        // Donc on ne retourne une erreur que si le texte n'existe ni dans data ni dans le state actuel
         if (data.text && typeof data.text === 'string' && data.text.trim().length > 0) {
           setText(data.text);
-        } else {
-          console.error('❌ game-started: Invalid or missing text:', data.text);
+        } else if (!text || text.trim().length === 0) {
+          // Si le texte n'est pas dans data ET n'existe pas déjà dans le state, c'est une erreur
+          console.error('❌ game-started: Invalid or missing text:', data.text, 'current text:', text);
           toast.error('Invalid game text received. Please refresh the page.');
           setGameStatus('waiting');
           return;
         }
+        // Sinon, le texte existe déjà dans le state (via matchmaking-match-found), on continue
         
         // Mettre à jour le mode et les paramètres
         if (data.mode) {
@@ -315,15 +321,20 @@ export default function BattleRoom() {
                     const wordsTyped = currentInput.trim().split(/\s+/).filter(w => w.length > 0).length;
                     const finalWpm = finalTime > 0 ? Math.round(wordsTyped / finalTime) : 0;
                     const finalAccuracy = currentInput.length > 0 ? Math.round(((currentInput.length - currentErrors) / currentInput.length) * 100) : 100;
+                    // IMPORTANT: Inclure les erreurs et les caractères pour les résultats complets
                     socketRef.current.emit('finish-game', {
                       wpm: finalWpm,
-                      accuracy: finalAccuracy
+                      accuracy: finalAccuracy,
+                      errors: currentErrors,
+                      characters: currentInput.length
                     });
                   } else {
                     // Si l'utilisateur n'a pas commencé à taper, envoyer 0
                     socketRef.current.emit('finish-game', {
                       wpm: 0,
-                      accuracy: 100
+                      accuracy: 100,
+                      errors: 0,
+                      characters: 0
                     });
                   }
                 }
@@ -508,6 +519,7 @@ export default function BattleRoom() {
       const timeoutId = setTimeout(() => {
         if (!hasJoinedRoomRef.current && socketRef.current && socketRef.current.connected) {
           console.log('⏱️ matchmaking-match-found non reçu après 1s - Tentative de synchronisation via join-room');
+          hasJoinedRoomRef.current = true; // Marquer avant l'appel pour éviter les doublons
           socketRef.current.emit('join-room', { 
             roomId, 
             playerName,
@@ -522,14 +534,24 @@ export default function BattleRoom() {
     const socket = socketRef.current;
 
     // CAS NORMAL : Room 1v1 manuelle - doit appeler join-room
-    // Marquer immédiatement qu'on essaie de joindre pour éviter les appels multiples
+    // IMPORTANT: Marquer immédiatement qu'on essaie de joindre pour éviter les appels multiples
+    // Cela empêche le useEffect de se déclencher plusieurs fois si les dépendances changent
     hasJoinedRoomRef.current = true;
     
     const handleJoinRoom = () => {
       // Vérifier une dernière fois (sécurité supplémentaire)
-      if (!socket || !socket.connected) {
-        console.warn('⚠️ Socket not connected, cannot join room');
+      // Ne pas appeler si on a déjà rejoint (double vérification)
+      if (!socket || !socket.connected || hasJoinedRoomRef.current === false) {
+        if (!socket || !socket.connected) {
+          console.warn('⚠️ Socket not connected, cannot join room');
+        }
         hasJoinedRoomRef.current = false; // Réinitialiser si pas connecté
+        return;
+      }
+
+      // Vérifier qu'on n'a pas déjà reçu room-joined (protection supplémentaire)
+      if (gameStatus !== 'connecting' && players.length > 0) {
+        console.log('⚠️ Already joined room, skipping join-room call');
         return;
       }
 
@@ -545,14 +567,19 @@ export default function BattleRoom() {
     if (socket.connected) {
       handleJoinRoom();
     } else {
-      socket.once('connect', handleJoinRoom);
+      // IMPORTANT: Ne pas ajouter plusieurs listeners 'connect'
+      // Vérifier qu'on n'a pas déjà un listener en attente
+      socket.once('connect', () => {
+        handleJoinRoom();
+      });
     }
 
     // Nettoyage: réinitialiser le flag si on quitte la room
     return () => {
-      hasJoinedRoomRef.current = false;
+      // Ne pas réinitialiser hasJoinedRoomRef ici car on veut éviter les appels multiples
+      // Il sera réinitialisé quand le composant se démonte complètement
     };
-  }, [roomId, playerName, userId, currentUser?.id, navigate, matchmaking]); // Dépendances pour rejoindre la room
+  }, [roomId, playerName, userId, currentUser?.id, matchmaking]); // Retirer navigate des dépendances car il ne change pas
 
   // Nettoyage des intervalles et timeouts
   useEffect(() => {
@@ -809,17 +836,22 @@ export default function BattleRoom() {
           toast.success('You finished! Waiting for opponent...', 2000);
           
           // Vérifier que le socket est connecté avant d'émettre
+          // IMPORTANT: Inclure les erreurs et les caractères pour les résultats complets
           if (socketRef.current && socketRef.current.connected) {
             socketRef.current.emit('finish-game', {
               wpm: finalWpm,
-              accuracy: finalAccuracy
+              accuracy: finalAccuracy,
+              errors: errorCount,
+              characters: value.length
             });
           } else if (socketRef.current) {
             // Si pas connecté, attendre la reconnexion
             socketRef.current.once('connect', () => {
               socketRef.current.emit('finish-game', {
                 wpm: finalWpm,
-                accuracy: finalAccuracy
+                accuracy: finalAccuracy,
+                errors: errorCount,
+                characters: value.length
               });
             });
           }
@@ -837,7 +869,22 @@ export default function BattleRoom() {
   // Raccourcis clavier pour BattleRoom
   useEffect(() => {
     const handleKeyPress = (e) => {
-      // Ne pas activer les raccourcis si on est en train de taper dans un input
+      // Enter : Relancer une nouvelle partie (seulement si le match est terminé)
+      // IMPORTANT: ENTER fonctionne même si l'input est focus quand le jeu est terminé
+      // Cela permet de relancer facilement avec ENTER depuis n'importe où
+      if (e.key === 'Enter' && gameStatus === 'finished') {
+        e.preventDefault();
+        // Appeler la même fonction que le bouton "Play Again"
+        if (location.state?.matchmaking) {
+          navigate('/matchmaking');
+        } else {
+          navigate('/battle');
+        }
+        return; // Sortir tôt pour éviter les autres handlers
+      }
+      
+      // Ne pas activer les autres raccourcis si on est en train de taper dans un input
+      // (sauf ENTER qui est géré ci-dessus)
       if (e.target.matches('input, textarea') || e.target.isContentEditable) {
         return;
       }
@@ -847,16 +894,6 @@ export default function BattleRoom() {
         e.preventDefault();
         if (inputRef.current && (gameStatus === 'waiting' || gameStatus === 'playing')) {
           inputRef.current.focus();
-        }
-      }
-      
-      // R : Retour au lobby (seulement si le match est terminé)
-      if ((e.key === 'r' || e.key === 'R') && gameStatus === 'finished') {
-        e.preventDefault();
-        if (location.state?.matchmaking) {
-          navigate('/matchmaking');
-        } else {
-          navigate('/battle');
         }
       }
     };
@@ -1081,7 +1118,7 @@ export default function BattleRoom() {
                     </div>
                   </div>
                 ) : (
-                      <div className="space-y-4 bg-bg-secondary/40 backdrop-blur-sm rounded-xl p-6 border border-accent-primary/20">
+                      <div className="space-y-4 bg-bg-secondary/40 backdrop-blur-sm rounded-xl p-6 border border-accent-primary/20 overflow-visible">
                     <div className="space-y-3">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></div>
@@ -1101,7 +1138,7 @@ export default function BattleRoom() {
                       )}
                     </div>
                     {players.length === 2 && isCreator && (
-                      <div className="space-y-4">
+                      <div className="space-y-4 overflow-visible">
                         {/* Sélecteur de mode - Design harmonisé */}
                         <div>
                           <label className="block text-text-secondary text-sm mb-2 font-medium">
@@ -1110,7 +1147,7 @@ export default function BattleRoom() {
                           <select
                             value={battleMode}
                             onChange={(e) => setBattleMode(e.target.value)}
-                            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 focus:ring-offset-2 focus:ring-offset-bg-secondary/40 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
                             aria-label="Select battle mode"
                             style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                           >
@@ -1128,7 +1165,7 @@ export default function BattleRoom() {
                             <select
                               value={timerDuration}
                               onChange={(e) => setTimerDuration(parseInt(e.target.value))}
-                              className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                              className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 focus:ring-offset-2 focus:ring-offset-bg-secondary/40 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
                               aria-label="Select duration"
                               style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                             >
@@ -1147,7 +1184,7 @@ export default function BattleRoom() {
                             <select
                               value={phraseDifficulty}
                               onChange={(e) => setPhraseDifficulty(e.target.value)}
-                              className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                              className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 focus:ring-offset-2 focus:ring-offset-bg-secondary/40 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
                               aria-label="Select difficulty"
                               style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                             >
@@ -1167,7 +1204,7 @@ export default function BattleRoom() {
                           <select
                             value={selectedLanguage}
                             onChange={(e) => setSelectedLanguage(e.target.value)}
-                            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
+                            className="w-full p-3 bg-bg-secondary/80 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary focus:outline-none focus:border-accent-primary/60 focus:ring-2 focus:ring-accent-primary/20 focus:ring-offset-2 focus:ring-offset-bg-secondary/40 transition-all hover:bg-bg-secondary font-medium appearance-none cursor-pointer"
                             style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                           >
                             {Object.entries(languages).map(([code, lang]) => (
@@ -1300,8 +1337,9 @@ export default function BattleRoom() {
                   type="text"
                   value={input}
                   onChange={handleInputChange}
+                  disabled={gameStatus === 'finished'}
                   className="input-modern text-lg"
-                  placeholder="Start typing..."
+                  placeholder={gameStatus === 'finished' ? 'Game finished' : 'Start typing...'}
                   style={{ fontFamily: 'JetBrains Mono' }}
                 />
               </div>
