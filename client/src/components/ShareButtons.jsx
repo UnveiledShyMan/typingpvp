@@ -32,14 +32,6 @@ function ShareButtons({ result, type = 'solo' }) {
     return window.location.origin;
   };
 
-  // Partager sur Twitter
-  const shareToTwitter = () => {
-    const text = getShareText();
-    const url = getShareUrl();
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-    window.open(twitterUrl, '_blank', 'width=550,height=420');
-  };
-
   // Copier dans le presse-papier
   const copyToClipboard = async () => {
     const text = getShareText();
@@ -79,18 +71,6 @@ function ShareButtons({ result, type = 'solo' }) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Bouton Twitter */}
-      <button
-        onClick={shareToTwitter}
-        className="flex items-center gap-2 px-4 py-2 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white rounded-lg transition-colors text-sm font-medium"
-        title="Share on Twitter"
-      >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/>
-        </svg>
-        <span>Twitter</span>
-      </button>
-
       {/* Bouton Copier */}
       <button
         onClick={copyToClipboard}

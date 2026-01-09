@@ -957,6 +957,9 @@ io.on('connection', (socket) => {
       
       io.to(roomId).emit('game-finished', { results: room.results, players: room.players, eloChanges });
       
+      // Initialiser le système de rematch
+      room.rematchReady = new Set();
+      
       // La room sera supprimée automatiquement quand les deux joueurs se déconnecteront
       // (géré dans le handler disconnect)
     } else {
@@ -966,6 +969,87 @@ io.on('connection', (socket) => {
         accuracy: player.accuracy,
         time: player.finishTime
       });
+    }
+  });
+
+  // Gérer les demandes de rematch
+  socket.on('request-rematch', (data) => {
+    const playerData = players.get(socket.id);
+    if (!playerData) return;
+    
+    const { roomId } = playerData;
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'finished') return;
+    
+    // Initialiser rematchReady si nécessaire
+    if (!room.rematchReady) {
+      room.rematchReady = new Set();
+    }
+    
+    // Ajouter le joueur à la liste des joueurs prêts pour le rematch
+    room.rematchReady.add(socket.id);
+    
+    // Informer tous les joueurs de la room qu'un joueur est prêt
+    io.to(roomId).emit('rematch-ready', {
+      playerId: socket.id,
+      ready: true
+    });
+    
+    // Si les deux joueurs sont prêts, démarrer le rematch
+    if (room.rematchReady.size === 2 && room.players.length === 2) {
+      // Réinitialiser les états de la room pour le rematch
+      room.status = 'waiting';
+      room.players.forEach(p => {
+        p.finished = false;
+        p.wpm = 0;
+        p.accuracy = 100;
+        p.progress = 0;
+      });
+      room.results = {};
+      room.rematchReady.clear();
+      
+      // Générer un nouveau texte pour le rematch
+      const language = room.language || 'en';
+      let newText = '';
+      
+      try {
+        if (room.mode === 'timer') {
+          // Générer du texte pour le mode timer
+          newText = generateTextForLanguage(language, 300);
+        } else if (room.mode === 'phrases') {
+          // Générer des phrases selon la difficulté
+          const difficulty = room.difficulty || 'medium';
+          const phraseCount = 20; // Nombre de phrases par défaut
+          newText = generatePhraseTextForLanguage(language, difficulty, phraseCount);
+        }
+      } catch (textError) {
+        logger.error(`Error generating text for rematch in room ${roomId}:`, textError);
+        io.to(roomId).emit('error', { message: 'Failed to start rematch. Please try again.' });
+        room.rematchReady.clear();
+        return;
+      }
+      
+      if (!newText) {
+        logger.error('Failed to generate text for rematch');
+        io.to(roomId).emit('error', { message: 'Failed to start rematch. Please try again.' });
+        room.rematchReady.clear();
+        return;
+      }
+      
+      room.text = newText;
+      room.startTime = Date.now();
+      room.status = 'playing';
+      
+      // Démarrer la partie
+      io.to(roomId).emit('rematch-start', {
+        text: newText,
+        startTime: room.startTime,
+        mode: room.mode,
+        timerDuration: room.timerDuration,
+        difficulty: room.difficulty
+      });
+      
+      logger.debug(`Rematch started in room ${roomId}`);
     }
   });
 
