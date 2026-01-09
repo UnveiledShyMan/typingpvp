@@ -73,10 +73,10 @@ function MatchResults({
   const opponentResult = opponent ? results[opponent.id] : null;
   
   return (
-    <div className={`min-h-screen flex items-center justify-center py-4 sm:py-6 md:py-8 lg:py-12 transition-all duration-700 ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-      <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+    <div className={`h-full flex items-center justify-center py-2 sm:py-4 transition-all duration-700 ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+      <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 overflow-y-auto max-h-full">
       {/* En-tête avec animation améliorée */}
-      <div className="text-center mb-6 sm:mb-8 md:mb-10 relative">
+      <div className="text-center mb-3 sm:mb-4 md:mb-6 relative">
         {/* Effet de particules pour la victoire */}
         {myIsWinner && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -85,19 +85,19 @@ function MatchResults({
           </div>
         )}
         
-        <div className="mb-4 sm:mb-6 relative z-10">
+        <div className="mb-2 sm:mb-3 relative z-10">
           {myIsWinner ? (
-            <div className="text-5xl sm:text-6xl md:text-7xl mb-2 sm:mb-3 animate-bounce drop-shadow-2xl filter" style={{ filter: 'drop-shadow(0 0 20px rgba(251, 191, 36, 0.6))' }}>
+            <div className="text-4xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 animate-bounce drop-shadow-2xl filter" style={{ filter: 'drop-shadow(0 0 20px rgba(251, 191, 36, 0.6))' }}>
               🏆
             </div>
           ) : winner ? (
-            <div className="text-5xl sm:text-6xl md:text-7xl mb-2 sm:mb-3 animate-pulse opacity-75">😔</div>
+            <div className="text-4xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 animate-pulse opacity-75">😔</div>
           ) : (
-            <div className="text-5xl sm:text-6xl md:text-7xl mb-2 sm:mb-3">🎯</div>
+            <div className="text-4xl sm:text-5xl md:text-6xl mb-1 sm:mb-2">🎯</div>
           )}
         </div>
         
-        <h2 className={`text-3xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-3 relative z-10 ${
+        <h2 className={`text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2 relative z-10 ${
           myIsWinner 
             ? 'text-accent-primary drop-shadow-lg' 
             : winner 
@@ -110,7 +110,7 @@ function MatchResults({
           {myIsWinner ? 'Victory!' : winner ? 'Defeat' : 'Match Finished!'}
         </h2>
         
-        <p className="text-text-secondary text-sm sm:text-base relative z-10 px-2">
+        <p className="text-text-secondary text-xs sm:text-sm relative z-10 px-2">
           {myIsWinner 
             ? '🎉 Congratulations! You won this match! 🎉' 
             : winner 
@@ -119,19 +119,19 @@ function MatchResults({
         </p>
         
         {/* Barre de séparation décorative */}
-        <div className={`mt-4 sm:mt-6 mx-auto h-0.5 sm:h-1 rounded-full ${
+        <div className={`mt-2 sm:mt-3 mx-auto h-0.5 rounded-full ${
           myIsWinner 
-            ? 'bg-gradient-to-r from-transparent via-accent-primary to-transparent w-24 sm:w-32' 
-            : 'bg-border-secondary/30 w-16 sm:w-24'
+            ? 'bg-gradient-to-r from-transparent via-accent-primary to-transparent w-20 sm:w-24' 
+            : 'bg-border-secondary/30 w-12 sm:w-16'
         }`}></div>
       </div>
       
       {/* Comparaison des résultats côte à côte - Design amélioré */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8 md:mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
         {/* Mon résultat */}
         {myPlayer && myResult && (
           <div
-            className={`relative backdrop-blur-xl rounded-3xl p-6 sm:p-8 border-2 transition-all duration-500 transform ${
+            className={`relative backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border-2 transition-all duration-500 transform ${
               myIsWinner
                 ? 'bg-gradient-to-br from-accent-primary/30 via-accent-primary/15 to-accent-primary/5 border-accent-primary/60 shadow-2xl shadow-accent-primary/40 scale-[1.02]'
                 : 'bg-gradient-to-br from-bg-secondary/60 via-bg-secondary/40 to-bg-secondary/60 border-border-secondary/40 hover:border-border-secondary/60'
@@ -142,20 +142,20 @@ function MatchResults({
               <div className="absolute inset-0 rounded-3xl bg-accent-primary/10 blur-2xl"></div>
             )}
             <div className="relative">
-            <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-2">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className={`text-xl sm:text-2xl font-bold ${
+            <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className={`text-lg sm:text-xl font-bold ${
                   myIsWinner ? 'text-accent-primary' : 'text-text-primary'
                 }`}>You</div>
                 {myIsWinner && (
                   <div className="relative">
-                    <span className="text-2xl sm:text-3xl animate-bounce">👑</span>
-                    <div className="absolute inset-0 text-2xl sm:text-3xl animate-ping opacity-20">👑</div>
+                    <span className="text-xl sm:text-2xl animate-bounce">👑</span>
+                    <div className="absolute inset-0 text-xl sm:text-2xl animate-ping opacity-20">👑</div>
                   </div>
                 )}
               </div>
               {eloChanges && eloChanges[myPlayer.id] !== undefined && (
-                <div className={`text-xs sm:text-sm font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border-2 ${
+                <div className={`text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border-2 ${
                   eloChanges[myPlayer.id] >= 0 
                     ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow-lg shadow-green-500/20' 
                     : 'bg-red-500/20 text-red-400 border-red-500/40 shadow-lg shadow-red-500/20'
@@ -166,55 +166,55 @@ function MatchResults({
             </div>
             
             {/* Stats principales - Design amélioré, responsive */}
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex items-baseline gap-3 sm:gap-4">
-                <span className={`text-4xl sm:text-5xl md:text-6xl font-bold ${
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-baseline gap-2 sm:gap-3">
+                <span className={`text-3xl sm:text-4xl md:text-5xl font-bold ${
                   myIsWinner ? 'text-accent-primary' : 'text-text-primary'
                 }`} style={{ fontFamily: 'JetBrains Mono', textShadow: myIsWinner ? '0 0 20px rgba(251, 191, 36, 0.4)' : 'none' }}>
                   {myResult.wpm}
                 </span>
-                <span className="text-text-secondary text-base sm:text-lg font-medium">WPM</span>
+                <span className="text-text-secondary text-sm sm:text-base font-medium">WPM</span>
               </div>
               
               {/* Stats détaillées - Design amélioré avec icônes */}
-              <div className="grid grid-cols-2 gap-4 pt-6 border-t border-border-secondary/30">
-                <div className="bg-bg-secondary/30 rounded-lg p-3">
-                  <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border-secondary/30">
+                <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                  <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                     <span>🎯</span>
                     <span>Accuracy</span>
                   </div>
-                  <div className={`text-2xl font-bold ${
+                  <div className={`text-xl sm:text-2xl font-bold ${
                     myResult.accuracy >= 95 ? 'text-green-400' : myResult.accuracy >= 85 ? 'text-yellow-400' : 'text-red-400'
                   }`} style={{ fontFamily: 'JetBrains Mono' }}>
                     {formatAccuracy(myResult.accuracy)}%
                   </div>
                 </div>
-                <div className="bg-bg-secondary/30 rounded-lg p-3">
-                  <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+                <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                  <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                     <span>⏱️</span>
                     <span>Time</span>
                   </div>
-                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                  <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                     {Math.round(myResult.time / 1000)}s
                   </div>
                 </div>
                 {myResult.errors !== undefined && (
                   <>
-                    <div className="bg-bg-secondary/30 rounded-lg p-3">
-                      <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+                    <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                      <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                         <span>❌</span>
                         <span>Errors</span>
                       </div>
-                      <div className="text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-xl sm:text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
                         {myResult.errors}
                       </div>
                     </div>
-                    <div className="bg-bg-secondary/30 rounded-lg p-3">
-                      <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+                    <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                      <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                         <span>⌨️</span>
                         <span>Characters</span>
                       </div>
-                      <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                         {myResult.characters || 0}
                       </div>
                     </div>
@@ -229,7 +229,7 @@ function MatchResults({
         {/* Résultat de l'adversaire - Design compétitif moderne */}
         {opponent && opponentResult && (
           <div
-            className={`relative backdrop-blur-xl rounded-3xl p-6 sm:p-8 border-2 transition-all duration-500 transform ${
+            className={`relative backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border-2 transition-all duration-500 transform ${
               !myIsWinner && winner && winner.id === opponent.id
                 ? 'bg-gradient-to-br from-accent-primary/30 via-accent-primary/15 to-accent-primary/5 border-accent-primary/60 shadow-2xl shadow-accent-primary/40 scale-[1.02]'
                 : 'bg-gradient-to-br from-bg-secondary/60 via-bg-secondary/40 to-bg-secondary/60 border-border-secondary/40 hover:border-border-secondary/60'
@@ -240,15 +240,15 @@ function MatchResults({
               <div className="absolute inset-0 rounded-3xl bg-accent-primary/10 blur-2xl"></div>
             )}
             <div className="relative">
-              <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-2">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className={`text-xl sm:text-2xl font-bold ${
+              <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className={`text-lg sm:text-xl font-bold ${
                     !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
                   }`}>{opponent.name}</div>
                   {!myIsWinner && winner && winner.id === opponent.id && (
                     <div className="relative">
-                      <span className="text-2xl sm:text-3xl animate-bounce">👑</span>
-                      <div className="absolute inset-0 text-2xl sm:text-3xl animate-ping opacity-20">👑</div>
+                      <span className="text-xl sm:text-2xl animate-bounce">👑</span>
+                      <div className="absolute inset-0 text-xl sm:text-2xl animate-ping opacity-20">👑</div>
                     </div>
                   )}
                 </div>
@@ -256,15 +256,15 @@ function MatchResults({
                 {isValidUserId(opponent.userId) && (
                   <button
                     onClick={() => navigateToProfile(navigate, opponent.userId, opponent.name)}
-                    className="text-accent-primary hover:text-accent-hover text-sm font-medium transition-all hover:scale-110 flex items-center gap-1 px-3 py-1 rounded-lg hover:bg-accent-primary/10"
+                    className="text-accent-primary hover:text-accent-hover text-xs sm:text-sm font-medium transition-all hover:scale-110 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-accent-primary/10"
                     title="View profile"
                   >
                     <span>👤</span>
-                    <span>Profile</span>
+                    <span className="hidden sm:inline">Profile</span>
                   </button>
                 )}
                 {eloChanges && eloChanges[opponent.id] !== undefined && (
-                  <div className={`text-sm font-bold px-4 py-2 rounded-full border-2 ${
+                  <div className={`text-xs font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border-2 ${
                     eloChanges[opponent.id] >= 0 
                       ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow-lg shadow-green-500/20' 
                       : 'bg-red-500/20 text-red-400 border-red-500/40 shadow-lg shadow-red-500/20'
@@ -276,9 +276,9 @@ function MatchResults({
               </div>
             
             {/* Stats principales - Design amélioré */}
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex items-baseline gap-3 sm:gap-4">
-                <span className={`text-4xl sm:text-5xl md:text-6xl font-bold ${
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-baseline gap-2 sm:gap-3">
+                <span className={`text-3xl sm:text-4xl md:text-5xl font-bold ${
                   !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
                 }`} style={{ 
                   fontFamily: 'JetBrains Mono',
@@ -286,48 +286,48 @@ function MatchResults({
                 }}>
                   {opponentResult.wpm}
                 </span>
-                <span className="text-text-secondary text-base sm:text-lg font-medium">WPM</span>
+                <span className="text-text-secondary text-sm sm:text-base font-medium">WPM</span>
               </div>
               
               {/* Stats détaillées - Design amélioré avec icônes */}
-              <div className="grid grid-cols-2 gap-4 pt-6 border-t border-border-secondary/30">
-                <div className="bg-bg-secondary/30 rounded-lg p-3">
-                  <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border-secondary/30">
+                <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                  <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                     <span>🎯</span>
                     <span>Accuracy</span>
                   </div>
-                  <div className={`text-2xl font-bold ${
+                  <div className={`text-xl sm:text-2xl font-bold ${
                     opponentResult.accuracy >= 95 ? 'text-green-400' : opponentResult.accuracy >= 85 ? 'text-yellow-400' : 'text-red-400'
                   }`} style={{ fontFamily: 'JetBrains Mono' }}>
                     {formatAccuracy(opponentResult.accuracy)}%
                   </div>
                 </div>
-                <div className="bg-bg-secondary/30 rounded-lg p-3">
-                  <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+                <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                  <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                     <span>⏱️</span>
                     <span>Time</span>
                   </div>
-                  <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                  <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                     {Math.round(opponentResult.time / 1000)}s
                   </div>
                 </div>
                 {opponentResult.errors !== undefined && (
                   <>
-                    <div className="bg-bg-secondary/30 rounded-lg p-3">
-                      <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+                    <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                      <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                         <span>❌</span>
                         <span>Errors</span>
                       </div>
-                      <div className="text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-xl sm:text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
                         {opponentResult.errors}
                       </div>
                     </div>
-                    <div className="bg-bg-secondary/30 rounded-lg p-3">
-                      <div className="text-text-secondary text-xs mb-2 font-medium flex items-center gap-1">
+                    <div className="bg-bg-secondary/30 rounded-lg p-2 sm:p-3">
+                      <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium flex items-center gap-1">
                         <span>⌨️</span>
                         <span>Characters</span>
                       </div>
-                      <div className="text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                         {opponentResult.characters || 0}
                       </div>
                     </div>
@@ -342,8 +342,8 @@ function MatchResults({
       
       {/* Comparaison visuelle améliorée - Design moderne */}
       {myResult && opponentResult && (
-        <div className="bg-gradient-to-br from-bg-secondary/60 via-bg-secondary/40 to-bg-secondary/60 backdrop-blur-sm rounded-2xl p-8 mb-10 border border-border-secondary/30 shadow-xl">
-          <h3 className="text-2xl font-bold text-text-primary mb-6 text-center flex items-center justify-center gap-2">
+        <div className="bg-gradient-to-br from-bg-secondary/60 via-bg-secondary/40 to-bg-secondary/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border border-border-secondary/30 shadow-xl">
+          <h3 className="text-lg sm:text-xl font-bold text-text-primary mb-3 sm:mb-4 text-center flex items-center justify-center gap-2">
             <span>⚔️</span>
             <span>Match Comparison</span>
             <span>⚔️</span>
@@ -407,10 +407,10 @@ function MatchResults({
       )}
       
       {/* Actions */}
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-3 sm:space-y-4">
         {/* Partage pour le gagnant */}
         {myIsWinner && myResult && (
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-2 sm:mb-3">
             <ShareButtons
               result={{
                 wpm: myResult.wpm,
@@ -424,7 +424,7 @@ function MatchResults({
         )}
         
         {/* Boutons d'action - Design amélioré, optimisé mobile */}
-        <div className="flex flex-col items-center gap-4 sm:gap-6">
+        <div className="flex flex-col items-center gap-3 sm:gap-4">
           {onPlayAgain && (
             <div className="flex flex-col items-center gap-3 w-full max-w-md px-2 sm:px-0">
               <button
