@@ -1302,6 +1302,21 @@ io.on('connection', (socket) => {
   // Créer une room depuis le matchmaking
   async function createMatchmakingRoom(socketId1, player1, socketId2, player2, language, ranked = true) {
     try {
+      // IMPORTANT: Vérifier que ce n'est pas le même joueur (même socketId ou même userId)
+      if (socketId1 === socketId2) {
+        logger.warn(`⚠️ Cannot create matchmaking room: same socket ID (${socketId1})`);
+        matchmakingQueue.removePlayer(socketId1);
+        return;
+      }
+      
+      // Vérifier que ce n'est pas le même utilisateur avec deux sockets différents
+      if (player1.userId && player2.userId && player1.userId === player2.userId) {
+        logger.warn(`⚠️ Cannot create matchmaking room: same user ID (${player1.userId}) with different sockets`);
+        matchmakingQueue.removePlayer(socketId1);
+        matchmakingQueue.removePlayer(socketId2);
+        return;
+      }
+      
       // IMPORTANT: Vérifier que les deux joueurs sont toujours dans la queue avant de créer la room
       // Cela évite les problèmes si un joueur a quitté entre-temps
       if (!matchmakingQueue.hasPlayer(socketId1) || !matchmakingQueue.hasPlayer(socketId2)) {

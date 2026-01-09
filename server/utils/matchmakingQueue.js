@@ -151,8 +151,15 @@ export class MatchmakingQueue {
 
       // Parcourir les joueurs dans ce bucket
       for (const [otherSocketId, otherPlayer] of bucketQueue.entries()) {
-        // Ignorer le joueur lui-même
+        // Ignorer le joueur lui-même (même socketId)
         if (otherSocketId === socketId) continue;
+        
+        // IMPORTANT: Ignorer aussi si c'est le même utilisateur avec un socket différent
+        // Cela évite qu'un utilisateur soit matché contre lui-même s'il a plusieurs onglets
+        const currentPlayer = this.getPlayer(socketId);
+        if (currentPlayer && currentPlayer.userId && otherPlayer.userId && currentPlayer.userId === otherPlayer.userId) {
+          continue;
+        }
 
         // Calculer la différence de MMR exacte
         const otherMMR = otherPlayer.mmr || 1000;
