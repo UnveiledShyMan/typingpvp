@@ -236,7 +236,10 @@ export const friendsService = {
  */
 export const profileService = {
   async getProfileByUsername(username) {
-    return request(`/api/users/username/${encodeURIComponent(username)}`);
+    // Nettoyer le username avant l'encodage (enlever ":1" ou autres suffixes)
+    // Cela évite les problèmes avec les usernames qui contiennent des caractères spéciaux
+    const cleanUsername = username ? String(username).split(':')[0].trim() : username;
+    return request(`/api/users/username/${encodeURIComponent(cleanUsername)}`);
   },
   async getProfile(userId) {
     return get(`/api/users/${userId}`);

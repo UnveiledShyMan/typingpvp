@@ -15,9 +15,13 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Nettoyer le username (enlever ":1" ou autres suffixes bizarres)
+  // React Router décode automatiquement les paramètres d'URL, donc on doit nettoyer ici
+  const cleanUsername = username ? String(username).split(':')[0].trim() : null;
+
   useEffect(() => {
     const fetchUserId = async () => {
-      if (!username) {
+      if (!cleanUsername) {
         setError('Username is required');
         setLoading(false);
         return;
@@ -25,8 +29,8 @@ export default function UserProfile() {
 
       try {
         setLoading(true);
-        // Récupérer l'utilisateur par username
-        const user = await profileService.getProfileByUsername(username);
+        // Récupérer l'utilisateur par username (déjà nettoyé)
+        const user = await profileService.getProfileByUsername(cleanUsername);
         if (user && user.id) {
           setUserId(user.id);
           // Rediriger vers /profile/:id pour une URL propre
@@ -43,7 +47,7 @@ export default function UserProfile() {
     };
 
     fetchUserId();
-  }, [username, navigate]);
+  }, [cleanUsername, navigate]);
 
   if (loading) {
     return (
@@ -60,7 +64,7 @@ export default function UserProfile() {
       <div className="h-full w-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-text-primary text-xl font-semibold mb-2">User not found</div>
-          <div className="text-text-secondary text-sm mb-4">The user "{username}" does not exist.</div>
+          <div className="text-text-secondary text-sm mb-4">The user "{cleanUsername}" does not exist.</div>
           <button
             onClick={() => navigate('/')}
             className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors"

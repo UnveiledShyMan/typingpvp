@@ -54,7 +54,12 @@ const upload = multer({
 // Obtenir un utilisateur par username (route spéciale avant /:id)
 router.get('/username/:username', optionalAuth, async (req, res) => {
   try {
-    const user = await getUserByUsername(req.params.username);
+    // Décoder le username depuis l'URL (caractères spéciaux et espaces)
+    // Nettoyer aussi les suffixes bizarres comme ":1" qui peuvent apparaître
+    const rawUsername = decodeURIComponent(req.params.username);
+    const cleanUsername = rawUsername.split(':')[0].trim();
+    
+    const user = await getUserByUsername(cleanUsername);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
