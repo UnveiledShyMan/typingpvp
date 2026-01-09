@@ -377,7 +377,7 @@ export default function Friends() {
                       <img
                         src={friend.avatar}
                         alt={friend.username}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-12 h-12 rounded-full object-cover object-center"
                         loading="lazy"
                       />
                     ) : (
@@ -442,7 +442,7 @@ export default function Friends() {
                         <img
                           src={request.avatar}
                           alt={request.username}
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="w-12 h-12 rounded-full object-cover object-center"
                           loading="lazy"
                         />
                       ) : (
@@ -499,7 +499,7 @@ export default function Friends() {
                         <img
                           src={request.avatar}
                           alt={request.username}
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="w-12 h-12 rounded-full object-cover object-center"
                           loading="lazy"
                         />
                       ) : (
@@ -552,7 +552,7 @@ export default function Friends() {
                       <img
                         src={user.avatar}
                         alt={user.username}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-12 h-12 rounded-full object-cover object-center"
                         loading="lazy"
                       />
                     ) : (

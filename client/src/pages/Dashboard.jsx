@@ -143,7 +143,7 @@ export default function Dashboard({ user, onSectionChange }) {
                 style={{ borderColor: rankInfo.color }}
               >
                 {user.avatar ? (
-                  <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" loading="lazy" />
+                  <img src={user.avatar} alt={user.username} className="w-full h-full object-cover object-center" loading="lazy" />
                 ) : (
                   <LogoIconSmall className="w-12 h-12 text-accent-primary" stroke="currentColor" />
                 )}

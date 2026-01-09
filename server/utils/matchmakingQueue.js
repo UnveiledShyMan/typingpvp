@@ -143,7 +143,8 @@ export class MatchmakingQueue {
     let bestMatch = null;
     let bestMMRDiff = Infinity;
 
-    // Parcourir tous les buckets dans la plage
+    // OPTIMISATION : Parcourir les buckets et arrêter dès qu'un match parfait est trouvé
+    // Un match parfait (différence < 50) est retourné immédiatement pour meilleure performance
     for (let bucket = minBucket; bucket <= maxBucket; bucket += 100) {
       const bucketQueue = typeQueue.get(bucket);
       if (!bucketQueue) continue;
@@ -157,10 +158,19 @@ export class MatchmakingQueue {
         const otherMMR = otherPlayer.mmr || 1000;
         const mmrDiff = Math.abs(otherMMR - playerMMR);
 
-        // Si dans la plage et meilleur match trouvé jusqu'ici
-        if (mmrDiff <= mmrRange && mmrDiff < bestMMRDiff) {
-          bestMatch = { socketId: otherSocketId, player: otherPlayer };
-          bestMMRDiff = mmrDiff;
+        // Si dans la plage
+        if (mmrDiff <= mmrRange) {
+          // OPTIMISATION : Si match parfait (différence < 50), retourner immédiatement
+          // Cela évite de parcourir les autres buckets inutilement
+          if (mmrDiff < 50) {
+            return { socketId: otherSocketId, player: otherPlayer };
+          }
+          
+          // Sinon, garder le meilleur match trouvé jusqu'ici
+          if (mmrDiff < bestMMRDiff) {
+            bestMatch = { socketId: otherSocketId, player: otherPlayer };
+            bestMMRDiff = mmrDiff;
+          }
         }
       }
     }

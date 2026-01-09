@@ -87,7 +87,7 @@ function UserTooltip({ userId, username, children }) {
                   <img
                     src={userData.avatar}
                     alt={userData.username}
-                    className="w-12 h-12 rounded-full object-cover"
+                    className="w-12 h-12 rounded-full object-cover object-center"
                     loading="lazy"
                   />
                 ) : (

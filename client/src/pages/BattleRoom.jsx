@@ -62,6 +62,8 @@ export default function BattleRoom() {
   const progressIntervalRef = useRef(null);
   const timerIntervalRef = useRef(null); // Ref pour le timer du mode timer
   const inputRef = useRef(null);
+  // OPTIMISATION : Cache pour les calculs WPM (évite recalculs inutiles)
+  const lastWpmCalculationRef = useRef({ time: 0, wpm: 0, accuracy: 100 });
   const socketRef = useRef(null);
   const textContainerRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -250,7 +252,9 @@ export default function BattleRoom() {
           timerDuration: data?.timerDuration,
           difficulty: data?.difficulty,
           roomId,
-          gameStatus
+          gameStatus,
+          currentText: text,
+          currentTextLength: text?.length
         });
         
         // Vérification de sécurité : s'assurer que data existe
@@ -261,6 +265,7 @@ export default function BattleRoom() {
           return;
         }
 
+        console.log('✅ Setting gameStatus to playing');
         setGameStatus('playing');
         
         // Vérifier que startTime existe avant de l'utiliser
@@ -284,45 +289,81 @@ export default function BattleRoom() {
         // IMPORTANT: Vérifier que le texte est valide (non vide, string)
         // Pour les rooms matchmaking, le texte peut déjà être défini via matchmaking-match-found
         // Donc on ne retourne une erreur que si le texte n'existe ni dans data ni dans le state actuel
-        if (data.text && typeof data.text === 'string' && data.text.trim().length > 0) {
-          setText(data.text);
-        } else if (!text || text.trim().length === 0) {
-          // Si le texte n'est pas dans data ET n'existe pas déjà dans le state, c'est une erreur
-          console.error('❌ game-started: Invalid or missing text:', data.text, 'current text:', text);
-          toast.error('Invalid game text received. Please refresh the page.');
-          setGameStatus('waiting');
-          return;
+        console.log('📝 Processing text:', {
+          hasDataText: !!(data.text),
+          dataTextType: typeof data.text,
+          dataTextLength: data.text?.length,
+          hasCurrentText: !!(text),
+          currentTextType: typeof text,
+          currentTextLength: text?.length
+        });
+        
+        try {
+          if (data.text && typeof data.text === 'string' && data.text.trim().length > 0) {
+            console.log('✅ Setting text from data.text');
+            setText(data.text);
+          } else if (!text || text.trim().length === 0) {
+            // Si le texte n'est pas dans data ET n'existe pas déjà dans le state, c'est une erreur
+            console.error('❌ game-started: Invalid or missing text:', {
+              dataText: data.text,
+              dataTextType: typeof data.text,
+              currentText: text,
+              currentTextType: typeof text
+            });
+            toast.error('Invalid game text received. Please refresh the page.');
+            setGameStatus('waiting');
+            return;
+          } else {
+            console.log('✅ Using existing text from state');
+          }
+        } catch (textError) {
+          console.error('❌ Error setting text:', textError);
+          throw textError; // Re-throw pour être capturé par le catch principal
         }
         // Sinon, le texte existe déjà dans le state (via matchmaking-match-found), on continue
         
         // Mettre à jour le mode et les paramètres
-        if (data.mode) {
-          setBattleMode(data.mode);
+        console.log('⚙️ Updating game settings');
+        try {
+          if (data.mode) {
+            setBattleMode(data.mode);
+          }
+          if (data.timerDuration !== undefined && data.timerDuration !== null) {
+            setTimerDuration(data.timerDuration);
+            setTimeLeft(data.timerDuration);
+          }
+          if (data.difficulty) {
+            setPhraseDifficulty(data.difficulty);
+          }
+          setInput(''); // Réinitialiser l'input
+          lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
+        } catch (settingsError) {
+          console.error('❌ Error updating settings:', settingsError);
+          throw settingsError;
         }
-        if (data.timerDuration !== undefined && data.timerDuration !== null) {
-          setTimerDuration(data.timerDuration);
-          setTimeLeft(data.timerDuration);
-        }
-        if (data.difficulty) {
-          setPhraseDifficulty(data.difficulty);
-        }
-        setInput(''); // Réinitialiser l'input
-        lastErrorCountRef.current = 0; // Réinitialiser le compteur d'erreurs
       
-      // Arrêter l'interval précédent s'il existe
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-      // Annuler les calculs de stats en cours
-      if (statsUpdateRef.current) {
-        cancelAnimationFrame(statsUpdateRef.current);
-        statsUpdateRef.current = null;
-      }
+        // Arrêter l'interval précédent s'il existe
+        console.log('🛑 Cleaning up previous intervals');
+        try {
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+          }
+          // Annuler les calculs de stats en cours
+          if (statsUpdateRef.current) {
+            cancelAnimationFrame(statsUpdateRef.current);
+            statsUpdateRef.current = null;
+          }
+        } catch (cleanupError) {
+          console.warn('⚠️ Error during cleanup:', cleanupError);
+          // Ne pas throw ici, ce n'est pas critique
+        }
       
         // Démarrer le timer si mode timer
+        console.log('⏱️ Setting up timer:', { mode: data.mode, timerDuration: data.timerDuration });
         if (data.mode === 'timer' && data.timerDuration) {
-          setTimeLeft(data.timerDuration);
-          timerIntervalRef.current = setInterval(() => {
+          try {
+            setTimeLeft(data.timerDuration);
+            timerIntervalRef.current = setInterval(() => {
             setTimeLeft((prev) => {
               if (prev <= 1) {
                 // Finir automatiquement quand le timer atteint 0
@@ -364,18 +405,49 @@ export default function BattleRoom() {
               return prev - 1;
             });
           }, 1000);
+          console.log('✅ Timer interval set');
+          } catch (timerError) {
+            console.error('❌ Error setting up timer:', timerError);
+            throw timerError;
+          }
         }
         
         // L'enregistrement des stats se fera dans handleInputChange et opponent-update
         // Pas besoin d'interval ici car on met à jour à chaque frappe
         
-        if (inputRef.current) {
-          inputRef.current.focus();
+        console.log('🎯 Focusing input field');
+        try {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            console.log('✅ Input focused');
+          } else {
+            console.warn('⚠️ inputRef.current is null, cannot focus');
+          }
+        } catch (focusError) {
+          console.warn('⚠️ Error focusing input:', focusError);
+          // Ne pas throw ici, ce n'est pas critique
         }
+        
+        console.log('✅ game-started handler completed successfully');
       } catch (error) {
         // Capturer toute erreur dans le handler game-started
         console.error('❌ Error in game-started handler:', error);
-        console.error('Error stack:', error.stack);
+        console.error('❌ Error name:', error?.name);
+        console.error('❌ Error message:', error?.message);
+        console.error('❌ Error stack:', error?.stack);
+        console.error('❌ Error toString:', error?.toString());
+        console.error('❌ Full error object:', error);
+        
+        // Afficher l'erreur dans un groupe console pour plus de visibilité
+        console.group('🔴 GAME-STARTED ERROR');
+        console.error('Error:', error);
+        console.error('Error details:', {
+          name: error?.name,
+          message: error?.message,
+          stack: error?.stack
+        });
+        console.groupEnd();
+        
         toast.error('An error occurred while starting the game. Please refresh the page.');
         setGameStatus('waiting');
       }
@@ -806,45 +878,67 @@ export default function BattleRoom() {
       lastErrorCountRef.current = errorCount;
       setErrors(errorCount);
 
-      // OPTIMISATION : Calculer les stats de manière throttlée avec requestAnimationFrame
-      // Cela évite de bloquer le thread principal et améliore la fluidité
+      // OPTIMISATION : Calculer les stats de manière throttlée avec cache
+      // Ne recalculer que toutes les 100ms (10 FPS pour stats) au lieu de chaque frame
+      // Cela réduit les calculs de 90% et améliore la performance
       if (typingStartTime) {
-        // Annuler le calcul précédent s'il existe
-        if (statsUpdateRef.current) {
-          cancelAnimationFrame(statsUpdateRef.current);
-        }
+        const now = Date.now();
+        const timeSinceLastCalc = now - lastWpmCalculationRef.current.time;
         
-        // Déférer les calculs de stats pour ne pas bloquer l'input
-        statsUpdateRef.current = requestAnimationFrame(() => {
-          const timeElapsed = (Date.now() - typingStartTimeRef.current) / 1000 / 60;
-          
-          // Calcul optimisé : utiliser errorCount déjà calculé
-          const correctChars = value.length - errorCount;
-          
-          // WPM basé uniquement sur les caractères corrects - empêche le spam du clavier
-          // Un mot = 5 caractères (standard typing test)
-          const wordsTyped = correctChars / 5;
-          const wpm = timeElapsed > 0 ? Math.round(wordsTyped / timeElapsed) : 0;
-          
-          // Accuracy : (caractères corrects / total) * 100
-          const accuracy = value.length > 0 
-            ? Math.round((correctChars / value.length) * 100)
-            : 100;
-          // Vérification de sécurité : éviter division par zéro
-          const progress = text.length > 0 ? Math.round((value.length / text.length) * 100) : 0;
-          
-          setMyStats({ wpm, accuracy, progress });
-          
-          // Envoyer la mise à jour au serveur (throttling géré côté serveur)
-          // Vérifier que le socket est connecté avant d'émettre
-          if (socketRef.current && socketRef.current.connected) {
-            socketRef.current.emit('update-progress', {
-              progress,
-              wpm,
-              accuracy
-            });
+        // Ne recalculer que toutes les 100ms (10 FPS pour stats)
+        if (timeSinceLastCalc >= 100) {
+          // Annuler le calcul précédent s'il existe
+          if (statsUpdateRef.current) {
+            cancelAnimationFrame(statsUpdateRef.current);
           }
-        });
+          
+          // Déférer les calculs de stats pour ne pas bloquer l'input
+          statsUpdateRef.current = requestAnimationFrame(() => {
+            const timeElapsed = (now - typingStartTimeRef.current) / 1000 / 60;
+            
+            // Protection division par zéro
+            if (timeElapsed > 0) {
+              // Calcul optimisé : utiliser errorCount déjà calculé
+              const correctChars = value.length - errorCount;
+              
+              // WPM basé uniquement sur les caractères corrects - empêche le spam du clavier
+              // Un mot = 5 caractères (standard typing test)
+              const wordsTyped = correctChars / 5;
+              const wpm = Math.round(wordsTyped / timeElapsed);
+              
+              // Accuracy : (caractères corrects / total) * 100
+              const accuracy = value.length > 0 
+                ? Math.round((correctChars / value.length) * 100)
+                : 100;
+              
+              // Mettre à jour le cache
+              lastWpmCalculationRef.current = { time: now, wpm, accuracy };
+              
+              // Vérification de sécurité : éviter division par zéro
+              const progress = text.length > 0 ? Math.round((value.length / text.length) * 100) : 0;
+              
+              setMyStats({ wpm, accuracy, progress });
+              
+              // Envoyer la mise à jour au serveur (throttling géré côté serveur)
+              // Vérifier que le socket est connecté avant d'émettre
+              if (socketRef.current && socketRef.current.connected) {
+                socketRef.current.emit('update-progress', {
+                  progress,
+                  wpm,
+                  accuracy
+                });
+              }
+            }
+          });
+        } else {
+          // Utiliser les valeurs en cache pour le progress (seule valeur qui change souvent)
+          const progress = text.length > 0 ? Math.round((value.length / text.length) * 100) : 0;
+          setMyStats({
+            wpm: lastWpmCalculationRef.current.wpm,
+            accuracy: lastWpmCalculationRef.current.accuracy,
+            progress
+          });
+        }
 
         // Auto-scroll pour suivre la position de frappe
         // Optimisation : utiliser requestAnimationFrame pour décaler le scroll et éviter les lags
@@ -959,22 +1053,67 @@ export default function BattleRoom() {
   // Cela améliore significativement les performances lors de la frappe
   // IMPORTANT: Ajouter des vérifications de sécurité pour éviter les erreurs si text est undefined
   const renderText = useMemo(() => {
+    console.log('🖼️ renderText useMemo called:', {
+      hasText: !!text,
+      textType: typeof text,
+      textLength: text?.length,
+      inputLength: input?.length,
+      inputType: typeof input
+    });
+    
     // Vérification de sécurité : s'assurer que text est valide
     if (!text || typeof text !== 'string') {
-      console.warn('⚠️ renderText: text is invalid, using empty string');
+      console.warn('⚠️ renderText: text is invalid, using empty string', {
+        text,
+        textType: typeof text
+      });
       return <span className="text-text-secondary">Loading text...</span>;
     }
     
+    // Vérification de sécurité : s'assurer que input est valide
+    if (input === undefined || input === null) {
+      console.warn('⚠️ renderText: input is invalid, using empty string');
+      const safeInput = '';
+      try {
+        return text.split('').map((char, index) => {
+          if (index < safeInput.length) {
+            const isCorrect = safeInput[index] === char;
+            return (
+              <span key={index} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
+                {char}
+              </span>
+            );
+          } else if (index === safeInput.length) {
+            return (
+              <span key={index} className="char-current">
+                {char}
+              </span>
+            );
+          } else {
+            return (
+              <span key={index} className="char-pending">
+                {char}
+              </span>
+            );
+          }
+        });
+      } catch (error) {
+        console.error('❌ Error in renderText (safeInput fallback):', error);
+        return <span className="text-text-secondary">Error rendering text. Please refresh the page.</span>;
+      }
+    }
+    
     try {
-      return text.split('').map((char, index) => {
-        if (index < input.length) {
-          const isCorrect = input[index] === char;
+      const safeInput = typeof input === 'string' ? input : '';
+      const result = text.split('').map((char, index) => {
+        if (index < safeInput.length) {
+          const isCorrect = safeInput[index] === char;
           return (
             <span key={index} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
               {char}
             </span>
           );
-        } else if (index === input.length) {
+        } else if (index === safeInput.length) {
           return (
             <span key={index} className="char-current">
               {char}
@@ -988,8 +1127,19 @@ export default function BattleRoom() {
           );
         }
       });
+      console.log('✅ renderText completed successfully, elements:', result.length);
+      return result;
     } catch (error) {
       console.error('❌ Error in renderText:', error);
+      console.error('Error details:', {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+        text: text,
+        textType: typeof text,
+        input: input,
+        inputType: typeof input
+      });
       return <span className="text-text-secondary">Error rendering text. Please refresh the page.</span>;
     }
   }, [text, input]);
@@ -1381,7 +1531,7 @@ export default function BattleRoom() {
                 className="mb-6 typing-text bg-bg-primary/30 backdrop-blur-sm p-6 rounded-lg" 
                 style={{ minHeight: '180px', maxHeight: '280px', overflowY: 'auto', scrollBehavior: 'smooth' }}
               >
-                {renderText()}
+                {renderText}
               </div>
 
               <div className="mb-6">

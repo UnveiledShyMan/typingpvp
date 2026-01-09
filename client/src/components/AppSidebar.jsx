@@ -107,7 +107,7 @@ export default function AppSidebar({ activeSection, onSectionChange, user, isOpe
                 <img
                   src={user.avatar}
                   alt={user.username}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-center"
                   loading="lazy"
                 />
               ) : (

@@ -150,7 +150,7 @@ export default function Rankings() {
                                 e.stopPropagation(); // Empêcher le clic sur la ligne
                                 navigate(`/profile/${player.username}`);
                               }}
-                              className="w-12 h-12 rounded-full object-cover ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer overflow-hidden"
+                              className="w-12 h-12 rounded-full ring-2 ring-text-secondary/20 hover:ring-accent-primary/50 transition-all cursor-pointer overflow-hidden"
                               title="View profile"
                               aria-label={`Voir le profil de ${player.username}`}
                             >
@@ -159,7 +159,7 @@ export default function Rankings() {
                                 alt={`Avatar de ${player.username}`}
                                 width={48}
                                 height={48}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover object-center"
                                 loading="lazy"
                                 priority={false}
                               />

@@ -464,7 +464,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                       alt={`Avatar de ${user.username}`} 
                       width={160}
                       height={160}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover object-center"
                       loading="lazy"
                       priority={false}
                     />
@@ -481,7 +481,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                     alt={`Avatar de ${user.username}`}
                     width={160}
                     height={160}
-                    className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover border-4 shadow-2xl"
+                    className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover object-center border-4 shadow-2xl"
                     style={{ borderColor: getRankColor(rankInfo) }}
                     loading="lazy"
                     priority={true}
