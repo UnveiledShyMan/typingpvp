@@ -17,7 +17,9 @@ export default function BattleRoom() {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = location.state || {};
+  // Protection : s'assurer que location.state existe avant de destructurer
+  const locationState = location.state || {};
+  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = locationState;
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
@@ -26,6 +28,12 @@ export default function BattleRoom() {
     console.error('BattleRoom: navigate is not a valid function');
     return <div>Error: Navigation not available</div>;
   }
+  
+  // Ref pour location.state pour éviter les problèmes de closure
+  const locationStateRef = useRef(locationState);
+  useEffect(() => {
+    locationStateRef.current = location.state || {};
+  }, [location.state]);
   
   // État pour gérer le pseudo si l'utilisateur rejoint via un lien direct
   const [showNameModal, setShowNameModal] = useState(false);
@@ -207,6 +215,12 @@ export default function BattleRoom() {
     // Cet événement est envoyé juste après la création de la room matchmaking
     socket.on('matchmaking-match-found', (data) => {
       try {
+        // Vérification de sécurité : s'assurer que toast est disponible
+        if (!toast || typeof toast.error !== 'function') {
+          console.error('❌ matchmaking-match-found: toast is not available');
+          return;
+        }
+        
         // Vérification de sécurité : s'assurer que data existe et contient les propriétés nécessaires
         if (!data) {
           console.error('❌ matchmaking-match-found: data is undefined or null');
@@ -232,25 +246,76 @@ export default function BattleRoom() {
           return;
         }
         
+        // Vérifier que tous les players ont les propriétés nécessaires
+        const validPlayers = data.players.filter(p => p && p.name && typeof p.name === 'string' && p.name.trim().length > 0);
+        if (validPlayers.length === 0) {
+          console.error('❌ matchmaking-match-found: No valid players in data.players');
+          toast.error('Invalid players data received. Please try again.');
+          return;
+        }
+        
         // Utiliser les refs pour avoir les valeurs à jour
         const currentMatchmaking = matchmakingRef.current;
         const currentGameStatus = gameStatusRef.current;
         const currentRoomId = roomIdRef.current;
         
+        // Vérifier si on est en mode matchmaking (location.state peut ne pas être encore défini)
+        const locationStateForMatch = locationStateRef.current || location.state || {};
+        const isMatchmakingMode = currentMatchmaking === true || locationStateForMatch.matchmaking === true;
+        
         console.log('📨 matchmaking-match-found reçu:', { 
           dataRoomId: data.roomId, 
-          currentRoomId: currentRoomId, 
+          currentRoomId: currentRoomId,
+          roomIdFromParams: roomId,
           hasJoined: hasJoinedRoomRef.current,
           matchmaking: currentMatchmaking,
+          matchmakingFromState: locationStateForMatch.matchmaking,
+          isMatchmakingMode: isMatchmakingMode,
           gameStatus: currentGameStatus
         });
         
-        // Si le roomId correspond à la room actuelle, traiter l'événement normalement
-        if (data.roomId === currentRoomId) {
-          console.log('✅ Matchmaking match found pour la room actuelle:', data.roomId);
-          setText(data.text);
-          setPlayers(data.players);
-          setGameStatus('waiting');
+        // PRIORITÉ 1 : Si on est en mode matchmaking et en "connecting", TOUJOURS traiter l'événement
+        // Cela couvre le cas où on arrive depuis Matchmaking (l'événement peut arriver avant que roomId soit défini)
+        if (isMatchmakingMode && currentGameStatus === 'connecting') {
+          console.log('✅ Matchmaking match found lors de l\'arrivée depuis Matchmaking (priorité 1):', data.roomId);
+          // Mettre à jour les états de manière sécurisée avec un setTimeout pour éviter de bloquer le rendu
+          setTimeout(() => {
+            try {
+              setText(data.text);
+              setPlayers(validPlayers);
+              setGameStatus('waiting');
+            } catch (stateError) {
+              console.error('❌ Error updating states:', stateError);
+              console.error('❌ State error details:', {
+                name: stateError?.name,
+                message: stateError?.message,
+                stack: stateError?.stack
+              });
+              toast.error('Error updating game state. Please refresh the page.');
+            }
+          }, 0);
+          if (textContainerRef.current) {
+            textContainerRef.current.scrollTop = 0;
+          }
+          hasJoinedRoomRef.current = true;
+          return;
+        }
+        
+        // PRIORITÉ 2 : Si le roomId correspond à la room actuelle, traiter l'événement normalement
+        // Cela couvre le cas où l'événement arrive après que roomId soit défini
+        if (data.roomId === currentRoomId || data.roomId === roomId) {
+          console.log('✅ Matchmaking match found pour la room actuelle (priorité 2):', data.roomId);
+          // Utiliser startTransition pour éviter de bloquer le rendu
+          startTransition(() => {
+            try {
+              setText(data.text);
+              setPlayers(validPlayers);
+              setGameStatus('waiting');
+            } catch (stateError) {
+              console.error('❌ Error updating states:', stateError);
+              toast.error('Error updating game state. Please refresh the page.');
+            }
+          });
           // Réinitialiser le scroll du conteneur de texte au début
           if (textContainerRef.current) {
             textContainerRef.current.scrollTop = 0;
@@ -260,22 +325,7 @@ export default function BattleRoom() {
           return;
         }
         
-        // Si on est en mode matchmaking et en "connecting", c'est qu'on arrive depuis Matchmaking
-        // Dans ce cas, traiter l'événement même si roomId n'est pas encore défini ou différent
-        // (l'événement peut arriver avant que la navigation soit complète)
-        if (currentMatchmaking && currentGameStatus === 'connecting') {
-          console.log('✅ Matchmaking match found lors de l\'arrivée depuis Matchmaking:', data.roomId);
-          setText(data.text);
-          setPlayers(data.players);
-          setGameStatus('waiting');
-          if (textContainerRef.current) {
-            textContainerRef.current.scrollTop = 0;
-          }
-          hasJoinedRoomRef.current = true;
-          return;
-        }
-        
-        // Si c'est une nouvelle room ET qu'on est déjà dans une partie active (Play Again)
+        // PRIORITÉ 3 : Si c'est une nouvelle room ET qu'on est déjà dans une partie active (Play Again)
         // Ne naviguer que si on a déjà rejoint une room ET qu'on n'est pas en "connecting"
         if (currentRoomId && data.roomId !== currentRoomId && hasJoinedRoomRef.current && currentGameStatus !== 'connecting') {
           console.log('✅ Nouveau match trouvé depuis une room existante, navigation vers la nouvelle room:', data.roomId);
@@ -1296,8 +1346,20 @@ export default function BattleRoom() {
 
   // Vérification de sécurité : s'assurer que players est un tableau
   const safePlayers = Array.isArray(players) ? players : [];
-  const myPlayer = safePlayers.find(p => p && (p.name === playerName || (p.userId && p.userId === (userId || currentUser?.id))));
-  const opponent = safePlayers.find(p => p && p.name !== playerName && (!p.userId || p.userId !== (userId || currentUser?.id)));
+  // Protection supplémentaire : vérifier que currentUser existe avant d'utiliser son id
+  const currentUserId = currentUser?.id || userId || null;
+  const myPlayer = safePlayers.find(p => {
+    if (!p) return false;
+    const playerMatchesName = p.name === playerName;
+    const playerMatchesUserId = p.userId && currentUserId && p.userId === currentUserId;
+    return playerMatchesName || playerMatchesUserId;
+  });
+  const opponent = safePlayers.find(p => {
+    if (!p) return false;
+    const playerNotMatchesName = p.name !== playerName;
+    const playerNotMatchesUserId = !p.userId || !currentUserId || p.userId !== currentUserId;
+    return playerNotMatchesName && playerNotMatchesUserId;
+  });
 
   // Écran de chargement
   if (gameStatus === 'connecting' || !playerName) {
@@ -1428,9 +1490,9 @@ export default function BattleRoom() {
               <div className="h-6 w-px bg-border-secondary/40 mx-2"></div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
-                  {matchmaking ? 'Competitive Match' : `Battle #${roomId?.slice(0, 8)}`}
+                  {matchmaking ? 'Competitive Match' : (roomId ? `Battle #${roomId.slice(0, 8)}` : 'Battle')}
                 </h2>
-                {matchmaking && (
+                {matchmaking === true && (
                   <div className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
                     ranked 
                       ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/50' 
@@ -1893,7 +1955,7 @@ export default function BattleRoom() {
           {gameStatus === 'finished' && results && (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <MatchResults
-                players={players}
+                players={safePlayers}
                 results={results}
                 eloChanges={eloChanges}
                 playerName={playerName}
