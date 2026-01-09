@@ -442,15 +442,19 @@ function rowToUser(row) {
     }
   }
   if (!stats || typeof stats !== 'object') {
-    stats = {
-      totalMatches: 0,
-      wins: 0,
-      losses: 0,
-      totalWPM: 0,
-      bestWPM: 0,
-      averageAccuracy: 0
-    };
+    stats = {};
   }
+  
+  // IMPORTANT: S'assurer que toutes les propriétés de stats sont définies avec des valeurs par défaut
+  // Même si l'objet stats existe, il peut manquer certaines propriétés
+  stats = {
+    totalMatches: stats.totalMatches || 0,
+    wins: stats.wins || 0,
+    losses: stats.losses || 0,
+    totalWPM: stats.totalWPM || 0,
+    bestWPM: stats.bestWPM || 0,
+    averageAccuracy: stats.averageAccuracy !== undefined && stats.averageAccuracy !== null ? stats.averageAccuracy : 0
+  };
   
   let socialMedia = row.social_media;
   if (typeof socialMedia === 'string') {

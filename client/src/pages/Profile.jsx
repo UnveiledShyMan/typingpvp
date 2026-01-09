@@ -767,7 +767,9 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                 <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
                   <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Accuracy</div>
                   <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#06b6d4' }}>
-                    {user.stats.averageAccuracy.toFixed(1)}%
+                    {user.stats?.averageAccuracy !== undefined && user.stats?.averageAccuracy !== null 
+                      ? user.stats.averageAccuracy.toFixed(1) 
+                      : '0.0'}%
                   </div>
                   <div className="text-text-muted text-xs">
                     Average

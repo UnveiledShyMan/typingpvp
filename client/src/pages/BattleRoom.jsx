@@ -225,23 +225,40 @@ export default function BattleRoom() {
     // Erreur lors du lancement de la partie (retour serveur)
     socket.on('start-error', (err) => {
       const message = (err && err.message) ? err.message : 'Unable to start the game. Please try again.';
+      console.error('❌ start-error received:', err);
+      console.error('❌ Error details:', {
+        message: err?.message,
+        roomId,
+        gameStatus,
+        playersCount: players.length,
+        isCreator,
+        socketConnected: socketRef.current?.connected
+      });
       toast.error(message);
       setGameStatus('waiting');
     });
 
     socket.on('game-started', (data) => {
       try {
+        console.log('🎮 game-started event received:', {
+          hasData: !!data,
+          hasText: !!(data?.text),
+          textLength: data?.text?.length,
+          textType: typeof data?.text,
+          startTime: data?.startTime,
+          mode: data?.mode,
+          timerDuration: data?.timerDuration,
+          difficulty: data?.difficulty,
+          roomId,
+          gameStatus
+        });
+        
         // Vérification de sécurité : s'assurer que data existe
         if (!data) {
           console.error('❌ game-started: data is undefined or null');
           toast.error('Invalid game data received. Please refresh the page.');
           setGameStatus('waiting');
           return;
-        }
-
-        // Log pour debugging (seulement en développement)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🎮 game-started received:', data);
         }
 
         setGameStatus('playing');
@@ -645,36 +662,57 @@ export default function BattleRoom() {
 
   const handleStartGame = () => {
     try {
+      console.log('🎮 handleStartGame called:', {
+        roomId,
+        playersCount: players.length,
+        gameStatus,
+        isCreator,
+        socketConnected: socketRef.current?.connected,
+        battleMode,
+        selectedLanguage,
+        timerDuration,
+        phraseDifficulty
+      });
+      
       // Vérifications de base
       if (players.length !== 2) {
+        console.warn('⚠️ Cannot start game: waiting for opponent', { playersCount: players.length });
         toast.warning('Waiting for opponent...');
         return;
       }
       
       if (!socketRef.current) {
+        console.error('❌ Cannot start game: socket not initialized');
         toast.error('Socket not initialized. Please refresh the page.');
         return;
       }
       
       // Vérifier que le socket est connecté avant d'émettre
       if (!socketRef.current.connected) {
+        console.warn('⚠️ Socket not connected, waiting for connection...');
         toast.error('Not connected to server. Please wait...');
         // Attendre la reconnexion avec un timeout
         const timeout = setTimeout(() => {
+          console.error('❌ Connection timeout while waiting to start game');
           toast.error('Connection timeout. Please try again.');
         }, 10000);
         
         socketRef.current.once('connect', () => {
           clearTimeout(timeout);
+          console.log('✅ Socket reconnected, retrying start-game');
           if (socketRef.current && socketRef.current.connected) {
-            socketRef.current.emit('start-game', { 
+            const startData = { 
               roomId, 
               language: selectedLanguage,
               mode: battleMode,
               timerDuration: battleMode === 'timer' ? timerDuration : null,
               difficulty: battleMode === 'phrases' ? phraseDifficulty : null
-            }, (ack) => {
+            };
+            console.log('🎮 Emitting start-game after reconnect:', startData);
+            socketRef.current.emit('start-game', startData, (ack) => {
+              console.log('📨 start-game ack received:', ack);
               if (ack && ack.ok === false) {
+                console.error('❌ start-game failed:', ack.message);
                 toast.error(ack.message || 'Unable to start the game. Please refresh the page.');
               }
             });
@@ -684,19 +722,26 @@ export default function BattleRoom() {
       }
       
       // Émettre l'événement
-      socketRef.current.emit('start-game', { 
+      const startData = { 
         roomId, 
         language: selectedLanguage,
         mode: battleMode,
         timerDuration: battleMode === 'timer' ? timerDuration : null,
         difficulty: battleMode === 'phrases' ? phraseDifficulty : null
-      }, (ack) => {
+      };
+      console.log('🎮 Emitting start-game:', startData);
+      socketRef.current.emit('start-game', startData, (ack) => {
+        console.log('📨 start-game ack received:', ack);
         if (ack && ack.ok === false) {
+          console.error('❌ start-game failed:', ack.message);
           toast.error(ack.message || 'Unable to start the game. Please refresh the page.');
+        } else if (ack && ack.ok === true) {
+          console.log('✅ start-game acknowledged by server');
         }
       });
     } catch (error) {
-      console.error('Error in handleStartGame:', error);
+      console.error('❌ Error in handleStartGame:', error);
+      console.error('❌ Error stack:', error.stack);
       toast.error('An error occurred. Please try again.');
     }
   };
@@ -705,11 +750,19 @@ export default function BattleRoom() {
     try {
       if (gameStatus !== 'playing') return;
       
-      // Vérification de sécurité : s'assurer que text est valide
-      if (!text || typeof text !== 'string') {
-        console.warn('⚠️ handleInputChange: text is invalid, ignoring input');
-        return;
-      }
+        // Vérification de sécurité : s'assurer que text est valide
+        if (!text || typeof text !== 'string') {
+          console.error('❌ handleInputChange: text is invalid', {
+            text,
+            textType: typeof text,
+            textLength: text?.length,
+            gameStatus,
+            roomId
+          });
+          toast.error('Invalid game text. Please refresh the page.');
+          setGameStatus('waiting');
+          return;
+        }
       
       const value = e.target.value;
       

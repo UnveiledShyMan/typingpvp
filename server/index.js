@@ -493,7 +493,8 @@ io.on('connection', (socket) => {
       status: 'waiting', // waiting, playing, finished
       startTime: null,
       results: {},
-      chatMessages: [] // Historique du chat pour la room
+      chatMessages: [], // Historique du chat pour la room
+      createdAt: Date.now() // Timestamp de création pour détecter les rooms trop anciennes
     };
     
     rooms.set(roomId, room);
@@ -535,8 +536,12 @@ io.on('connection', (socket) => {
     if (room.matchmaking) {
       // IMPORTANT: Vérifier que la room est dans un état valide
       // Si la room est vide ou dans un état invalide, la supprimer et refuser la connexion
-      if (room.players.length === 0 || !room.text || typeof room.text !== 'string' || room.text.trim().length === 0) {
-        logger.warn(`⚠️ Matchmaking room ${roomId} is in invalid state (empty or no text), deleting it`);
+      // Vérifier aussi si la room est trop ancienne (plus de 5 minutes) et la supprimer
+      const roomAge = Date.now() - (room.createdAt || Date.now());
+      const MAX_ROOM_AGE = 5 * 60 * 1000; // 5 minutes
+      
+      if (room.players.length === 0 || !room.text || typeof room.text !== 'string' || room.text.trim().length === 0 || roomAge > MAX_ROOM_AGE) {
+        logger.warn(`⚠️ Matchmaking room ${roomId} is in invalid state or too old (age=${Math.round(roomAge/1000)}s, empty=${room.players.length === 0}, noText=${!room.text}), deleting it`);
         rooms.delete(roomId);
         socket.emit('error', { message: 'Room is no longer available. Please start a new matchmaking.' });
         return;
@@ -727,35 +732,80 @@ io.on('connection', (socket) => {
 
       if (!room) {
         const message = 'Room not found. Please refresh the page.';
+        logger.error(`❌ start-game: Room ${roomId} not found for socket ${socket.id}`);
         socket.emit('start-error', { message });
         if (typeof ack === 'function') ack({ ok: false, message });
-        logger.warn(`start-game refused: room ${roomId} not found`);
         return;
       }
-      if (room.status !== 'waiting') {
-        const message = 'Game already started or finished.';
+      
+      // IMPORTANT: Vérifier que le socket qui demande le start est bien dans la room
+      const playerData = players.get(socket.id);
+      if (!playerData || playerData.roomId !== roomId) {
+        const message = 'You are not in this room. Please refresh the page.';
+        logger.warn(`⚠️ start-game: Socket ${socket.id} not in room ${roomId}`);
         socket.emit('start-error', { message });
         if (typeof ack === 'function') ack({ ok: false, message });
-        logger.warn(`start-game refused: room ${roomId} status=${room.status}`);
+        return;
+      }
+      
+      // IMPORTANT: Vérifier que le joueur est le créateur (pour les rooms non-matchmaking)
+      // Pour les rooms matchmaking, le start est automatique après 3 secondes
+      if (!room.matchmaking) {
+        const isCreator = room.players.find(p => p.id === socket.id && p.userId === playerData.player?.userId);
+        if (!isCreator && room.players.length > 0) {
+          // Vérifier si c'est le premier joueur (créateur)
+          const firstPlayer = room.players[0];
+          if (firstPlayer.id !== socket.id) {
+            const message = 'Only the room creator can start the game.';
+            logger.warn(`⚠️ start-game: Socket ${socket.id} is not the creator of room ${roomId}`);
+            socket.emit('start-error', { message });
+            if (typeof ack === 'function') ack({ ok: false, message });
+            return;
+          }
+        }
+      }
+      
+      if (room.status !== 'waiting') {
+        const message = 'Game already started or finished.';
+        logger.warn(`⚠️ start-game: Room ${roomId} status=${room.status}, cannot start`);
+        socket.emit('start-error', { message });
+        if (typeof ack === 'function') ack({ ok: false, message });
         return;
       }
       if (!Array.isArray(room.players) || room.players.length < 2) {
         const message = 'Waiting for opponent to join.';
+        logger.warn(`⚠️ start-game: Room ${roomId} has only ${room.players?.length || 0} players`);
         socket.emit('start-error', { message });
         if (typeof ack === 'function') ack({ ok: false, message });
-        logger.warn(`start-game refused: room ${roomId} players=${room.players?.length || 0}`);
         return;
       }
 
       let newText = '';
 
       // Générer le texte selon le mode
-      if (mode === 'phrases') {
-        const phraseCount = difficulty === 'easy' ? 15 : difficulty === 'medium' ? 20 : difficulty === 'hard' ? 25 : 30;
-        newText = generatePhraseTextForLanguage(language, difficulty, phraseCount);
-      } else {
-        // Mode timer : générer un texte long comme Solo
-        newText = generateTextForLanguage(language, 300);
+      try {
+        if (mode === 'phrases') {
+          const phraseCount = difficulty === 'easy' ? 15 : difficulty === 'medium' ? 20 : difficulty === 'hard' ? 25 : 30;
+          newText = generatePhraseTextForLanguage(language, difficulty, phraseCount);
+        } else {
+          // Mode timer : générer un texte long comme Solo
+          newText = generateTextForLanguage(language, 300);
+        }
+        
+        // IMPORTANT: Vérifier que le texte généré est valide
+        if (!newText || typeof newText !== 'string' || newText.trim().length === 0) {
+          const message = 'Failed to generate game text. Please try again.';
+          logger.error(`❌ start-game: Invalid text generated for room ${roomId} (mode=${mode}, lang=${language})`);
+          socket.emit('start-error', { message });
+          if (typeof ack === 'function') ack({ ok: false, message });
+          return;
+        }
+      } catch (textError) {
+        const message = 'Failed to generate game text. Please try again.';
+        logger.error(`❌ start-game: Error generating text for room ${roomId}:`, textError);
+        socket.emit('start-error', { message });
+        if (typeof ack === 'function') ack({ ok: false, message });
+        return;
       }
 
       room.text = newText;
@@ -961,13 +1011,16 @@ io.on('connection', (socket) => {
     user2.updateMMR(language, newMMR2);
     
     // Mettre à jour les stats
+    // IMPORTANT: Inclure le type pour que updateStats sache que c'est un match multijoueur
     user1.updateStats({
+      type: 'battle', // Indiquer que c'est un match multijoueur
       won: player1Won,
       wpm: result1.wpm,
       accuracy: result1.accuracy
     });
     
     user2.updateStats({
+      type: 'battle', // Indiquer que c'est un match multijoueur
       won: !player1Won,
       wpm: result2.wpm,
       accuracy: result2.accuracy
@@ -1199,11 +1252,27 @@ io.on('connection', (socket) => {
     
     // Créer une nouvelle room avec un ID unique
     const roomId = nanoid(8);
-    // IMPORTANT: Générer un nouveau texte pour chaque room
-    // Vérifier que le texte est valide (non vide, string)
-    const text = getRandomText();
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      logger.error(`❌ Failed to generate valid text for matchmaking room`);
+    // IMPORTANT: Générer un texte long selon la langue choisie (comme pour Solo)
+    // Utiliser generateTextForLanguage pour générer un texte de 300 mots (suffisant pour 60 secondes)
+    // C'est le même type de texte que l'écran d'accueil (Solo)
+    let text = '';
+    try {
+      text = generateTextForLanguage(language, 300);
+      
+      // Vérifier que le texte est valide (non vide, string)
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        logger.error(`❌ Failed to generate valid text for matchmaking room (language: ${language})`);
+        // Notifier les joueurs de l'erreur
+        if (socket1) {
+          socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+        }
+        if (socket2) {
+          socket2.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+        }
+        return;
+      }
+    } catch (textError) {
+      logger.error(`❌ Error generating text for matchmaking room (language: ${language}):`, textError);
       // Notifier les joueurs de l'erreur
       if (socket1) {
         socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
@@ -1227,7 +1296,8 @@ io.on('connection', (socket) => {
       mode: 'timer', // Mode par défaut pour matchmaking (timer)
       timerDuration: 60, // Durée par défaut pour matchmaking (60 secondes)
       difficulty: null, // Pas de difficulté pour le mode timer
-      chatMessages: [] // Historique du chat pour la room
+      chatMessages: [], // Historique du chat pour la room
+      createdAt: Date.now() // Timestamp de création pour détecter les rooms trop anciennes
     };
     
     rooms.set(roomId, room);
