@@ -179,9 +179,11 @@ export default function BattleRoom() {
     // Les joueurs sont déjà dans la room (ajoutés par createMatchmakingRoom), pas besoin de join-room
     // Cet événement est envoyé juste après la création de la room matchmaking
     socket.on('matchmaking-match-found', (data) => {
-      // Si c'est une nouvelle room (nouveau matchmaking), naviguer vers elle
-      if (data.roomId !== roomId) {
-        console.log('✅ Nouveau match trouvé, navigation vers la nouvelle room:', data.roomId);
+      // Si c'est une nouvelle room ET qu'on a déjà rejoint la room actuelle (Play Again)
+      // Ne naviguer que si on a déjà un roomId défini, qu'il est différent, ET qu'on a déjà rejoint
+      // Cela évite de naviguer quand on arrive depuis Matchmaking (où hasJoinedRoomRef.current est false)
+      if (roomId && data.roomId !== roomId && hasJoinedRoomRef.current) {
+        console.log('✅ Nouveau match trouvé depuis une room existante, navigation vers la nouvelle room:', data.roomId);
         navigate(`/battle/${data.roomId}`, {
           state: {
             playerName: playerName,
@@ -194,8 +196,8 @@ export default function BattleRoom() {
         });
         return;
       }
-      // Sinon, c'est la room actuelle
-      console.log('✅ Matchmaking match found:', data);
+      // Sinon, c'est la room actuelle (arrivée depuis Matchmaking ou même room)
+      console.log('✅ Matchmaking match found pour la room actuelle:', data.roomId, 'current roomId:', roomId, 'hasJoined:', hasJoinedRoomRef.current);
       setText(data.text);
       setPlayers(data.players);
       setGameStatus('waiting');
