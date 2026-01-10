@@ -18,15 +18,12 @@ export default function BattleRoom() {
   const location = useLocation();
   const navigate = useNavigate();
   // Protection : s'assurer que location.state existe avant de destructurer
-  // IMPORTANT: Éviter complètement les références circulaires et l'optional chaining pour éviter les erreurs TDZ
-  // Le problème "Cannot access 'Ye' before initialization" vient du fait que le minificateur peut réorganiser
-  // les variables et créer un problème d'ordre. En initialisant locationStateRef avec une valeur par défaut
-  // stable (objet vide), puis en mettant à jour dans un useEffect, on évite ce problème.
+  // IMPORTANT: Éviter complètement la destructuration pour éviter les erreurs TDZ lors de la minification
+  // Le problème "Cannot access 'Ye' before initialization" vient du fait que la destructuration crée
+  // des variables qui peuvent être réorganisées par le minificateur et utilisées avant d'être déclarées.
+  // Solution: Ne jamais destructurer location.state, utiliser directement location.state.property partout
   const locationStateRef = useRef({});
   
-  // Extraire location.state de manière sûre sans créer de référence circulaire
-  const currentLocationState = (location && location.state) ? location.state : {};
-  const { playerName: initialPlayerName, userId, isCreator, matchmaking, ranked } = currentLocationState;
   const { toast } = useToastContext();
   const { user: currentUserFromContext } = useUser();
   
@@ -107,16 +104,20 @@ export default function BattleRoom() {
 
   // IMPORTANT: Initialiser playerName dès le premier render pour éviter les problèmes TDZ
   // Ce useEffect s'exécute immédiatement après le montage et initialise playerName avec la bonne valeur
+  // IMPORTANT: Utiliser directement location.state au lieu de variables destructurées pour éviter les problèmes TDZ
   useEffect(() => {
-    // Utiliser initialPlayerName ou currentUserFromContext.username pour initialiser playerName
-    // si playerName n'est pas encore défini
+    // Utiliser directement location.state pour éviter d'utiliser des variables destructurées
+    // qui pourraient causer un problème TDZ lors de la minification
     if (!playerName) {
-      const newPlayerName = initialPlayerName || (currentUserFromContext && currentUserFromContext.username) || '';
+      const locationStateForInit = (location && location.state) ? location.state : {};
+      const locationPlayerName = (locationStateForInit && locationStateForInit.playerName) || '';
+      const contextUsername = (currentUserFromContext && currentUserFromContext.username) || '';
+      const newPlayerName = locationPlayerName || contextUsername || '';
       if (newPlayerName) {
         setPlayerName(newPlayerName);
       }
     }
-  }, []); // S'exécuter une seule fois au montage
+  }, []); // S'exécuter une seule fois au montage - ne pas inclure location dans les dépendances pour éviter TDZ
   
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
@@ -131,9 +132,15 @@ export default function BattleRoom() {
   // Récupérer l'utilisateur courant si userId est fourni
   // Ne pas faire la requête si l'utilisateur n'est pas connecté (évite l'erreur 401)
   useEffect(() => {
+    // IMPORTANT: Utiliser currentLocationState directement au lieu de userId et matchmaking destructurés
+    // pour éviter les problèmes TDZ lors de la minification
+    const currentLocationStateForUser = (location && location.state) ? location.state : {};
+    const hasUserId = currentLocationStateForUser.userId || null;
+    const hasMatchmaking = currentLocationStateForUser.matchmaking === true;
+    
     // Vérifier si un token existe avant de faire la requête
     const token = localStorage.getItem('token');
-    if ((userId || matchmaking || currentUserFromContext) && token) {
+    if ((hasUserId || hasMatchmaking || currentUserFromContext) && token) {
       const fetchUser = async () => {
         try {
           const userData = await authService.getCurrentUser();
@@ -151,7 +158,7 @@ export default function BattleRoom() {
       // Pas de token, définir currentUser à null
       setCurrentUser(null);
     }
-  }, [userId, matchmaking, currentUserFromContext, playerName]);
+  }, [location, currentUserFromContext, playerName]);
 
   // Gérer la soumission du nom
   const handleNameSubmit = () => {
@@ -190,18 +197,17 @@ export default function BattleRoom() {
 
   // IMPORTANT: Mettre à jour toutes les refs dans un seul useEffect pour éviter les problèmes TDZ
   // Ce useEffect s'exécute immédiatement après le montage et chaque fois que les valeurs changent.
-  // En regroupant toutes les mises à jour dans un seul useEffect, on évite les problèmes d'ordre
-  // d'initialisation lors de la minification.
+  // IMPORTANT: Ne pas utiliser les variables destructurées (matchmaking, userId) dans les dépendances
+  // car elles peuvent causer un problème TDZ lors de la minification
+  // Utiliser directement location et les états React dans les dépendances
   useEffect(() => {
-    // Mettre à jour toutes les refs avec les valeurs actuelles
-    // Utiliser des valeurs par défaut explicites pour éviter les problèmes avec undefined
-    // IMPORTANT: Ne pas utiliser de variables destructurées directement, mais utiliser les valeurs
-    // depuis currentLocationState ou les états directement pour éviter les problèmes TDZ
-    const currentMatchmakingValue = matchmaking === true ? true : false;
+    // Récupérer les valeurs directement depuis location.state et les états pour éviter TDZ
+    const currentLocationStateFromHook = (location && location.state) ? location.state : {};
+    const currentMatchmakingValue = (currentLocationStateFromHook && currentLocationStateFromHook.matchmaking === true) ? true : false;
     const currentGameStatusValue = gameStatus || 'connecting';
     const currentRoomIdValue = roomId || '';
     const currentPlayerNameValue = playerName || '';
-    const currentUserIdValue = userId || null;
+    const currentUserIdValue = (currentLocationStateFromHook && currentLocationStateFromHook.userId) || null;
     
     matchmakingRef.current = currentMatchmakingValue;
     gameStatusRef.current = currentGameStatusValue;
@@ -214,7 +220,7 @@ export default function BattleRoom() {
     if (listenersSetupRef.current && listenersSetupRef.current !== currentConfig) {
       listenersSetupRef.current = null;
     }
-  }, [matchmaking, gameStatus, roomId, playerName, userId]);
+  }, [location, gameStatus, roomId, playerName]);
 
   // Configurer les listeners socket une seule fois
   // IMPORTANT: Nettoyer les anciens listeners avant d'ajouter les nouveaux pour éviter les doublons
@@ -245,8 +251,10 @@ export default function BattleRoom() {
     
     // Si les listeners ont déjà été configurés pour cette configuration, ne pas les reconfigurer
     // Vérifier que la configuration n'a pas changé (roomId ou matchmaking)
-    // Utiliser des valeurs par défaut pour éviter les problèmes avec undefined
-    const currentConfig = `${roomId || 'no-room'}-${matchmaking || false}`;
+    // IMPORTANT: Utiliser location.state directement au lieu de matchmaking destructuré pour éviter TDZ
+    const currentLocationStateForConfig = (location && location.state) ? location.state : {};
+    const currentMatchmakingForConfig = currentLocationStateForConfig.matchmaking === true ? true : false;
+    const currentConfig = `${roomId || 'no-room'}-${currentMatchmakingForConfig}`;
     if (listenersSetupRef.current && listenersSetupRef.current === currentConfig) {
       return;
     }
@@ -392,10 +400,10 @@ export default function BattleRoom() {
           navigate(`/battle/${data.roomId}`, {
             state: {
               playerName: currentPlayerName,
-              userId: userIdRef.current || userId || currentUser?.id || null,
+              userId: userIdRef.current || ((location && location.state && location.state.userId) || null) || currentUser?.id || null,
               isCreator: false,
               matchmaking: true,
-              ranked: data.ranked !== undefined ? data.ranked : (ranked !== undefined ? ranked : true),
+              ranked: data.ranked !== undefined ? data.ranked : (((location && location.state && location.state.ranked) !== undefined) ? location.state.ranked : true),
               existingSocket: true
             }
           });
@@ -465,7 +473,7 @@ export default function BattleRoom() {
         roomId,
         gameStatus,
         playersCount: players.length,
-        isCreator,
+        isCreator: (location && location.state && location.state.isCreator) || false,
         socketConnected: socketRef.current?.connected
       });
       toast.error(message);
@@ -862,13 +870,16 @@ export default function BattleRoom() {
       toast.success('Connection restored');
       
       // Réessayer de rejoindre la room après reconnexion
+      // IMPORTANT: Utiliser locationStateRef.current au lieu de userId destructuré pour éviter TDZ
       if (playerName && roomId && hasJoinedRoomRef.current) {
         console.log('🔄 Rejoining room after reconnection...');
         hasJoinedRoomRef.current = false; // Permettre de rejoindre à nouveau
+        const currentLocationStateForRejoin = locationStateRef.current || (location && location.state) || {};
+        const currentUserIdForRejoin = (currentLocationStateForRejoin && currentLocationStateForRejoin.userId) || null;
         socket.emit('join-room', { 
           roomId, 
           playerName,
-          userId: userId || currentUser?.id || null
+          userId: currentUserIdForRejoin || currentUser?.id || null
         });
       }
     });
@@ -893,7 +904,12 @@ export default function BattleRoom() {
     // Les joueurs sont déjà dans la room (créée par createMatchmakingRoom)
     // On attend l'événement matchmaking-match-found
     // Mais si l'événement est déjà passé ou perdu, on peut appeler join-room pour se synchroniser
-    if (matchmaking) {
+    // IMPORTANT: Utiliser currentLocationState directement au lieu de matchmaking destructuré pour éviter TDZ
+    const currentLocationStateForJoin = (location && location.state) ? location.state : {};
+    const isMatchmakingRoom = currentLocationStateForJoin.matchmaking === true;
+    const currentUserIdForJoin = currentLocationStateForJoin.userId || null;
+    
+    if (isMatchmakingRoom) {
       console.log('🎮 Room matchmaking détectée - En attente de matchmaking-match-found...');
       
       // Attendre un peu pour voir si matchmaking-match-found arrive
@@ -905,7 +921,7 @@ export default function BattleRoom() {
           socketRef.current.emit('join-room', { 
             roomId, 
             playerName,
-            userId: userId || currentUser?.id || null
+            userId: currentUserIdForJoin || currentUser?.id || null
           });
         }
       }, 1000);
@@ -990,7 +1006,7 @@ export default function BattleRoom() {
         roomId,
         playersCount: players.length,
         gameStatus,
-        isCreator,
+        isCreator: (location && location.state && location.state.isCreator) || false,
         socketConnected: socketRef.current?.connected,
         battleMode,
         selectedLanguage,
@@ -1484,7 +1500,9 @@ export default function BattleRoom() {
     // Récupérer les paramètres du match précédent depuis location.state ou utiliser des valeurs par défaut
     const language = selectedLanguage || 'en';
     const mmr = currentUser ? (currentUser.mmr?.[language] || 1000) : 1000;
-    const isRanked = ranked !== undefined ? ranked : true;
+    // IMPORTANT: Utiliser directement location.state.ranked au lieu de ranked destructuré pour éviter TDZ
+    const locationStateForRanked = (location && location.state) ? location.state : {};
+    const isRanked = (locationStateForRanked.ranked !== undefined) ? locationStateForRanked.ranked : true;
 
     // Vérifier que l'utilisateur est connecté pour ranked
     if (isRanked && !currentUser) {
@@ -1520,7 +1538,7 @@ export default function BattleRoom() {
     });
 
     toast.info('Searching for a new opponent...');
-  }, [socketRef, selectedLanguage, currentUser, ranked, playerName, toast]);
+  }, [socketRef, selectedLanguage, currentUser, location, playerName, toast]); // Utiliser location au lieu de ranked pour éviter TDZ
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-bg-primary">
@@ -1556,15 +1574,15 @@ export default function BattleRoom() {
               <div className="h-6 w-px bg-border-secondary/40 mx-2"></div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
-                  {matchmaking ? 'Competitive Match' : (roomId ? `Battle #${roomId.slice(0, 8)}` : 'Battle')}
+                  {((location && location.state && location.state.matchmaking) === true) ? 'Competitive Match' : (roomId ? `Battle #${roomId.slice(0, 8)}` : 'Battle')}
                 </h2>
-                {matchmaking === true && (
+                {((location && location.state && location.state.matchmaking) === true) && (
                   <div className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
-                    ranked 
+                    (location && location.state && location.state.ranked) === true
                       ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/50' 
                       : 'bg-bg-secondary/60 text-text-secondary border-border-secondary/40'
                   }`}>
-                    {ranked ? '🏆 Ranked' : '🎮 Unrated'}
+                    {(location && location.state && location.state.ranked) === true ? '🏆 Ranked' : '🎮 Unrated'}
                   </div>
                 )}
               </div>
@@ -1698,7 +1716,7 @@ export default function BattleRoom() {
                         </p>
                         <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-accent-primary animate-pulse shadow-lg shadow-accent-primary/50" style={{ animationDelay: '0.5s' }}></div>
                       </div>
-                      {isCreator ? (
+                      {((location && location.state && location.state.isCreator) === true) ? (
                         <p className="text-text-secondary text-sm sm:text-base font-medium">
                           Configure the battle settings below and click start when you're ready
                         </p>
@@ -1715,7 +1733,7 @@ export default function BattleRoom() {
                         </div>
                       )}
                     </div>
-                    {safePlayers.length === 2 && isCreator && (
+                    {safePlayers.length === 2 && ((location && location.state && location.state.isCreator) === true) && (
                       <div className="space-y-3 sm:space-y-4 overflow-visible">
                         {/* Sélecteur de mode - Design harmonisé */}
                         <div>
