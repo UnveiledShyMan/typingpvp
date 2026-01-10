@@ -36,11 +36,8 @@ export default function BattleRoom() {
     return <div>Error: Navigation not available</div>;
   }
   
-  // Mettre à jour la ref immédiatement avec la valeur actuelle (en dehors du useEffect pour éviter TDZ)
-  // Puis la mettre à jour dans un useEffect quand location.state change
-  if (currentLocationState && Object.keys(currentLocationState).length > 0) {
-    locationStateRef.current = currentLocationState;
-  }
+  // IMPORTANT: NE JAMAIS modifier les refs en dehors des useEffect car cela peut causer des problèmes TDZ
+  // lors de la minification. Les refs seront mises à jour uniquement dans les useEffect suivants.
   
   // Mettre à jour la ref quand location.state change
   // Éviter l'optional chaining dans les dépendances pour éviter les problèmes de minification
@@ -52,9 +49,10 @@ export default function BattleRoom() {
   // État pour gérer le pseudo si l'utilisateur rejoint via un lien direct
   const [showNameModal, setShowNameModal] = useState(false);
   const [tempPlayerName, setTempPlayerName] = useState('');
-  // Éviter l'optional chaining dans useState pour éviter les problèmes TDZ lors de la minification
-  const safePlayerNameForState = initialPlayerName || (currentUserFromContext && currentUserFromContext.username) || '';
-  const [playerName, setPlayerName] = useState(safePlayerNameForState);
+  // IMPORTANT: Éviter de calculer la valeur initiale de playerName en dehors de useState
+  // car cela peut créer un problème TDZ si les variables utilisées ne sont pas encore initialisées.
+  // Utiliser une valeur par défaut et mettre à jour dans un useEffect immédiatement après.
+  const [playerName, setPlayerName] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   
   // État pour le mode de battle
@@ -103,24 +101,23 @@ export default function BattleRoom() {
   const playerNameRef = useRef(''); // playerName sera mis à jour dans useEffect
   const userIdRef = useRef(null); // userId sera mis à jour dans useEffect
   
-  // Initialiser immédiatement les refs avec les valeurs actuelles (hors useEffect pour éviter TDZ)
-  // IMPORTANT: Utiliser les valeurs directement depuis currentLocationState pour éviter les problèmes d'ordre
-  // Ne pas utiliser les variables destructurées directement car elles peuvent créer un problème TDZ
-  // lors de la minification si le minificateur réorganise les variables
-  try {
-    matchmakingRef.current = (currentLocationState && currentLocationState.matchmaking === true) ? true : false;
-    roomIdRef.current = roomId || '';
-    playerNameRef.current = (currentLocationState && currentLocationState.playerName) || initialPlayerName || '';
-    userIdRef.current = (currentLocationState && currentLocationState.userId) || userId || null;
-  } catch (initError) {
-    console.error('❌ Error initializing refs:', initError);
-    // Si erreur, utiliser des valeurs par défaut sûres
-    matchmakingRef.current = false;
-    roomIdRef.current = '';
-    playerNameRef.current = '';
-    userIdRef.current = null;
-  }
+  // IMPORTANT: NE JAMAIS modifier les refs en dehors des useEffect car cela peut causer des problèmes TDZ
+  // lors de la minification. Les refs seront initialisées avec des valeurs par défaut et mises à jour
+  // dans le useEffect suivant qui s'exécute immédiatement après le montage.
 
+  // IMPORTANT: Initialiser playerName dès le premier render pour éviter les problèmes TDZ
+  // Ce useEffect s'exécute immédiatement après le montage et initialise playerName avec la bonne valeur
+  useEffect(() => {
+    // Utiliser initialPlayerName ou currentUserFromContext.username pour initialiser playerName
+    // si playerName n'est pas encore défini
+    if (!playerName) {
+      const newPlayerName = initialPlayerName || (currentUserFromContext && currentUserFromContext.username) || '';
+      if (newPlayerName) {
+        setPlayerName(newPlayerName);
+      }
+    }
+  }, []); // S'exécuter une seule fois au montage
+  
   // Vérifier si l'utilisateur doit choisir un pseudo
   useEffect(() => {
     if (!playerName && !currentUserFromContext) {
@@ -191,39 +188,33 @@ export default function BattleRoom() {
     };
   }, []); // Exécuter une seule fois au montage
 
-  // Mettre à jour les refs quand les valeurs changent (pour éviter les closures obsolètes dans les listeners)
-  // IMPORTANT: Mettre à jour matchmakingRef AVANT de configurer les listeners
-  // IMPORTANT: Mettre à jour toutes les refs dès le premier render pour éviter les problèmes TDZ
+  // IMPORTANT: Mettre à jour toutes les refs dans un seul useEffect pour éviter les problèmes TDZ
+  // Ce useEffect s'exécute immédiatement après le montage et chaque fois que les valeurs changent.
+  // En regroupant toutes les mises à jour dans un seul useEffect, on évite les problèmes d'ordre
+  // d'initialisation lors de la minification.
   useEffect(() => {
-    // Mettre à jour matchmakingRef immédiatement
-    matchmakingRef.current = matchmaking || false;
-    // Si matchmaking change, réinitialiser le flag pour reconfigurer les listeners
-    // Utiliser des valeurs par défaut pour éviter les problèmes avec undefined
-    const currentConfig = `${roomId || 'no-room'}-${matchmaking || false}`;
+    // Mettre à jour toutes les refs avec les valeurs actuelles
+    // Utiliser des valeurs par défaut explicites pour éviter les problèmes avec undefined
+    // IMPORTANT: Ne pas utiliser de variables destructurées directement, mais utiliser les valeurs
+    // depuis currentLocationState ou les états directement pour éviter les problèmes TDZ
+    const currentMatchmakingValue = matchmaking === true ? true : false;
+    const currentGameStatusValue = gameStatus || 'connecting';
+    const currentRoomIdValue = roomId || '';
+    const currentPlayerNameValue = playerName || '';
+    const currentUserIdValue = userId || null;
+    
+    matchmakingRef.current = currentMatchmakingValue;
+    gameStatusRef.current = currentGameStatusValue;
+    roomIdRef.current = currentRoomIdValue;
+    playerNameRef.current = currentPlayerNameValue;
+    userIdRef.current = currentUserIdValue;
+    
+    // Si matchmaking ou roomId change, réinitialiser le flag pour reconfigurer les listeners
+    const currentConfig = `${currentRoomIdValue || 'no-room'}-${currentMatchmakingValue}`;
     if (listenersSetupRef.current && listenersSetupRef.current !== currentConfig) {
       listenersSetupRef.current = null;
     }
-  }, [matchmaking, roomId]);
-  
-  // Mettre à jour gameStatusRef dès le premier render
-  useEffect(() => {
-    gameStatusRef.current = gameStatus || 'connecting';
-  }, [gameStatus]);
-  
-  // Mettre à jour roomIdRef dès le premier render
-  useEffect(() => {
-    roomIdRef.current = roomId || '';
-  }, [roomId]);
-  
-  // Mettre à jour playerNameRef dès le premier render
-  useEffect(() => {
-    playerNameRef.current = playerName || '';
-  }, [playerName]);
-  
-  // Mettre à jour userIdRef dès le premier render
-  useEffect(() => {
-    userIdRef.current = userId || null;
-  }, [userId]);
+  }, [matchmaking, gameStatus, roomId, playerName, userId]);
 
   // Configurer les listeners socket une seule fois
   // IMPORTANT: Nettoyer les anciens listeners avant d'ajouter les nouveaux pour éviter les doublons
