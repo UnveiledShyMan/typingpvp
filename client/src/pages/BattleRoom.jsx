@@ -750,7 +750,10 @@ export default function BattleRoom() {
         // Rafraîchir les données utilisateur si connecté pour mettre à jour les ELO
         // Vérifier qu'un token existe avant de faire la requête
         const token = localStorage.getItem('token');
-        if ((userId || currentUser?.id) && token) {
+        // IMPORTANT: Utiliser locationStateRef.current au lieu de userId destructuré pour éviter TDZ
+        const currentLocationStateForElo = locationStateRef.current || (location && location.state) || {};
+        const currentUserIdForElo = (currentLocationStateForElo && currentLocationStateForElo.userId) || null;
+        if ((currentUserIdForElo || currentUser?.id) && token) {
           const refreshUserData = async () => {
             try {
               const userData = await authService.getCurrentUser();
@@ -953,11 +956,14 @@ export default function BattleRoom() {
         return;
       }
 
-      console.log('🔌 Joining room:', roomId, 'as', playerName, '(userId:', userId || currentUser?.id || 'guest', ')');
+      // IMPORTANT: Utiliser locationStateRef.current au lieu de userId destructuré pour éviter TDZ
+      const currentLocationStateForJoinRoom = locationStateRef.current || (location && location.state) || {};
+      const currentUserIdForJoinRoom = (currentLocationStateForJoinRoom && currentLocationStateForJoinRoom.userId) || null;
+      console.log('🔌 Joining room:', roomId, 'as', playerName, '(userId:', currentUserIdForJoinRoom || currentUser?.id || 'guest', ')');
       socket.emit('join-room', { 
         roomId, 
         playerName,
-        userId: userId || currentUser?.id || null
+        userId: currentUserIdForJoinRoom || currentUser?.id || null
       });
     };
 
@@ -977,7 +983,7 @@ export default function BattleRoom() {
       // Ne pas réinitialiser hasJoinedRoomRef ici car on veut éviter les appels multiples
       // Il sera réinitialisé quand le composant se démonte complètement
     };
-  }, [roomId, playerName, userId, currentUser?.id, matchmaking]); // Retirer navigate des dépendances car il ne change pas
+  }, [roomId, playerName, location, currentUser?.id]); // Utiliser location au lieu de userId et matchmaking destructurés pour éviter TDZ
 
   // Nettoyage des intervalles et timeouts
   useEffect(() => {
@@ -1429,7 +1435,13 @@ export default function BattleRoom() {
   // Vérification de sécurité : s'assurer que players est un tableau
   const safePlayers = Array.isArray(players) ? players : [];
   // Protection supplémentaire : vérifier que currentUser existe avant d'utiliser son id
-  const currentUserId = currentUser?.id || userId || null;
+  // IMPORTANT: Utiliser useMemo pour calculer les valeurs de location.state une seule fois
+  // Cela garantit l'ordre d'exécution et évite les problèmes TDZ lors de la minification
+  const locationStateForRender = useMemo(() => {
+    return (location && location.state) ? location.state : {};
+  }, [location]);
+  const currentUserIdFromState = (locationStateForRender && locationStateForRender.userId) || null;
+  const currentUserId = currentUser?.id || currentUserIdFromState || null;
   const myPlayer = safePlayers.find(p => {
     if (!p) return false;
     const playerMatchesName = p.name === playerName;
@@ -2043,7 +2055,7 @@ export default function BattleRoom() {
                 results={results}
                 eloChanges={eloChanges || {}}
                 playerName={playerName || ''}
-                userId={userId || null}
+                userId={currentUserIdFromState || null}
                 currentUser={currentUser || null}
                 onPlayAgain={() => {
         // Demander un rematch si on est dans une room (pas de matchmaking)
