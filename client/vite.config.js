@@ -45,8 +45,18 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true, // Supprimer console.log en production
+        drop_console: false, // Garder console.log temporairement pour debugging
         drop_debugger: true,
+        // IMPORTANT: Désactiver les optimisations qui peuvent réorganiser les variables
+        // et causer des problèmes TDZ (Temporal Dead Zone)
+        hoist_vars: false, // Ne pas déplacer les déclarations de variables
+        hoist_funs: false, // Ne pas déplacer les déclarations de fonctions
+        passes: 1, // Réduire le nombre de passes pour éviter les réorganisations agressives
+      },
+      mangle: {
+        // Désactiver le mangling agressif qui pourrait causer des problèmes TDZ
+        keep_classnames: true,
+        keep_fnames: true,
       },
     },
   },
