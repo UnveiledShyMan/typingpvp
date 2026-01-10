@@ -1435,12 +1435,11 @@ export default function BattleRoom() {
   // Vérification de sécurité : s'assurer que players est un tableau
   const safePlayers = Array.isArray(players) ? players : [];
   // Protection supplémentaire : vérifier que currentUser existe avant d'utiliser son id
-  // IMPORTANT: Utiliser useMemo pour calculer les valeurs de location.state une seule fois
-  // Cela garantit l'ordre d'exécution et évite les problèmes TDZ lors de la minification
-  const locationStateForRender = useMemo(() => {
-    return (location && location.state) ? location.state : {};
-  }, [location]);
-  const currentUserIdFromState = (locationStateForRender && locationStateForRender.userId) || null;
+  // IMPORTANT: Utiliser locationStateRef.current au lieu de useMemo pour éviter les problèmes TDZ
+  // locationStateRef.current est mis à jour dans un useEffect, donc il est toujours disponible
+  // et ne cause pas de problème d'ordre lors de la minification
+  const currentLocationStateFromRef = locationStateRef.current || {};
+  const currentUserIdFromState = (currentLocationStateFromRef && currentLocationStateFromRef.userId) || null;
   const currentUserId = currentUser?.id || currentUserIdFromState || null;
   const myPlayer = safePlayers.find(p => {
     if (!p) return false;
@@ -1586,15 +1585,15 @@ export default function BattleRoom() {
               <div className="h-6 w-px bg-border-secondary/40 mx-2"></div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-semibold text-text-primary" style={{ fontFamily: 'Inter' }}>
-                  {((location && location.state && location.state.matchmaking) === true) ? 'Competitive Match' : (roomId ? `Battle #${roomId.slice(0, 8)}` : 'Battle')}
+                  {((currentLocationStateFromRef && currentLocationStateFromRef.matchmaking) === true) ? 'Competitive Match' : (roomId ? `Battle #${roomId.slice(0, 8)}` : 'Battle')}
                 </h2>
-                {((location && location.state && location.state.matchmaking) === true) && (
+                {((currentLocationStateFromRef && currentLocationStateFromRef.matchmaking) === true) && (
                   <div className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
-                    (location && location.state && location.state.ranked) === true
+                    (currentLocationStateFromRef && currentLocationStateFromRef.ranked) === true
                       ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/50' 
                       : 'bg-bg-secondary/60 text-text-secondary border-border-secondary/40'
                   }`}>
-                    {(location && location.state && location.state.ranked) === true ? '🏆 Ranked' : '🎮 Unrated'}
+                    {(currentLocationStateFromRef && currentLocationStateFromRef.ranked) === true ? '🏆 Ranked' : '🎮 Unrated'}
                   </div>
                 )}
               </div>
@@ -1728,7 +1727,7 @@ export default function BattleRoom() {
                         </p>
                         <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-accent-primary animate-pulse shadow-lg shadow-accent-primary/50" style={{ animationDelay: '0.5s' }}></div>
                       </div>
-                      {((location && location.state && location.state.isCreator) === true) ? (
+                      {((currentLocationStateFromRef && currentLocationStateFromRef.isCreator) === true) ? (
                         <p className="text-text-secondary text-sm sm:text-base font-medium">
                           Configure the battle settings below and click start when you're ready
                         </p>
@@ -1745,7 +1744,7 @@ export default function BattleRoom() {
                         </div>
                       )}
                     </div>
-                    {safePlayers.length === 2 && ((location && location.state && location.state.isCreator) === true) && (
+                    {safePlayers.length === 2 && ((currentLocationStateFromRef && currentLocationStateFromRef.isCreator) === true) && (
                       <div className="space-y-3 sm:space-y-4 overflow-visible">
                         {/* Sélecteur de mode - Design harmonisé */}
                         <div>
