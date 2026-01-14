@@ -375,6 +375,29 @@ export default function Matchmaking() {
           Find an opponent with similar skill level and compete in real-time
         </p>
       </div>
+      
+      {/* Résumé rapide des paramètres pour rassurer l'utilisateur */}
+      <div className="mb-6 flex-shrink-0">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-text-secondary">Mode:</span>
+            <span className="text-text-primary font-semibold">
+              {matchType === 'ranked' ? 'Ranked' : 'Unrated'}
+            </span>
+            <span className="text-text-secondary">Language:</span>
+            <span className="text-text-primary font-semibold">
+              {languages[selectedLang]?.name || selectedLang.toUpperCase()}
+            </span>
+            <span className="text-text-secondary">ELO:</span>
+            <span className="text-text-primary font-semibold" style={{ fontFamily: 'JetBrains Mono' }}>
+              {userMMR}
+            </span>
+          </div>
+          <div className="text-text-secondary text-xs mt-2">
+            We search within a fair range to find balanced opponents.
+          </div>
+        </div>
+      </div>
 
       {/* Sélection du type de match */}
       <div className="mb-6 flex-shrink-0">

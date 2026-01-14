@@ -386,6 +386,31 @@ export default function Dashboard({ user, onSectionChange }) {
               </div>
             </div>
           </div>
+
+          {/* Next steps */}
+          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6">
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Next Steps</h3>
+            <div className="space-y-3">
+              <button
+                onClick={() => onSectionChange('matchmaking')}
+                className="w-full bg-bg-primary hover:bg-bg-tertiary border border-border-secondary hover:border-accent-primary/40 rounded-lg px-4 py-3 text-left text-text-primary transition-all"
+              >
+                Find a ranked opponent
+              </button>
+              <button
+                onClick={() => onSectionChange('battle')}
+                className="w-full bg-bg-primary hover:bg-bg-tertiary border border-border-secondary hover:border-accent-primary/40 rounded-lg px-4 py-3 text-left text-text-primary transition-all"
+              >
+                Start a 1v1 battle
+              </button>
+              <button
+                onClick={() => onSectionChange('rankings')}
+                className="w-full bg-bg-primary hover:bg-bg-tertiary border border-border-secondary hover:border-accent-primary/40 rounded-lg px-4 py-3 text-left text-text-primary transition-all"
+              >
+                Climb the leaderboard
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

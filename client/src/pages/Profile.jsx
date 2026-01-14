@@ -1093,6 +1093,17 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                   </div>
                 </div>
               )}
+              
+              {/* Empty state si aucun match */}
+              {(soloMatches.length === 0 && multiplayerMatches.length === 0 && !loadingMatches) && (
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 text-center border border-border-secondary/30">
+                  <div className="text-4xl mb-3">📝</div>
+                  <div className="text-text-primary font-semibold mb-1">No matches yet</div>
+                  <div className="text-text-secondary text-sm">
+                    Start a match to build your history and stats.
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
