@@ -1402,6 +1402,56 @@ export default function BattleRoom() {
   }, [gameStatus, text, input, typingStartTime, errors]);
 
   // Raccourcis clavier pour BattleRoom
+  // Fonction pour relancer le matchmaking automatiquement
+  const handlePlayAgainMatchmaking = useCallback(() => {
+    if (!socketRef.current || !socketRef.current.connected) {
+      toast.error('Not connected to server. Please wait...');
+      return;
+    }
+
+    // Récupérer les paramètres du match précédent depuis location.state ou utiliser des valeurs par défaut
+    const language = selectedLanguage || 'en';
+    const mmr = currentUser ? (currentUser.mmr?.[language] || 1000) : 1000;
+    // IMPORTANT: Utiliser directement location.state.ranked au lieu de ranked destructuré pour éviter TDZ
+    const locationStateForRanked = (location && location.state) ? location.state : {};
+    const isRanked = (locationStateForRanked.ranked !== undefined) ? locationStateForRanked.ranked : true;
+
+    // Vérifier que l'utilisateur est connecté pour ranked
+    if (isRanked && !currentUser) {
+      toast.error('You must be logged in to play ranked matches');
+      return;
+    }
+
+    // Réinitialiser l'état pour le nouveau match
+    setGameStatus('connecting');
+    setResults(null);
+    setEloChanges({});
+    setRematchReady(false);
+    setOpponentRematchReady(false);
+    setPlayers([]);
+    setText('');
+    setInput('');
+    setMyStats({ wpm: 0, accuracy: 100, progress: 0 });
+    setOpponentStats({ wpm: 0, accuracy: 100, progress: 0 });
+    hasJoinedRoomRef.current = false;
+    
+    // Réinitialiser le scroll du conteneur de texte au début
+    if (textContainerRef.current) {
+      textContainerRef.current.scrollTop = 0;
+    }
+
+    // Émettre join-matchmaking avec les mêmes paramètres
+    socketRef.current.emit('join-matchmaking', {
+      userId: currentUser ? currentUser.id : null,
+      username: currentUser ? currentUser.username : playerName,
+      language: language,
+      mmr: mmr,
+      ranked: isRanked
+    });
+
+    toast.info('Searching for a new opponent...');
+  }, [socketRef, selectedLanguage, currentUser, location, playerName, toast]); // Utiliser location au lieu de ranked pour éviter TDZ
+
   useEffect(() => {
     const handleKeyPress = (e) => {
       // Enter : Relancer une nouvelle partie (seulement si le match est terminé)
@@ -1613,56 +1663,6 @@ export default function BattleRoom() {
       </>
     );
   }
-
-  // Fonction pour relancer le matchmaking automatiquement
-  const handlePlayAgainMatchmaking = useCallback(() => {
-    if (!socketRef.current || !socketRef.current.connected) {
-      toast.error('Not connected to server. Please wait...');
-      return;
-    }
-
-    // Récupérer les paramètres du match précédent depuis location.state ou utiliser des valeurs par défaut
-    const language = selectedLanguage || 'en';
-    const mmr = currentUser ? (currentUser.mmr?.[language] || 1000) : 1000;
-    // IMPORTANT: Utiliser directement location.state.ranked au lieu de ranked destructuré pour éviter TDZ
-    const locationStateForRanked = (location && location.state) ? location.state : {};
-    const isRanked = (locationStateForRanked.ranked !== undefined) ? locationStateForRanked.ranked : true;
-
-    // Vérifier que l'utilisateur est connecté pour ranked
-    if (isRanked && !currentUser) {
-      toast.error('You must be logged in to play ranked matches');
-      return;
-    }
-
-    // Réinitialiser l'état pour le nouveau match
-    setGameStatus('connecting');
-    setResults(null);
-    setEloChanges({});
-    setRematchReady(false);
-    setOpponentRematchReady(false);
-    setPlayers([]);
-    setText('');
-    setInput('');
-    setMyStats({ wpm: 0, accuracy: 100, progress: 0 });
-    setOpponentStats({ wpm: 0, accuracy: 100, progress: 0 });
-    hasJoinedRoomRef.current = false;
-    
-    // Réinitialiser le scroll du conteneur de texte au début
-    if (textContainerRef.current) {
-      textContainerRef.current.scrollTop = 0;
-    }
-
-    // Émettre join-matchmaking avec les mêmes paramètres
-    socketRef.current.emit('join-matchmaking', {
-      userId: currentUser ? currentUser.id : null,
-      username: currentUser ? currentUser.username : playerName,
-      language: language,
-      mmr: mmr,
-      ranked: isRanked
-    });
-
-    toast.info('Searching for a new opponent...');
-  }, [socketRef, selectedLanguage, currentUser, location, playerName, toast]); // Utiliser location au lieu de ranked pour éviter TDZ
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-bg-primary">
