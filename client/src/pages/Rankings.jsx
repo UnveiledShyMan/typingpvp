@@ -284,6 +284,7 @@ export default function Rankings() {
               </table>
             </div>
           </div>
+        </div>
         )}
       </div>
     </>
