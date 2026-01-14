@@ -12,6 +12,7 @@ import { generateText } from '../data/languages'
 import { generatePhraseText } from '../data/phrases'
 import { getSocket, cleanupSocket } from '../services/socketService'
 import { navigateToProfile, isValidUserId } from '../utils/profileNavigation'
+import { normalizeSocketErrorMessage } from '../utils/normalizeSocketErrorMessage'
 
 export default function BattleRoom() {
   const { roomId } = useParams();
@@ -62,6 +63,13 @@ export default function BattleRoom() {
   const [input, setInput] = useState('');
   const [players, setPlayers] = useState([]);
   const [gameStatus, setGameStatus] = useState('connecting'); // connecting, waiting, playing, finished
+  // UI: message d'état simple pour rendre le flow en ligne clair et fluide.
+  // Cette structure centralise les messages visibles (connexion, attente, erreurs).
+  const [battleStatus, setBattleStatus] = useState({
+    type: 'info',
+    message: 'Connecting to server...',
+    visible: true
+  });
   const [startTime, setStartTime] = useState(null); // Temps de début de la partie (pour le timer)
   const startTimeRef = useRef(null); // Ref pour accéder à startTime dans les callbacks
   const [typingStartTime, setTypingStartTime] = useState(null); // Temps de début de la frappe (pour le WPM)
@@ -83,6 +91,8 @@ export default function BattleRoom() {
   // OPTIMISATION : Cache pour les calculs WPM (évite recalculs inutiles)
   const lastWpmCalculationRef = useRef({ time: 0, wpm: 0, accuracy: 100 });
   const socketRef = useRef(null);
+  // Timeout pour masquer certains messages d'état automatiquement.
+  const battleStatusTimeoutRef = useRef(null);
   const textContainerRef = useRef(null);
   const hasJoinedRoomRef = useRef(false); // Ref pour éviter de joindre plusieurs fois
   const listenersSetupRef = useRef(null); // Ref pour stocker la configuration des listeners (roomId-matchmaking)
@@ -101,6 +111,50 @@ export default function BattleRoom() {
   // IMPORTANT: NE JAMAIS modifier les refs en dehors des useEffect car cela peut causer des problèmes TDZ
   // lors de la minification. Les refs seront initialisées avec des valeurs par défaut et mises à jour
   // dans le useEffect suivant qui s'exécute immédiatement après le montage.
+
+  /**
+   * Afficher un message d'état court et lisible.
+   * Objectif: guider l'utilisateur pendant les transitions (connexion, attente, erreurs).
+   */
+  const showBattleStatus = useCallback((message, type = 'info', autoHideMs = null) => {
+    if (!message || typeof message !== 'string') return;
+
+    // Nettoyer l'ancien timeout pour éviter les effets de bord.
+    if (battleStatusTimeoutRef.current) {
+      clearTimeout(battleStatusTimeoutRef.current);
+      battleStatusTimeoutRef.current = null;
+    }
+
+    setBattleStatus({
+      type,
+      message,
+      visible: true
+    });
+
+    // Auto-hide optionnel pour les messages temporaires.
+    if (autoHideMs && Number.isFinite(autoHideMs)) {
+      battleStatusTimeoutRef.current = setTimeout(() => {
+        setBattleStatus(prev => ({
+          ...prev,
+          visible: false
+        }));
+      }, autoHideMs);
+    }
+  }, []);
+
+  // Mapper le type d'état vers un style visuel simple et cohérent.
+  const getBattleStatusClasses = (type) => {
+    if (type === 'error') {
+      return 'bg-text-error/10 text-text-error border border-text-error/30';
+    }
+    if (type === 'warning') {
+      return 'bg-bg-secondary/60 text-text-secondary border border-border-secondary/40';
+    }
+    if (type === 'success') {
+      return 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30';
+    }
+    return 'bg-bg-secondary/50 text-text-secondary border border-border-secondary/40';
+  };
 
   // IMPORTANT: Initialiser playerName dès le premier render pour éviter les problèmes TDZ
   // Ce useEffect s'exécute immédiatement après le montage et initialise playerName avec la bonne valeur
@@ -235,6 +289,7 @@ export default function BattleRoom() {
     // Nettoyer les anciens listeners AVANT de vérifier le flag
     // Cela évite les doublons si le composant est remonté avec un nouveau roomId ou matchmaking
     const eventsToClean = [
+      'matchmaking-error',
       'matchmaking-match-found',
       'room-joined',
       'player-joined',
@@ -262,6 +317,10 @@ export default function BattleRoom() {
     listenersSetupRef.current = currentConfig;
 
     // Configurer tous les listeners socket
+    // Listener simple pour signaler une connexion active côté UI.
+    socket.on('connect', () => {
+      showBattleStatus('Connected. Preparing room...', 'info', 1500);
+    });
     
     // LISTENER SPÉCIAL : Pour les rooms matchmaking, écouter matchmaking-match-found
     // Les joueurs sont déjà dans la room (ajoutés par createMatchmakingRoom), pas besoin de join-room
@@ -270,6 +329,8 @@ export default function BattleRoom() {
       console.log('🔵 matchmaking-match-found event received at:', new Date().toISOString());
       console.log('🔵 Raw data:', data);
       try {
+        // UX: indiquer immédiatement que le match est trouvé.
+        showBattleStatus('Match found. Preparing room...', 'success', 2000);
         // Vérification de sécurité : s'assurer que toast est disponible
         if (!toast || typeof toast.error !== 'function') {
           console.error('❌ matchmaking-match-found: toast is not available');
@@ -437,13 +498,36 @@ export default function BattleRoom() {
         console.error('Error data:', data);
         console.groupEnd();
         if (toast && typeof toast.error === 'function') {
-          toast.error('An error occurred while processing the match. Please try again.');
+          const message = normalizeSocketErrorMessage(
+            error,
+            'An error occurred while processing the match. Please try again.'
+          );
+          toast.error(message);
+          // UX: garder un message visible même si le toast est fermé.
+          showBattleStatus(message, 'error');
         }
       }
     });
 
+    // Erreurs spécifiques au matchmaking (ex: adversaire déconnecté, texte invalide)
+    socket.on('matchmaking-error', (error) => {
+      const message = normalizeSocketErrorMessage(error, 'Matchmaking failed. Please try again.');
+      console.error('❌ matchmaking-error received:', error);
+      toast.error(message);
+      // UX: message visible pour expliquer l'échec.
+      showBattleStatus(message, 'error');
+      setGameStatus('waiting');
+    });
+
     socket.on('room-joined', (data) => {
       console.log('✅ Room joined:', data);
+      // UX: mise à jour de l'état affiché selon le nombre de joueurs.
+      const playerCount = Array.isArray(data?.players) ? data.players.length : 0;
+      if (playerCount < 2) {
+        showBattleStatus('Waiting for opponent...', 'info');
+      } else {
+        showBattleStatus('Opponent found. Ready to start.', 'success', 2500);
+      }
       // IMPORTANT: Marquer qu'on a rejoint pour éviter les appels multiples à join-room
       hasJoinedRoomRef.current = true;
       setText(data.text);
@@ -457,11 +541,20 @@ export default function BattleRoom() {
     socket.on('player-joined', (data) => {
       console.log('👤 Player joined:', data);
       setPlayers(data.players);
+      // UX: signaler que l'adversaire est prêt.
+      const playerCount = Array.isArray(data?.players) ? data.players.length : 0;
+      if (playerCount >= 2) {
+        showBattleStatus('Opponent joined. You can start the game.', 'success', 3000);
+      }
     });
 
     socket.on('player-left', (data) => {
       console.log('👋 Player left:', data);
       setPlayers(data.players);
+      // UX: prévenir si l'adversaire quitte.
+      if ((data?.players?.length || 0) < 2 && gameStatusRef.current !== 'finished') {
+        showBattleStatus('Opponent left the room. Waiting for reconnection...', 'warning');
+      }
     });
 
     // Erreur lors du lancement de la partie (retour serveur)
@@ -477,6 +570,8 @@ export default function BattleRoom() {
         socketConnected: socketRef.current?.connected
       });
       toast.error(message);
+      // UX: message persistant pour expliquer le refus de démarrage.
+      showBattleStatus(message, 'error');
       setGameStatus('waiting');
     });
 
@@ -507,6 +602,8 @@ export default function BattleRoom() {
 
         console.log('✅ Setting gameStatus to playing');
         setGameStatus('playing');
+        // UX: confirmer le démarrage de la partie.
+        showBattleStatus('Game started. Good luck!', 'success', 2000);
         
         // Réinitialiser le scroll du conteneur de texte au début
         if (textContainerRef.current) {
@@ -780,8 +877,11 @@ export default function BattleRoom() {
     });
 
     socket.on('error', (error) => {
+      const message = normalizeSocketErrorMessage(error, 'An error occurred');
       console.error('❌ Socket error:', error);
-      toast.error(error.message || 'An error occurred');
+      toast.error(message);
+      // UX: garder un message visible même si le toast disparaît.
+      showBattleStatus(message, 'error');
       
       // Ne pas rediriger immédiatement, laisser Socket.IO tenter de se reconnecter
       // La redirection se fera seulement si la reconnexion échoue définitivement
@@ -860,6 +960,8 @@ export default function BattleRoom() {
     // Gérer les déconnexions avec reconnexion automatique
     socket.on('disconnect', (reason) => {
       console.warn('⚠️ Socket disconnected:', reason);
+      // UX: informer l'utilisateur qu'une reconnexion est en cours.
+      showBattleStatus('Connection lost. Reconnecting...', 'warning');
       if (reason === 'io server disconnect') {
         // Le serveur a déconnecté, reconnecter manuellement
         socket.connect();
@@ -871,6 +973,8 @@ export default function BattleRoom() {
     socket.on('reconnect', (attemptNumber) => {
       console.log(`✅ Socket reconnected after ${attemptNumber} attempt(s)`);
       toast.success('Connection restored');
+      // UX: confirmer le retour de la connexion.
+      showBattleStatus('Connection restored.', 'success', 2000);
       
       // Réessayer de rejoindre la room après reconnexion
       // IMPORTANT: Utiliser locationStateRef.current au lieu de userId destructuré pour éviter TDZ
@@ -893,7 +997,7 @@ export default function BattleRoom() {
       // Les listeners seront nettoyés par cleanupSocket dans le premier useEffect
       // Ne pas réinitialiser listenersSetupRef ici car on veut le garder pour éviter les doublons
     };
-  }, [roomId, matchmaking]); // Reconfigurer si roomId ou matchmaking change (même si undefined)
+  }, [roomId, location, showBattleStatus]); // Reconfigurer si roomId ou matchmaking change (même si undefined)
 
   // Joindre la room une fois que le playerName est défini
   // IMPORTANT : Pour les rooms matchmaking, ne PAS appeler join-room car les joueurs sont déjà dans la room
@@ -996,6 +1100,11 @@ export default function BattleRoom() {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
+      // Nettoyage du timeout d'état UI pour éviter les fuites.
+      if (battleStatusTimeoutRef.current) {
+        clearTimeout(battleStatusTimeoutRef.current);
+        battleStatusTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -1038,6 +1147,8 @@ export default function BattleRoom() {
       if (!socketRef.current.connected) {
         console.warn('⚠️ Socket not connected, waiting for connection...');
         toast.error('Not connected to server. Please wait...');
+        // UX: expliquer la tentative de reconnexion avant le démarrage.
+        showBattleStatus('Waiting for connection to start the game...', 'warning');
         // Attendre la reconnexion avec un timeout
         const timeout = setTimeout(() => {
           console.error('❌ Connection timeout while waiting to start game');
@@ -1077,6 +1188,8 @@ export default function BattleRoom() {
         difficulty: battleMode === 'phrases' ? phraseDifficulty : null
       };
       console.log('🎮 Emitting start-game:', startData);
+      // UX: indiquer que le démarrage est en cours.
+      showBattleStatus('Starting the game...', 'info');
       socketRef.current.emit('start-game', startData, (ack) => {
         console.log('📨 start-game ack received:', ack);
         if (ack && ack.ok === false) {
@@ -1621,6 +1734,14 @@ export default function BattleRoom() {
       {/* Main content - ONEPAGE sans scroll */}
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          {/* Statut global pour guider l'utilisateur pendant le flow en ligne */}
+          {battleStatus.visible && battleStatus.message && (
+            <div className="mb-4">
+              <div className={`px-4 py-2 rounded-lg text-sm font-medium ${getBattleStatusClasses(battleStatus.type)}`}>
+                {battleStatus.message}
+              </div>
+            </div>
+          )}
 
           {gameStatus === 'waiting' && safePlayers && safePlayers.length > 0 && playerName && (
             <div className="flex-1 flex items-center justify-center min-h-0 overflow-y-auto">

@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useToastContext } from '../contexts/ToastContext'
 import { authService } from '../services/apiService'
 import { getSocket, cleanupSocket } from '../services/socketService'
+import { normalizeSocketErrorMessage } from '../utils/normalizeSocketErrorMessage'
 
 export default function Matchmaking() {
   const [selectedLang, setSelectedLang] = useState('en');
@@ -196,6 +197,11 @@ export default function Matchmaking() {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+        // Sécurité: vérifier que la roomId est présente avant la navigation.
+        if (!data || !data.roomId) {
+          toast.error('Match found, but room data is missing. Please try again.');
+          return;
+        }
         
         // Rediriger vers la battle room
         navigate(`/battle/${data.roomId}`, { 
@@ -212,7 +218,8 @@ export default function Matchmaking() {
       });
 
       socket.on('matchmaking-error', (error) => {
-        toast.error(error.message || 'An error occurred');
+        const message = normalizeSocketErrorMessage(error, 'An error occurred');
+        toast.error(message);
         setIsInQueue(false);
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
@@ -320,6 +327,11 @@ export default function Matchmaking() {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      // Sécurité: vérifier que la roomId est présente avant la navigation.
+      if (!data || !data.roomId) {
+        toast.error('Match found, but room data is missing. Please try again.');
+        return;
+      }
       
       // Jouer le son de match trouvé
       playMatchFoundSound();
@@ -338,7 +350,8 @@ export default function Matchmaking() {
     });
 
     socket.on('matchmaking-error', (error) => {
-      toast.error(error.message);
+      const message = normalizeSocketErrorMessage(error, 'An error occurred');
+      toast.error(message);
       setIsInQueue(false);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

@@ -167,6 +167,22 @@ function getRandomText() {
   return defaultTexts[Math.floor(Math.random() * defaultTexts.length)];
 }
 
+/**
+ * Helpers d'erreur Socket.IO.
+ * Objectif: renvoyer un message clair + un code pour un debug rapide côté client.
+ */
+function emitSocketError(socket, code, message, context = {}) {
+  socket.emit('error', { code, message, ...context });
+}
+
+function emitStartError(socket, code, message, context = {}) {
+  socket.emit('start-error', { code, message, ...context });
+}
+
+function emitMatchmakingError(socket, code, message, context = {}) {
+  socket.emit('matchmaking-error', { code, message, ...context });
+}
+
 // Mots les plus utilisés par langue (version simplifiée pour le serveur)
 const languageWords = {
   en: ['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take', 'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us'],
@@ -520,13 +536,15 @@ io.on('connection', (socket) => {
     
     // Validation basique
     if (!roomId) {
-      socket.emit('error', { message: 'Room ID is required' });
+      // Message clair + code pour debug client.
+      emitSocketError(socket, 'ROOM_ID_REQUIRED', 'Room ID is required');
       return;
     }
     
     const room = rooms.get(roomId);
     if (!room) {
-      socket.emit('error', { message: 'Room not found' });
+      // Room inexistante: informer proprement le client.
+      emitSocketError(socket, 'ROOM_NOT_FOUND', 'Room not found');
       return;
     }
     
@@ -543,7 +561,11 @@ io.on('connection', (socket) => {
       if (room.players.length === 0 || !room.text || typeof room.text !== 'string' || room.text.trim().length === 0 || roomAge > MAX_ROOM_AGE) {
         logger.warn(`⚠️ Matchmaking room ${roomId} is in invalid state or too old (age=${Math.round(roomAge/1000)}s, empty=${room.players.length === 0}, noText=${!room.text}), deleting it`);
         rooms.delete(roomId);
-        socket.emit('error', { message: 'Room is no longer available. Please start a new matchmaking.' });
+        emitSocketError(
+          socket,
+          'MATCHMAKING_ROOM_EXPIRED',
+          'Room is no longer available. Please start a new matchmaking.'
+        );
         return;
       }
       
@@ -554,7 +576,11 @@ io.on('connection', (socket) => {
         if (!room.text || typeof room.text !== 'string' || room.text.trim().length === 0) {
           logger.warn(`⚠️ Matchmaking room ${roomId} has invalid text, deleting it`);
           rooms.delete(roomId);
-          socket.emit('error', { message: 'Room is no longer available. Please start a new matchmaking.' });
+          emitSocketError(
+            socket,
+            'MATCHMAKING_ROOM_INVALID',
+            'Room is no longer available. Please start a new matchmaking.'
+          );
           return;
         }
         
@@ -580,7 +606,11 @@ io.on('connection', (socket) => {
         // NOUVEAU JOUEUR tentant de rejoindre une room matchmaking
         // Cela ne devrait pas arriver normalement, mais on refuse pour éviter les problèmes
         logger.warn(`⚠️ Tentative de rejoindre une room matchmaking par un joueur non autorisé: ${playerName}`);
-        socket.emit('error', { message: 'Cannot join matchmaking room. Players are already assigned.' });
+        emitSocketError(
+          socket,
+          'MATCHMAKING_ROOM_LOCKED',
+          'Cannot join matchmaking room. Players are already assigned.'
+        );
         return;
       }
     }
@@ -625,7 +655,7 @@ io.on('connection', (socket) => {
       
       // Vérifier si la room est pleine (max 2 joueurs pour 1v1)
       if (room.players.length >= 2) {
-        socket.emit('error', { message: 'Room is full' });
+        emitSocketError(socket, 'ROOM_FULL', 'Room is full');
         logger.debug(`Room ${roomId} is full (${room.players.length} players)`);
         return;
       }
@@ -689,7 +719,7 @@ io.on('connection', (socket) => {
         logger.debug(`Player ${playerName} reconnected to playing room ${roomId}`);
         return;
       }
-      socket.emit('error', { message: 'Game is already in progress' });
+      emitSocketError(socket, 'GAME_IN_PROGRESS', 'Game is already in progress');
       return;
     }
     
@@ -718,7 +748,7 @@ io.on('connection', (socket) => {
     }
     
     // État inattendu
-    socket.emit('error', { message: 'Room is not available' });
+    emitSocketError(socket, 'ROOM_NOT_AVAILABLE', 'Room is not available');
   });
 
   // Démarrer la partie
@@ -733,7 +763,7 @@ io.on('connection', (socket) => {
       if (!room) {
         const message = 'Room not found. Please refresh the page.';
         logger.error(`❌ start-game: Room ${roomId} not found for socket ${socket.id}`);
-        socket.emit('start-error', { message });
+        emitStartError(socket, 'START_ROOM_NOT_FOUND', message);
         if (typeof ack === 'function') ack({ ok: false, message });
         return;
       }
@@ -743,7 +773,7 @@ io.on('connection', (socket) => {
       if (!playerData || playerData.roomId !== roomId) {
         const message = 'You are not in this room. Please refresh the page.';
         logger.warn(`⚠️ start-game: Socket ${socket.id} not in room ${roomId}`);
-        socket.emit('start-error', { message });
+        emitStartError(socket, 'START_NOT_IN_ROOM', message);
         if (typeof ack === 'function') ack({ ok: false, message });
         return;
       }
@@ -758,7 +788,7 @@ io.on('connection', (socket) => {
           if (firstPlayer.id !== socket.id) {
             const message = 'Only the room creator can start the game.';
             logger.warn(`⚠️ start-game: Socket ${socket.id} is not the creator of room ${roomId}`);
-            socket.emit('start-error', { message });
+            emitStartError(socket, 'START_NOT_CREATOR', message);
             if (typeof ack === 'function') ack({ ok: false, message });
             return;
           }
@@ -768,14 +798,14 @@ io.on('connection', (socket) => {
       if (room.status !== 'waiting') {
         const message = 'Game already started or finished.';
         logger.warn(`⚠️ start-game: Room ${roomId} status=${room.status}, cannot start`);
-        socket.emit('start-error', { message });
+        emitStartError(socket, 'START_INVALID_STATUS', message);
         if (typeof ack === 'function') ack({ ok: false, message });
         return;
       }
       if (!Array.isArray(room.players) || room.players.length < 2) {
         const message = 'Waiting for opponent to join.';
         logger.warn(`⚠️ start-game: Room ${roomId} has only ${room.players?.length || 0} players`);
-        socket.emit('start-error', { message });
+        emitStartError(socket, 'START_NEED_TWO_PLAYERS', message);
         if (typeof ack === 'function') ack({ ok: false, message });
         return;
       }
@@ -796,14 +826,14 @@ io.on('connection', (socket) => {
         if (!newText || typeof newText !== 'string' || newText.trim().length === 0) {
           const message = 'Failed to generate game text. Please try again.';
           logger.error(`❌ start-game: Invalid text generated for room ${roomId} (mode=${mode}, lang=${language})`);
-          socket.emit('start-error', { message });
+          emitStartError(socket, 'START_TEXT_INVALID', message);
           if (typeof ack === 'function') ack({ ok: false, message });
           return;
         }
       } catch (textError) {
         const message = 'Failed to generate game text. Please try again.';
         logger.error(`❌ start-game: Error generating text for room ${roomId}:`, textError);
-        socket.emit('start-error', { message });
+        emitStartError(socket, 'START_TEXT_ERROR', message);
         if (typeof ack === 'function') ack({ ok: false, message });
         return;
       }
@@ -830,7 +860,7 @@ io.on('connection', (socket) => {
     } catch (err) {
       const message = 'Server error while starting the game. Please refresh the page.';
       logger.error('❌ start-game exception:', err);
-      socket.emit('start-error', { message });
+      emitStartError(socket, 'START_EXCEPTION', message);
       if (typeof ack === 'function') ack({ ok: false, message });
     }
   });
@@ -1024,14 +1054,20 @@ io.on('connection', (socket) => {
         }
       } catch (textError) {
         logger.error(`Error generating text for rematch in room ${roomId}:`, textError);
-        io.to(roomId).emit('error', { message: 'Failed to start rematch. Please try again.' });
+        io.to(roomId).emit('error', {
+          code: 'REMATCH_FAILED',
+          message: 'Failed to start rematch. Please try again.'
+        });
         room.rematchReady.clear();
         return;
       }
       
       if (!newText) {
         logger.error('Failed to generate text for rematch');
-        io.to(roomId).emit('error', { message: 'Failed to start rematch. Please try again.' });
+        io.to(roomId).emit('error', {
+          code: 'REMATCH_FAILED',
+          message: 'Failed to start rematch. Please try again.'
+        });
         room.rematchReady.clear();
         return;
       }
@@ -1216,13 +1252,17 @@ io.on('connection', (socket) => {
     
     // Vérifier si déjà dans la queue
     if (matchmakingQueue.hasPlayer(socket.id)) {
-      socket.emit('matchmaking-error', { message: 'Already in queue' });
+      emitMatchmakingError(socket, 'MATCHMAKING_ALREADY_IN_QUEUE', 'Already in queue');
       return;
     }
     
     // Pour ranked, exiger un userId (pas de guests)
     if (ranked && !userId) {
-      socket.emit('matchmaking-error', { message: 'Must be logged in for ranked matches' });
+      emitMatchmakingError(
+        socket,
+        'MATCHMAKING_RANKED_LOGIN_REQUIRED',
+        'Must be logged in for ranked matches'
+      );
       return;
     }
     
@@ -1241,7 +1281,7 @@ io.on('connection', (socket) => {
     const added = matchmakingQueue.addPlayer(language, queueName, socket.id, playerData);
     
     if (!added) {
-      socket.emit('matchmaking-error', { message: 'Failed to join queue' });
+      emitMatchmakingError(socket, 'MATCHMAKING_JOIN_FAILED', 'Failed to join queue');
       return;
     }
     
@@ -1363,10 +1403,18 @@ io.on('connection', (socket) => {
         logger.error(`❌ Failed to generate valid text for matchmaking room (language: ${language})`);
         // Notifier les joueurs de l'erreur
         if (socket1) {
-          socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+          emitMatchmakingError(
+            socket1,
+            'MATCHMAKING_CREATE_FAILED',
+            'Failed to create match. Please try again.'
+          );
         }
         if (socket2) {
-          socket2.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+          emitMatchmakingError(
+            socket2,
+            'MATCHMAKING_CREATE_FAILED',
+            'Failed to create match. Please try again.'
+          );
         }
         return;
       }
@@ -1374,10 +1422,18 @@ io.on('connection', (socket) => {
       logger.error(`❌ Error generating text for matchmaking room (language: ${language}):`, textError);
       // Notifier les joueurs de l'erreur
       if (socket1) {
-        socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+        emitMatchmakingError(
+          socket1,
+          'MATCHMAKING_CREATE_FAILED',
+          'Failed to create match. Please try again.'
+        );
       }
       if (socket2) {
-        socket2.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+        emitMatchmakingError(
+          socket2,
+          'MATCHMAKING_CREATE_FAILED',
+          'Failed to create match. Please try again.'
+        );
       }
       return;
     }
@@ -1438,10 +1494,18 @@ io.on('connection', (socket) => {
       rooms.delete(roomId);
       // Notifier les joueurs s'ils sont encore connectés
       if (socket1Final && socket1Final.connected) {
-        socket1Final.emit('matchmaking-error', { message: 'Opponent disconnected. Please try again.' });
+        emitMatchmakingError(
+          socket1Final,
+          'MATCHMAKING_OPPONENT_DISCONNECTED',
+          'Opponent disconnected. Please try again.'
+        );
       }
       if (socket2Final && socket2Final.connected) {
-        socket2Final.emit('matchmaking-error', { message: 'Opponent disconnected. Please try again.' });
+        emitMatchmakingError(
+          socket2Final,
+          'MATCHMAKING_OPPONENT_DISCONNECTED',
+          'Opponent disconnected. Please try again.'
+        );
       }
       return;
     }
@@ -1469,7 +1533,10 @@ io.on('connection', (socket) => {
           logger.error(`❌ Cannot start matchmaking game: room ${roomId} has invalid text`);
           // Nettoyer la room et notifier les joueurs
           rooms.delete(roomId);
-          io.to(roomId).emit('matchmaking-error', { message: 'Game text is invalid. Please start a new matchmaking.' });
+          io.to(roomId).emit('matchmaking-error', {
+            code: 'MATCHMAKING_GAME_TEXT_INVALID',
+            message: 'Game text is invalid. Please start a new matchmaking.'
+          });
           return;
         }
         
@@ -1484,7 +1551,10 @@ io.on('connection', (socket) => {
             logger.warn(`⚠️ Cannot start matchmaking game: not all players connected (${connectedPlayers.length}/2)`);
             // Nettoyer la room si un joueur s'est déconnecté
             rooms.delete(roomId);
-            io.to(roomId).emit('matchmaking-error', { message: 'Opponent disconnected. Please start a new matchmaking.' });
+            io.to(roomId).emit('matchmaking-error', {
+              code: 'MATCHMAKING_OPPONENT_DISCONNECTED',
+              message: 'Opponent disconnected. Please start a new matchmaking.'
+            });
             return;
           }
           
@@ -1516,10 +1586,18 @@ io.on('connection', (socket) => {
       const socket2 = io.sockets.sockets.get(socketId2);
       
       if (socket1) {
-        socket1.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+        emitMatchmakingError(
+          socket1,
+          'MATCHMAKING_CREATE_EXCEPTION',
+          'Failed to create match. Please try again.'
+        );
       }
       if (socket2) {
-        socket2.emit('matchmaking-error', { message: 'Failed to create match. Please try again.' });
+        emitMatchmakingError(
+          socket2,
+          'MATCHMAKING_CREATE_EXCEPTION',
+          'Failed to create match. Please try again.'
+        );
       }
     }
   }

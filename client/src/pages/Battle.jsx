@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToastContext } from '../contexts/ToastContext'
 import { useUser } from '../contexts/UserContext'
 import { getSocket, cleanupSocket } from '../services/socketService'
+import { normalizeSocketErrorMessage } from '../utils/normalizeSocketErrorMessage'
 
 export default function Battle() {
   const [roomId, setRoomId] = useState('');
@@ -32,8 +33,9 @@ export default function Battle() {
     });
 
     socket.on('error', (error) => {
+      const message = normalizeSocketErrorMessage(error, 'An error occurred');
       console.error('❌ Socket error in Battle:', error);
-      toast.error(error.message || 'An error occurred');
+      toast.error(message);
     });
 
     // Nettoyage: retirer seulement les listeners spécifiques à ce composant
