@@ -2060,65 +2060,53 @@ export default function BattleRoom() {
                 )}
               </div>
 
-              {/* Zone de texte principal - style épuré comme main page */}
+              {/* Zone de texte - alignée exactement sur le mode Solo */}
               <div className="relative w-full max-w-5xl mx-auto flex-1 min-h-0 flex flex-col px-2 sm:px-0">
-                {/* Container visuel pour rendre la zone évidente */}
-                <div className={`relative rounded-lg p-4 flex-1 min-h-0 flex flex-col transition-all duration-300 ${
-                  isFocused
-                    ? 'bg-bg-secondary/40 backdrop-blur-sm border border-accent-primary/40'
-                    : 'bg-bg-secondary/20 backdrop-blur-sm border border-border-secondary/30'
-                } ui-card`}>
-                  <div 
-                    ref={textContainerRef}
-                    onClick={() => {
-                      if (gameStatus === 'playing' && inputRef.current) {
-                        inputRef.current.focus();
-                      }
-                    }}
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    className={`typing-text bg-transparent rounded-lg w-full flex-1 min-h-0 overflow-y-auto cursor-text relative transition-all duration-300 ${
-                      isFocused ? 'typing-area-focused' : 'typing-area-unfocused'
-                    }`}
-                    style={{ 
-                      scrollBehavior: 'smooth',
-                      width: '100%',
-                      maxWidth: '100%',
-                      padding: 0,
-                      fontSize: 'clamp(0.875rem, 3vw, 1.25rem)', // Responsive font size: min 0.875rem, max 1.25rem
-                      lineHeight: '1.8',
-                      fontFamily: 'JetBrains Mono'
-                    }}
-                  >
-                    {renderText}
-                  </div>
-
-                  {/* Input invisible - Style Monkeytype (on tape directement sur le texte) */}
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={input}
-                    onChange={handleInputChange}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    disabled={gameStatus === 'finished'}
-                    className="absolute opacity-0 pointer-events-none"
-                    placeholder=""
-                    style={{ fontFamily: 'JetBrains Mono' }}
-                    autoFocus={gameStatus === 'playing'}
-                  />
-                  
-                  {/* Indicateur de focus subtil pour guider l'utilisateur */}
-                  {isFocused && (
-                    <div className="absolute inset-0 rounded-lg bg-accent-primary/5 pointer-events-none"></div>
-                  )}
+                <div 
+                  ref={textContainerRef}
+                  onClick={() => {
+                    if (gameStatus === 'playing' && inputRef.current) {
+                      inputRef.current.focus();
+                    }
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onDragStart={(e) => e.preventDefault()}
+                  className={`typing-text bg-transparent rounded-lg w-full overflow-y-auto cursor-text relative transition-all duration-300 ${
+                    isFocused ? 'typing-area-focused' : 'typing-area-unfocused'
+                  }`}
+                  style={{ 
+                    // Hauteur exacte pour 3 lignes complètes (identique au mode Solo)
+                    height: 'calc(1.5rem * 1.8 * 3)',
+                    scrollBehavior: 'smooth',
+                    width: '100%',
+                    maxWidth: '100%',
+                    overflowY: 'auto',
+                    padding: 0
+                  }}
+                >
+                  {renderText}
                 </div>
+
+                {/* Input invisible - identique au mode Solo */}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={handleInputChange}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  disabled={gameStatus === 'finished'}
+                  className="absolute opacity-0 pointer-events-none"
+                  placeholder=""
+                  style={{ fontFamily: 'JetBrains Mono' }}
+                  autoFocus={gameStatus === 'playing'}
+                />
               </div>
             </div>
           )}
 
           {gameStatus === 'finished' && results && safePlayers && safePlayers.length > 0 && (
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-hidden">
               {/* Résultats - conteneur simple et cohérent avec la main page */}
               <div className="max-w-5xl mx-auto w-full space-y-4 pb-6">
                 <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40 ui-card ui-fade-up">

@@ -111,10 +111,10 @@ function MatchResults({
   const opponentResult = opponentKey ? results[opponentKey] : null;
   
   return (
-    <div className={`h-full flex items-center justify-center py-2 sm:py-4 transition-all duration-700 ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-      <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 overflow-y-auto max-h-full">
-      {/* En-tête de résultats - style sobre et cohérent avec la main page */}
-      <div className="text-center mb-4 sm:mb-6">
+    <div className={`h-full flex items-center justify-center py-2 transition-all duration-700 ${showResults ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+      <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+      {/* En-tête de résultats - encore plus compact pour mobile */}
+      <div className="text-center mb-2 sm:mb-4">
         {/* Badge de statut pour garder une lecture rapide */}
         <div className="flex justify-center mb-3">
           <div className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border ${
@@ -129,7 +129,7 @@ function MatchResults({
         </div>
         
         <h2
-          className={`text-2xl sm:text-3xl font-bold mb-2 ${
+          className={`text-xl sm:text-3xl font-bold mb-2 ${
             myIsWinner ? 'text-accent-primary' : winner ? 'text-text-error' : 'text-text-primary'
           }`}
           style={{ fontFamily: 'Inter' }}
@@ -137,7 +137,7 @@ function MatchResults({
           {myIsWinner ? 'Victory' : winner ? 'Defeat' : 'Match Finished'}
         </h2>
         
-        <p className="text-text-secondary text-sm px-2">
+        <p className="text-text-secondary text-xs sm:text-sm px-2">
           {myIsWinner
             ? 'Great job. You won this match.'
             : winner
@@ -146,11 +146,11 @@ function MatchResults({
         </p>
         
         {/* Barre de séparation simple pour structurer la page */}
-        <div className="mt-3 mx-auto h-px w-14 bg-border-secondary/40"></div>
+        <div className="mt-2 mx-auto h-px w-14 bg-border-secondary/40"></div>
       </div>
       
       {/* Résultats côte à côte - layout simple et lisible */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-2 sm:mb-4">
         {/* Résultat du joueur */}
         {myPlayer && myResult && (
           <div
@@ -160,7 +160,7 @@ function MatchResults({
                 : 'bg-bg-secondary/40 border-border-secondary/40'
             }`}
           >
-            <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+            <div className="flex items-center justify-between mb-2 sm:mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <div className={`text-lg sm:text-xl font-bold ${myIsWinner ? 'text-accent-primary' : 'text-text-primary'}`}>You</div>
               </div>
@@ -176,9 +176,9 @@ function MatchResults({
             </div>
             
             {/* Stats principales - compactes et lisibles */}
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-2 sm:space-y-3">
               <div className="flex items-baseline gap-2 sm:gap-3">
-                <span className={`text-3xl sm:text-4xl md:text-5xl font-bold ${
+                <span className={`text-2xl sm:text-4xl md:text-5xl font-bold ${
                   myIsWinner ? 'text-accent-primary' : 'text-text-primary'
                 }`} style={{ fontFamily: 'JetBrains Mono' }}>
                   {myResult.wpm}
@@ -186,11 +186,11 @@ function MatchResults({
                 <span className="text-text-secondary text-sm sm:text-base font-medium">WPM</span>
               </div>
               
-              {/* Stats détaillées - plus sobres */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border-secondary/30">
+            {/* Stats détaillées - compactes (mobile réduit) */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-border-secondary/30">
                 <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
                   <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Accuracy</div>
-                  <div className={`text-xl sm:text-2xl font-bold ${
+                  <div className={`text-lg sm:text-2xl font-bold ${
                     myResult.accuracy >= 95 ? 'text-green-400' : myResult.accuracy >= 85 ? 'text-yellow-400' : 'text-red-400'
                   }`} style={{ fontFamily: 'JetBrains Mono' }}>
                     {formatAccuracy(myResult.accuracy)}%
@@ -198,21 +198,21 @@ function MatchResults({
                 </div>
                 <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
                   <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Time</div>
-                  <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                  <div className="text-lg sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                     {Math.round(myResult.time / 1000)}s
                   </div>
                 </div>
                 {myResult.errors !== undefined && (
                   <>
-                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
+                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3 hidden sm:block">
                       <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Errors</div>
-                      <div className="text-xl sm:text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-lg sm:text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
                         {myResult.errors}
                       </div>
                     </div>
-                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
+                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3 hidden sm:block">
                       <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Characters</div>
-                      <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-lg sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                         {myResult.characters || 0}
                       </div>
                     </div>
@@ -232,7 +232,7 @@ function MatchResults({
                 : 'bg-bg-secondary/40 border-border-secondary/40'
             }`}
           >
-              <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+            <div className="flex items-center justify-between mb-2 sm:mb-4 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <div className={`text-lg sm:text-xl font-bold ${
                   !myIsWinner && winner && opponent && ((winner.id && opponent.id && winner.id === opponent.id) || (winner.name && opponent.name && winner.name === opponent.name))
@@ -263,9 +263,9 @@ function MatchResults({
               </div>
               </div>
             {/* Stats principales - compactes */}
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-2 sm:space-y-3">
               <div className="flex items-baseline gap-2 sm:gap-3">
-                <span className={`text-3xl sm:text-4xl md:text-5xl font-bold ${
+                <span className={`text-2xl sm:text-4xl md:text-5xl font-bold ${
                   !myIsWinner && winner && winner.id === opponent.id ? 'text-accent-primary' : 'text-text-primary'
                 }`} style={{ 
                   fontFamily: 'JetBrains Mono'
@@ -275,11 +275,11 @@ function MatchResults({
                 <span className="text-text-secondary text-sm sm:text-base font-medium">WPM</span>
               </div>
               
-              {/* Stats détaillées - plus sobres */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border-secondary/30">
+              {/* Stats détaillées - compactes (mobile réduit) */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-border-secondary/30">
                 <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
                   <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Accuracy</div>
-                  <div className={`text-xl sm:text-2xl font-bold ${
+                  <div className={`text-lg sm:text-2xl font-bold ${
                     opponentResult.accuracy >= 95 ? 'text-green-400' : opponentResult.accuracy >= 85 ? 'text-yellow-400' : 'text-red-400'
                   }`} style={{ fontFamily: 'JetBrains Mono' }}>
                     {formatAccuracy(opponentResult.accuracy)}%
@@ -287,21 +287,21 @@ function MatchResults({
                 </div>
                 <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
                   <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Time</div>
-                  <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                  <div className="text-lg sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                     {Math.round(opponentResult.time / 1000)}s
                   </div>
                 </div>
                 {opponentResult.errors !== undefined && (
                   <>
-                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
+                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3 hidden sm:block">
                       <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Errors</div>
-                      <div className="text-xl sm:text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-lg sm:text-2xl font-bold text-red-400" style={{ fontFamily: 'JetBrains Mono' }}>
                         {opponentResult.errors}
                       </div>
                     </div>
-                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3">
+                    <div className="bg-bg-primary/30 rounded-lg p-2 sm:p-3 hidden sm:block">
                       <div className="text-text-secondary text-xs mb-1 sm:mb-2 font-medium">Characters</div>
-                      <div className="text-xl sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
+                      <div className="text-lg sm:text-2xl font-bold text-text-primary" style={{ fontFamily: 'JetBrains Mono' }}>
                         {opponentResult.characters || 0}
                       </div>
                     </div>
@@ -313,10 +313,10 @@ function MatchResults({
         )}
       </div>
       
-      {/* Comparaison rapide - version simplifiée */}
+      {/* Comparaison rapide - masquée sur mobile pour éviter le scroll */}
       {myResult && opponentResult && (
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6 mb-4 sm:mb-6 border border-border-secondary/40 ui-card ui-fade-up">
-          <h3 className="text-lg sm:text-xl font-bold text-text-primary mb-3 sm:mb-4 text-center">
+        <div className="hidden sm:block bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-5 mb-3 sm:mb-4 border border-border-secondary/40 ui-card ui-fade-up">
+          <h3 className="text-base sm:text-lg font-bold text-text-primary mb-3 text-center">
             Match Comparison
           </h3>
           <div className="space-y-4">
@@ -326,7 +326,7 @@ function MatchResults({
                 <span>Words Per Minute</span>
                 <span className="font-semibold">{Math.abs(myResult.wpm - opponentResult.wpm)} WPM difference</span>
               </div>
-              <div className="relative h-10 bg-bg-primary/30 rounded-lg overflow-hidden">
+              <div className="relative h-9 bg-bg-primary/30 rounded-lg overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-xs font-bold text-text-secondary">vs</div>
                 </div>
@@ -353,7 +353,7 @@ function MatchResults({
                 <span>Accuracy</span>
                 <span className="font-semibold">{formatAccuracy(Math.abs((myResult.accuracy || 0) - (opponentResult.accuracy || 0)))}% difference</span>
               </div>
-              <div className="relative h-10 bg-bg-primary/30 rounded-lg overflow-hidden">
+              <div className="relative h-9 bg-bg-primary/30 rounded-lg overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-xs font-bold text-text-secondary">vs</div>
                 </div>
@@ -378,7 +378,7 @@ function MatchResults({
       )}
       
       {/* Actions */}
-      <div className="text-center space-y-3 sm:space-y-4">
+      <div className="text-center space-y-2 sm:space-y-3">
         {/* Partage pour le gagnant - discret */}
         {myIsWinner && myResult && (
           <div className="flex justify-center mb-2 sm:mb-3">
@@ -395,13 +395,13 @@ function MatchResults({
         )}
         
         {/* Boutons d'action - style simple et direct */}
-        <div className="flex flex-col items-center gap-3 sm:gap-4">
+          <div className="flex flex-col items-center gap-2 sm:gap-3">
           {onPlayAgain && (
             <div className="flex flex-col items-center gap-3 w-full max-w-md px-2 sm:px-0">
               <button
                 onClick={onPlayAgain}
                 disabled={rematchReady}
-                className={`font-semibold py-3.5 px-6 rounded-lg transition-all text-base border w-full min-h-[48px] ui-press ${
+                  className={`font-semibold py-3 px-6 rounded-lg transition-all text-base border w-full min-h-[46px] ui-press ${
                   rematchReady
                     ? 'bg-yellow-500/10 text-yellow-200 border-yellow-500/40 cursor-wait'
                     : 'bg-accent-primary hover:bg-accent-hover text-accent-text border-accent-primary/50'
@@ -445,11 +445,11 @@ function MatchResults({
             </div>
           )}
           
-          <div className="flex items-center justify-center gap-4 flex-wrap">
+              <div className="flex items-center justify-center gap-3 flex-wrap">
             {onBackToLobby && (
               <button
                 onClick={onBackToLobby}
-                className="bg-bg-primary/60 hover:bg-bg-primary/80 border border-border-secondary/40 text-text-primary font-semibold py-3 px-5 rounded-lg transition-all ui-press min-h-[48px] w-full sm:w-auto"
+                    className="bg-bg-primary/60 hover:bg-bg-primary/80 border border-border-secondary/40 text-text-primary font-semibold py-2.5 px-5 rounded-lg transition-all ui-press min-h-[46px] w-full sm:w-auto"
               >
                 <span className="flex items-center justify-center gap-2 text-sm sm:text-base">
                   <span>←</span>
@@ -460,7 +460,7 @@ function MatchResults({
             
             <button
               onClick={() => navigate('/')}
-              className="bg-bg-primary/60 hover:bg-bg-primary/80 border border-border-secondary/40 text-text-primary font-semibold py-3 px-6 rounded-lg transition-all ui-press"
+                  className="bg-bg-primary/60 hover:bg-bg-primary/80 border border-border-secondary/40 text-text-primary font-semibold py-2.5 px-6 rounded-lg transition-all ui-press"
             >
               <span className="flex items-center gap-2">
                 <span>🏠</span>
