@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useState } from 'react'
 import { useUser } from '../contexts/UserContext'
 import OptimizedImage from './OptimizedImage.jsx'
+import LogoIconSmall from './icons/LogoIconSmall.jsx'
 
 export default function Header() {
   const { user, logout: contextLogout } = useUser();
@@ -15,17 +16,50 @@ export default function Header() {
 
   return (
     <header 
-      className="fixed top-0 right-0 left-64 h-16 bg-bg-secondary/80 backdrop-blur-md border-b border-border-secondary/50 px-6 flex items-center justify-end z-40"
+      className="fixed top-0 right-0 left-64 h-16 bg-bg-secondary/80 backdrop-blur-md border-b border-border-secondary/50 flex items-center z-40 ui-header"
       style={{
         color: 'var(--text-primary, #e8ecf3)',
         backgroundColor: 'rgba(19, 24, 37, 0.8)'
       }}
     >
-      {user ? (
-        <div className="relative">
+      <div className="flex items-center justify-between w-full">
+        <Link to="/" className="flex items-center gap-2 ui-press">
+          <LogoIconSmall className="w-5 h-5 text-text-primary/80" stroke="currentColor" />
+          <span className="text-text-primary font-semibold tracking-tight">TypingPVP</span>
+        </Link>
+        
+        <nav className="hidden md:flex items-center gap-4 text-sm">
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `ui-nav-link ${isActive ? 'ui-nav-link-active' : 'text-text-secondary'}`
+            }
+          >
+            Home
+          </NavLink>
+          <NavLink
+            to="/faq"
+            className={({ isActive }) =>
+              `ui-nav-link ${isActive ? 'ui-nav-link-active' : 'text-text-secondary'}`
+            }
+          >
+            FAQ
+          </NavLink>
+          <NavLink
+            to="/privacy"
+            className={({ isActive }) =>
+              `ui-nav-link ${isActive ? 'ui-nav-link-active' : 'text-text-secondary'}`
+            }
+          >
+            Privacy
+          </NavLink>
+        </nav>
+
+        {user ? (
+          <div className="relative">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity ui-press"
             aria-label={`Menu utilisateur pour ${user.username}`}
             aria-expanded={showMenu}
             aria-haspopup="true"
@@ -61,7 +95,7 @@ export default function Header() {
               >
                 <Link
                   to={`/profile/${user.username ? user.username : user.id}`}
-                  className="block px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
+                  className="block px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors ui-press"
                   onClick={() => setShowMenu(false)}
                   role="menuitem"
                   aria-label="Voir mon profil"
@@ -70,7 +104,7 @@ export default function Header() {
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors"
+                  className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-tertiary/50 transition-colors ui-press"
                   role="menuitem"
                   aria-label="Se déconnecter"
                 >
@@ -80,22 +114,23 @@ export default function Header() {
             </>
           )}
         </div>
-      ) : (
-        <div className="flex items-center gap-4">
-          <Link
-            to="/login"
-            className="text-text-secondary hover:text-text-primary transition-colors font-medium"
-          >
-            Login
-          </Link>
-          <Link
-            to="/register"
-            className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-accent-primary/20"
-          >
-            Register
-          </Link>
-        </div>
-      )}
+        ) : (
+          <div className="flex items-center gap-4">
+            <Link
+              to="/login"
+              className="text-text-secondary hover:text-text-primary transition-colors font-medium ui-press"
+            >
+              Login
+            </Link>
+            <Link
+              to="/register"
+              className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-accent-primary/20 ui-press"
+            >
+              Register
+            </Link>
+          </div>
+        )}
+      </div>
     </header>
   )
 }

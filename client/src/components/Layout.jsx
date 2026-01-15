@@ -7,7 +7,7 @@ export default function Layout({ children }) {
       <Sidebar />
       <div className="ml-64 pt-16 min-h-screen">
         <Header />
-        <main className="p-8 animate-fade-in">
+        <main id="main-content" className="p-8 ui-fade-in">
           {children}
         </main>
       </div>

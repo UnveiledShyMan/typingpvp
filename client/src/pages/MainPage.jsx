@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useRef } from 'react'
+import { useState, useEffect, Suspense, lazy, useRef, useTransition } from 'react'
 import Footer from '../components/Footer'
 import LogoIcon from '../components/icons/LogoIcon'
 import LogoIconSmall from '../components/icons/LogoIconSmall'
@@ -56,7 +56,7 @@ function UserMenu({ user, onProfileClick }) {
       <div className="md:hidden relative">
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary/70 hover:text-text-primary/90 transition-all"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary/70 hover:text-text-primary/90 transition-all ui-press"
           aria-label="Menu utilisateur"
           aria-expanded={showMenu}
         >
@@ -97,7 +97,7 @@ function UserMenu({ user, onProfileClick }) {
                   onProfileClick();
                   setShowMenu(false);
                 }}
-                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2 ui-press"
                 role="menuitem"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +107,7 @@ function UserMenu({ user, onProfileClick }) {
               </button>
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2 ui-press"
                 role="menuitem"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,7 +124,7 @@ function UserMenu({ user, onProfileClick }) {
       <div className="hidden md:block relative">
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity group ui-press"
           aria-label="Menu utilisateur"
           aria-expanded={showMenu}
         >
@@ -175,7 +175,7 @@ function UserMenu({ user, onProfileClick }) {
                   onProfileClick();
                   setShowMenu(false);
                 }}
-                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2 ui-press"
                 role="menuitem"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,7 +185,7 @@ function UserMenu({ user, onProfileClick }) {
               </button>
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-text-primary hover:bg-bg-primary/50 transition-colors flex items-center gap-2 ui-press"
                 role="menuitem"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,6 +207,7 @@ export default function MainPage() {
   const { user, updateUser } = useUser();
   const [showSandbox, setShowSandbox] = useState(false);
   const [showUserSearch, setShowUserSearch] = useState(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     // Charger la préférence depuis localStorage si pas d'utilisateur connecté
@@ -299,7 +300,7 @@ export default function MainPage() {
       <div className="h-screen bg-bg-primary flex flex-col overflow-hidden">
       {/* Header avec navigation horizontale */}
       <header 
-        className="w-full bg-bg-primary/60 backdrop-blur-md relative"
+        className="w-full bg-bg-primary/60 backdrop-blur-md relative ui-header ui-fade-in"
         style={{
           background: 'rgba(10, 14, 26, 0.6)',
           backdropFilter: 'blur(12px)',
@@ -313,17 +314,19 @@ export default function MainPage() {
             <button
               onClick={() => {
                 setShowSandbox(false);
-                setActiveSection('solo');
+                startTransition(() => {
+                  setActiveSection('solo');
+                });
                 saveModePreference('solo');
               }}
-              className="flex items-center gap-2 sm:gap-3 cursor-pointer group flex-shrink-0"
+              className="flex items-center gap-2 sm:gap-3 cursor-pointer group flex-shrink-0 ui-press"
             >
               <LogoIcon 
                 className="w-7 h-7 sm:w-8 sm:h-8 text-text-primary/80 group-hover:text-accent-primary transition-all duration-200" 
                 stroke="currentColor"
               />
               <h1 
-                className="text-base sm:text-xl font-bold text-text-primary/90 group-hover:text-accent-primary transition-all duration-200 whitespace-nowrap"
+                className="text-base sm:text-xl font-bold text-text-primary/90 group-hover:text-accent-primary transition-all duration-200 whitespace-nowrap ui-title"
                 style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}
               >
                 typingpvp.com
@@ -360,9 +363,9 @@ export default function MainPage() {
                           // Sur mobile, le clic toggle le dropdown (géré par SoloDropdown)
                           // On ne change pas la section ici pour éviter les conflits
                         }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ui-press ui-nav-link ${
                           (isActive && !showSandbox) || showSandbox
-                            ? 'text-accent-primary'
+                            ? 'text-accent-primary ui-nav-link-active'
                             : 'text-text-secondary/70 hover:text-text-primary/90'
                         }`}
                       >
@@ -388,10 +391,10 @@ export default function MainPage() {
                 return (
                   <button
                     key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    onClick={() => startTransition(() => setActiveSection(section.id))}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ui-press ui-nav-link ${
                       isActive
-                        ? 'text-accent-primary'
+                        ? 'text-accent-primary ui-nav-link-active'
                         : 'text-text-secondary/70 hover:text-text-primary/90'
                     }`}
                   >
@@ -414,7 +417,7 @@ export default function MainPage() {
               {/* Bouton de recherche d'utilisateurs */}
               <button
                 onClick={() => setShowUserSearch(true)}
-                className="hidden md:flex items-center justify-center w-10 h-10 rounded-lg bg-bg-primary/50 hover:bg-bg-primary/70 text-text-secondary hover:text-text-primary transition-colors"
+                className="hidden md:flex items-center justify-center w-10 h-10 rounded-lg bg-bg-primary/50 hover:bg-bg-primary/70 text-text-secondary hover:text-text-primary transition-colors ui-press"
                 title="Search users (Ctrl+K)"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -428,13 +431,13 @@ export default function MainPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowAuth('login')}
-                    className="text-text-secondary hover:text-text-primary transition-colors text-sm font-medium px-3 py-1.5"
+                    className="text-text-secondary hover:text-text-primary transition-colors text-sm font-medium px-3 py-1.5 ui-press"
                   >
                     Login
                   </button>
                   <button
                     onClick={() => setShowAuth('register')}
-                    className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm ui-press"
                   >
                     Register
                   </button>
@@ -474,9 +477,9 @@ export default function MainPage() {
                           // Sur mobile, le clic toggle le dropdown (géré par SoloDropdown)
                           // On ne change pas la section ici pour éviter les conflits
                         }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ui-press ui-nav-link ${
                           (isActive && !showSandbox) || showSandbox
-                            ? 'text-accent-primary'
+                            ? 'text-accent-primary ui-nav-link-active'
                             : 'text-text-secondary/70 hover:text-text-primary/90'
                         }`}
                       >
@@ -502,10 +505,10 @@ export default function MainPage() {
                 return (
                   <button
                     key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                    onClick={() => startTransition(() => setActiveSection(section.id))}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ui-press ui-nav-link ${
                       isActive
-                        ? 'text-accent-primary'
+                        ? 'text-accent-primary ui-nav-link-active'
                         : 'text-text-secondary/70 hover:text-text-primary/90'
                     }`}
                   >
@@ -527,7 +530,7 @@ export default function MainPage() {
       <main id="main-content" className="flex-1 overflow-hidden relative" style={{ zIndex: 1 }} role="main" aria-label="Contenu principal">
         <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Suspense fallback={<LoadingSpinner />}>
-            <div key={`${activeSection}-${showSandbox}`} className="h-full overflow-hidden animate-fade-in">
+            <div key={`${activeSection}-${showSandbox}`} className="h-full overflow-hidden ui-fade-in">
               {activeSection === 'solo' && !showSandbox && <Solo />}
               {activeSection === 'sandbox' && showSandbox && <Sandbox />}
               {activeSection === 'battle' && <Battle />}
