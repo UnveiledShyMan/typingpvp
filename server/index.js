@@ -8,6 +8,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import compression from 'compression';
 // import helmet from 'helmet'; // Temporairement désactivé
 import { nanoid } from 'nanoid';
 import { fileURLToPath } from 'url';
@@ -43,6 +44,9 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+
+// Compression HTTP pour améliorer la latence perçue et réduire la bande passante
+app.use(compression());
 
 // Configuration Socket.io simple
 const io = new Server(httpServer, {
@@ -1186,7 +1190,8 @@ io.on('connection', (socket) => {
     });
     
     // Invalider le cache des rankings pour cette langue (les ELO ont changé)
-    invalidateRankingsCache(language);
+    // Invalidation async (Redis + mémoire)
+    void invalidateRankingsCache(language);
     
     // Log seulement en développement
     if (process.env.NODE_ENV !== 'production') {

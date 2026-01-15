@@ -1002,7 +1002,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                       
                       return (
                         <>
-                          <div className="space-y-3">
+                          <div className="space-y-3 content-visibility-auto">
                             {allMatches.map((match) => (
                             <div
                               key={match.id}

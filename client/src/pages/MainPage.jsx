@@ -18,6 +18,7 @@ import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation'
 import SEOHead from '../components/SEOHead'
 import OptimizedImage from '../components/OptimizedImage'
 import { useNavigate } from 'react-router-dom'
+import { prefetchOnce } from '../utils/prefetch'
 
 // Lazy loading des composants de pages pour améliorer les performances et réduire le bundle initial
 const Solo = lazy(() => import('./Solo'))
@@ -30,6 +31,26 @@ const Matchmaking = lazy(() => import('./Matchmaking'))
 const Friends = lazy(() => import('./Friends'))
 const Login = lazy(() => import('./Login'))
 const Register = lazy(() => import('./Register'))
+
+// Prefetch des routes au survol pour améliorer la latence perçue
+const sectionPrefetchers = {
+  solo: () => import('./Solo'),
+  sandbox: () => import('./Sandbox'),
+  battle: () => import('./Battle'),
+  rankings: () => import('./Rankings'),
+  competitions: () => import('./Competitions'),
+  matchmaking: () => import('./Matchmaking'),
+  friends: () => import('./Friends'),
+  profile: () => import('./Profile'),
+  login: () => import('./Login'),
+  register: () => import('./Register')
+};
+
+const prefetchSection = (sectionId) => {
+  const prefetcher = sectionPrefetchers[sectionId];
+  if (!prefetcher) return;
+  prefetchOnce(sectionId, prefetcher);
+};
 
 // Composant de chargement pour le lazy loading
 const LoadingSpinner = () => (
@@ -363,6 +384,10 @@ export default function MainPage() {
                           // Sur mobile, le clic toggle le dropdown (géré par SoloDropdown)
                           // On ne change pas la section ici pour éviter les conflits
                         }}
+                        onMouseEnter={() => {
+                          prefetchSection('solo');
+                          prefetchSection('sandbox');
+                        }}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ui-press ui-nav-link ${
                           (isActive && !showSandbox) || showSandbox
                             ? 'text-accent-primary ui-nav-link-active'
@@ -392,6 +417,7 @@ export default function MainPage() {
                   <button
                     key={section.id}
                     onClick={() => startTransition(() => setActiveSection(section.id))}
+                    onMouseEnter={() => prefetchSection(section.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ui-press ui-nav-link ${
                       isActive
                         ? 'text-accent-primary ui-nav-link-active'
@@ -417,6 +443,7 @@ export default function MainPage() {
               {/* Bouton de recherche d'utilisateurs */}
               <button
                 onClick={() => setShowUserSearch(true)}
+                onMouseEnter={() => prefetchSection('profile')}
                 className="hidden md:flex items-center justify-center w-10 h-10 rounded-lg bg-bg-primary/50 hover:bg-bg-primary/70 text-text-secondary hover:text-text-primary transition-colors ui-press"
                 title="Search users (Ctrl+K)"
               >
@@ -431,12 +458,14 @@ export default function MainPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowAuth('login')}
+                    onMouseEnter={() => prefetchSection('login')}
                     className="text-text-secondary hover:text-text-primary transition-colors text-sm font-medium px-3 py-1.5 ui-press"
                   >
                     Login
                   </button>
                   <button
                     onClick={() => setShowAuth('register')}
+                    onMouseEnter={() => prefetchSection('register')}
                     className="bg-accent-primary hover:bg-accent-hover text-accent-text font-semibold py-2 px-4 rounded-lg transition-colors text-sm ui-press"
                   >
                     Register
@@ -477,6 +506,10 @@ export default function MainPage() {
                           // Sur mobile, le clic toggle le dropdown (géré par SoloDropdown)
                           // On ne change pas la section ici pour éviter les conflits
                         }}
+                        onMouseEnter={() => {
+                          prefetchSection('solo');
+                          prefetchSection('sandbox');
+                        }}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ui-press ui-nav-link ${
                           (isActive && !showSandbox) || showSandbox
                             ? 'text-accent-primary ui-nav-link-active'
@@ -506,6 +539,7 @@ export default function MainPage() {
                   <button
                     key={section.id}
                     onClick={() => startTransition(() => setActiveSection(section.id))}
+                    onMouseEnter={() => prefetchSection(section.id)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ui-press ui-nav-link ${
                       isActive
                         ? 'text-accent-primary ui-nav-link-active'

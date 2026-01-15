@@ -14,8 +14,10 @@ router.get('/:language', async (req, res) => {
 
     // Vérifier le cache d'abord (seulement pour limit <= 100 pour éviter trop de variantes)
     if (limit <= 100) {
-      const cached = getCachedRankings(language);
+      const cached = await getCachedRankings(language);
       if (cached) {
+        // Cache navigateur court pour réduire la charge sans staler trop longtemps
+        res.set('Cache-Control', 'public, max-age=60');
         // Retourner les données en cache (déjà avec rankInfo)
         return res.json({
           language,
@@ -38,7 +40,12 @@ router.get('/:language', async (req, res) => {
 
     // Mettre en cache seulement pour limit <= 100 (top 100)
     if (limit <= 100) {
-      setCachedRankings(language, rankingsWithRanks);
+      await setCachedRankings(language, rankingsWithRanks);
+    }
+
+    // Cache navigateur court pour les top 100, même si non en cache serveur
+    if (limit <= 100) {
+      res.set('Cache-Control', 'public, max-age=60');
     }
 
     res.json({

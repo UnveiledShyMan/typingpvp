@@ -5,6 +5,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+const CDN_BASE = import.meta.env.VITE_IMAGE_CDN_BASE;
+
 export default function OptimizedImage({
   src,
   alt = '',
@@ -63,6 +65,30 @@ export default function OptimizedImage({
   // Convertir l'URL en WebP si supporté
   const getOptimizedSrc = (originalSrc) => {
     if (!originalSrc) return null;
+    const cdnBase = CDN_BASE;
+
+    // Si un CDN est configuré, réécrire les URLs locales d'uploads
+    if (cdnBase && typeof originalSrc === 'string') {
+      if (originalSrc.startsWith(cdnBase)) {
+        return originalSrc;
+      }
+
+      // Cas 1: URL relative (ex: /uploads/avatars/...)
+      if (originalSrc.startsWith('/uploads/')) {
+        return `${cdnBase}${originalSrc}`;
+      }
+
+      // Cas 2: URL absolue vers le même chemin uploads
+      try {
+        const url = new URL(originalSrc);
+        if (url.pathname.startsWith('/uploads/')) {
+          return `${cdnBase}${url.pathname}`;
+        }
+      } catch (error) {
+        // Ignorer si originalSrc n'est pas une URL absolue valide
+      }
+    }
+
     // Si l'image est déjà WebP ou si WebP n'est pas supporté, retourner l'original
     if (!supportsWebP() || originalSrc.includes('.webp')) {
       return originalSrc;

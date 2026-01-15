@@ -349,7 +349,7 @@ export default function Friends() {
       )}
 
       {/* Contenu scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-on-hover">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-on-hover content-visibility-auto">
       {/* Friends List */}
       {activeTab === 'friends' && (
         <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6 ui-card ui-fade-up">

@@ -2,6 +2,7 @@ import express from 'express';
 import { getUserMatches, recordMatch, updateUser } from '../db.js';
 import { getUserById } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { cacheMiddleware, invalidateCacheByPrefix } from '../utils/apiCache.js';
 
 const router = express.Router();
 
@@ -58,6 +59,7 @@ router.post('/solo', authenticateToken, async (req, res) => {
     
     // Sauvegarder dans la base de données
     await updateUser(user);
+    await invalidateCacheByPrefix('matches:');
     
     res.json({ success: true, matchId });
   } catch (error) {
@@ -71,7 +73,10 @@ router.post('/solo', authenticateToken, async (req, res) => {
  * GET /api/matches/user/:userId?limit=50&type=solo|multiplayer
  * Cette route doit être avant GET /:userId pour éviter les conflits
  */
-router.get('/user/:userId', async (req, res) => {
+router.get(
+  '/user/:userId',
+  cacheMiddleware({ keyPrefix: 'matches', ttlMs: 60 * 1000, cacheControl: 'public, max-age=60' }),
+  async (req, res) => {
   try {
     const { userId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
@@ -82,13 +87,17 @@ router.get('/user/:userId', async (req, res) => {
     console.error('Error fetching user matches:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+  }
+);
 
 /**
  * Récupère l'historique des matchs d'un utilisateur spécifique (public) - route alternative
  * GET /api/matches/:userId?limit=50&type=solo|multiplayer
  */
-router.get('/:userId', async (req, res) => {
+router.get(
+  '/:userId',
+  cacheMiddleware({ keyPrefix: 'matches', ttlMs: 60 * 1000, cacheControl: 'public, max-age=60' }),
+  async (req, res) => {
   try {
     const { userId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
@@ -99,7 +108,8 @@ router.get('/:userId', async (req, res) => {
     console.error('Error fetching user matches:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+  }
+);
 
 export default router;
 

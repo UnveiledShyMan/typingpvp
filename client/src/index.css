@@ -4,12 +4,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Limiter les transitions globales pour réduire le coût de rendu */
 * {
-  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Variables CSS redéfinies ici pour s'assurer qu'elles sont disponibles même si index.html n'a pas chargé */
@@ -144,6 +143,12 @@ body {
 
 .ui-fade-in {
   animation: fadeInSoft var(--motion-base) var(--motion-ease);
+}
+
+/* Render optimization for long scroll lists */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 800px;
 }
 
 /* Header utilities */

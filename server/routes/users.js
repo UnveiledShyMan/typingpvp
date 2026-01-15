@@ -5,6 +5,7 @@ import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { getUserById, getAllUsers, updateUser, getUserByUsername } from '../db.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
+import { cacheMiddleware, invalidateCacheByPrefix } from '../utils/apiCache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,7 +53,11 @@ const upload = multer({
 });
 
 // Obtenir un utilisateur par username (route spéciale avant /:id)
-router.get('/username/:username', optionalAuth, async (req, res) => {
+router.get(
+  '/username/:username',
+  optionalAuth,
+  cacheMiddleware({ keyPrefix: 'user', ttlMs: 60 * 1000, cacheControl: 'public, max-age=60' }),
+  async (req, res) => {
   try {
     // Décoder le username depuis l'URL (caractères spéciaux et espaces)
     // Nettoyer aussi les suffixes bizarres comme ":1" qui peuvent apparaître
@@ -89,10 +94,15 @@ router.get('/username/:username', optionalAuth, async (req, res) => {
     console.error('Error fetching user by username:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+  }
+);
 
 // Obtenir un utilisateur par ID
-router.get('/:id', optionalAuth, async (req, res) => {
+router.get(
+  '/:id',
+  optionalAuth,
+  cacheMiddleware({ keyPrefix: 'user', ttlMs: 60 * 1000, cacheControl: 'public, max-age=60' }),
+  async (req, res) => {
   // Vérifier si c'est "username" pour éviter les conflits
   if (req.params.id === 'username') {
     return res.status(400).json({ error: 'Invalid user ID' });
@@ -124,7 +134,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     },
     createdAt: user.createdAt
   });
-});
+  }
+);
 
 // Mettre à jour le profil (nécessite authentification)
 router.put('/:id', authenticateToken, async (req, res) => {
@@ -155,6 +166,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
   // Sauvegarder dans la base de données
   await updateUser(req.user);
+  await invalidateCacheByPrefix('user:');
 
   res.json({
     id: req.user.id,
@@ -190,12 +202,14 @@ router.post('/:id/avatar', authenticateToken, upload.single('avatar'), async (re
     // Construire l'URL de l'image
     // Utiliser l'URL complète si disponible, sinon URL relative
     // L'URL sera servie statiquement depuis /uploads/avatars/
-    const baseUrl = process.env.CLIENT_URL || req.protocol + '://' + req.get('host');
+    const cdnBaseUrl = process.env.CDN_BASE_URL;
+    const baseUrl = cdnBaseUrl || process.env.CLIENT_URL || req.protocol + '://' + req.get('host');
     const imageUrl = `${baseUrl}/uploads/avatars/${req.file.filename}`;
 
     // Mettre à jour l'avatar de l'utilisateur dans la base de données
     req.user.avatar = imageUrl;
     await updateUser(req.user);
+    await invalidateCacheByPrefix('user:');
 
     res.json({
       success: true,

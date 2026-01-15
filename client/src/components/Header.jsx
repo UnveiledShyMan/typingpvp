@@ -3,6 +3,19 @@ import { useState } from 'react'
 import { useUser } from '../contexts/UserContext'
 import OptimizedImage from './OptimizedImage.jsx'
 import LogoIconSmall from './icons/LogoIconSmall.jsx'
+import { prefetchOnce } from '../utils/prefetch'
+
+const routePrefetchers = {
+  home: () => import('../pages/MainPage'),
+  faq: () => import('../pages/FAQ'),
+  privacy: () => import('../pages/PrivacyPolicy')
+};
+
+const prefetchRoute = (routeKey) => {
+  const prefetcher = routePrefetchers[routeKey];
+  if (!prefetcher) return;
+  prefetchOnce(routeKey, prefetcher);
+};
 
 export default function Header() {
   const { user, logout: contextLogout } = useUser();
@@ -23,7 +36,11 @@ export default function Header() {
       }}
     >
       <div className="flex items-center justify-between w-full">
-        <Link to="/" className="flex items-center gap-2 ui-press">
+        <Link
+          to="/"
+          className="flex items-center gap-2 ui-press"
+          onMouseEnter={() => prefetchRoute('home')}
+        >
           <LogoIconSmall className="w-5 h-5 text-text-primary/80" stroke="currentColor" />
           <span className="text-text-primary font-semibold tracking-tight">TypingPVP</span>
         </Link>
@@ -34,6 +51,7 @@ export default function Header() {
             className={({ isActive }) =>
               `ui-nav-link ${isActive ? 'ui-nav-link-active' : 'text-text-secondary'}`
             }
+            onMouseEnter={() => prefetchRoute('home')}
           >
             Home
           </NavLink>
@@ -42,6 +60,7 @@ export default function Header() {
             className={({ isActive }) =>
               `ui-nav-link ${isActive ? 'ui-nav-link-active' : 'text-text-secondary'}`
             }
+            onMouseEnter={() => prefetchRoute('faq')}
           >
             FAQ
           </NavLink>
@@ -50,6 +69,7 @@ export default function Header() {
             className={({ isActive }) =>
               `ui-nav-link ${isActive ? 'ui-nav-link-active' : 'text-text-secondary'}`
             }
+            onMouseEnter={() => prefetchRoute('privacy')}
           >
             Privacy
           </NavLink>

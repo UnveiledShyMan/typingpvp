@@ -170,7 +170,7 @@ export default function Rankings() {
             </div>
 
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg overflow-hidden animate-slide-up flex-1 min-h-0 flex flex-col ui-card ui-fade-up">
-            <div className="overflow-auto flex-1 scrollbar-on-hover">
+            <div className="overflow-auto flex-1 scrollbar-on-hover content-visibility-auto">
               <table className="w-full">
                 <thead className="bg-bg-primary/40">
                   <tr>

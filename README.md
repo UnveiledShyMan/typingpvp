@@ -74,6 +74,25 @@ Cette commande lance automatiquement :
 - Le serveur sur http://localhost:3001 (avec nodemon pour le rechargement automatique)
 - Le client sur http://localhost:5173 (avec Vite pour le hot-reload)
 
+## ⚙️ Configuration optionnelle (performance)
+
+### CDN images
+- **Backend** : `CDN_BASE_URL` (ex: `https://cdn.typingpvp.com`)
+- **Frontend** : `VITE_IMAGE_CDN_BASE` (ex: `https://cdn.typingpvp.com`)
+
+Les images `/uploads/` sont automatiquement réécrites vers le CDN si configuré.
+
+### Redis cache
+- **Backend** : `REDIS_URL` (ex: `redis://localhost:6379`)
+
+Active le cache API et le cache rankings via Redis (fallback mémoire si absent).
+
+### Bundle analysis
+```bash
+cd client
+npm run build:analyze
+```
+
 #### Mode Manuel (Deux terminaux)
 
 ```bash

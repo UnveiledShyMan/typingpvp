@@ -434,7 +434,7 @@ export default function CompetitionRoom() {
                     <span className="w-1 h-5 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Leaderboard
                   </h2>
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-on-hover">
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-on-hover content-visibility-auto">
                     {leaderboard.slice(0, 20).map((player, index) => {
                       const isTopThree = player.position <= 3;
                       const isMe = player.name === username;

@@ -318,7 +318,7 @@ export default function Dashboard({ user, onSectionChange }) {
                 <div className="text-sm mt-2">Start playing to see your match history</div>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1 scrollbar-on-hover">
+              <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1 scrollbar-on-hover content-visibility-auto">
                 {recentMatches.map((match, index) => (
                   <div
                     key={index}
