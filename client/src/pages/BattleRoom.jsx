@@ -85,6 +85,8 @@ export default function BattleRoom() {
   const [rematchReady, setRematchReady] = useState(false); // État pour savoir si le joueur veut rematcher
   const [opponentRematchReady, setOpponentRematchReady] = useState(false); // État pour savoir si l'adversaire veut rematcher
   const [isFocused, setIsFocused] = useState(false); // Pour le style seamless comme Solo
+  // Compte à rebours d'avant match pour préparer les joueurs.
+  const [preStartCountdown, setPreStartCountdown] = useState(null);
   const progressIntervalRef = useRef(null);
   const timerIntervalRef = useRef(null); // Ref pour le timer du mode timer
   const inputRef = useRef(null);
@@ -98,6 +100,8 @@ export default function BattleRoom() {
   const listenersSetupRef = useRef(null); // Ref pour stocker la configuration des listeners (roomId-matchmaking)
   const lastErrorCountRef = useRef(0); // Ref pour le calcul incrémental des erreurs (optimisation O(1))
   const statsUpdateRef = useRef(null); // Ref pour throttler les calculs de stats avec requestAnimationFrame
+  const countdownIntervalRef = useRef(null);
+  const countdownTimeoutRef = useRef(null);
   // Refs pour éviter les closures obsolètes dans les listeners socket
   // IMPORTANT: Initialiser TOUTES les refs avec des valeurs par défaut STABLES pour éviter les problèmes TDZ
   // Ne pas utiliser de variables destructurées ou calculées dans l'initialisation car le minificateur
@@ -155,6 +159,56 @@ export default function BattleRoom() {
     }
     return 'bg-bg-secondary/50 text-text-secondary border border-border-secondary/40';
   };
+
+  /**
+   * Démarre un compte à rebours local avant le début de la partie.
+   * Objectif: offrir 3 secondes aux joueurs pour se préparer.
+   */
+  const startPreGameCountdown = useCallback((seconds = 3, onComplete) => {
+    // Nettoyer un éventuel countdown précédent.
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    if (countdownTimeoutRef.current) {
+      clearTimeout(countdownTimeoutRef.current);
+      countdownTimeoutRef.current = null;
+    }
+
+    const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 3;
+    let remaining = safeSeconds;
+    setPreStartCountdown(remaining);
+
+    // Décrémenter visuellement chaque seconde.
+    countdownIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      setPreStartCountdown(remaining);
+      if (remaining <= 1) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    }, 1000);
+
+    // Déclencher le démarrage réel à la fin du countdown.
+    countdownTimeoutRef.current = setTimeout(() => {
+      setPreStartCountdown(null);
+      if (typeof onComplete === 'function') {
+        onComplete();
+      }
+    }, safeSeconds * 1000);
+  }, []);
+
+  // Nettoyer les timeouts/intervals du countdown à la désactivation du composant.
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // IMPORTANT: Initialiser playerName dès le premier render pour éviter les problèmes TDZ
   // Ce useEffect s'exécute immédiatement après le montage et initialise playerName avec la bonne valeur
@@ -600,10 +654,16 @@ export default function BattleRoom() {
           return;
         }
 
-        console.log('✅ Setting gameStatus to playing');
-        setGameStatus('playing');
-        // UX: confirmer le démarrage de la partie.
-        showBattleStatus('Game started. Good luck!', 'success', 2000);
+        const countdownSeconds = Number.isFinite(data.countdownSeconds) ? data.countdownSeconds : 3;
+        // Préparer l'overlay de démarrage.
+        setGameStatus('starting');
+        showBattleStatus(`Get ready... Starting in ${countdownSeconds} seconds.`, 'info');
+
+        const startGameNow = () => {
+          console.log('✅ Setting gameStatus to playing');
+          setGameStatus('playing');
+          // UX: confirmer le démarrage de la partie.
+          showBattleStatus('Game started. Good luck!', 'success', 2000);
         
         // Réinitialiser le scroll du conteneur de texte au début
         if (textContainerRef.current) {
@@ -612,8 +672,9 @@ export default function BattleRoom() {
         
         // Vérifier que startTime existe avant de l'utiliser
         if (data.startTime !== undefined && data.startTime !== null) {
-          setStartTime(data.startTime);
-          startTimeRef.current = data.startTime; // Stocker aussi dans la ref
+          const safeStartTime = data.startTime > Date.now() ? data.startTime : Date.now();
+          setStartTime(safeStartTime);
+          startTimeRef.current = safeStartTime; // Stocker aussi dans la ref
         } else {
           // Utiliser Date.now() comme fallback si startTime n'est pas fourni
           const fallbackStartTime = Date.now();
@@ -770,7 +831,10 @@ export default function BattleRoom() {
           // Ne pas throw ici, ce n'est pas critique
         }
         
-        console.log('✅ game-started handler completed successfully');
+          console.log('✅ game-started handler completed successfully');
+        };
+
+        startPreGameCountdown(countdownSeconds, startGameNow);
       } catch (error) {
         // Capturer toute erreur dans le handler game-started
         console.error('❌ Error in game-started handler:', error);
@@ -915,46 +979,54 @@ export default function BattleRoom() {
       setOpponentStats({ wpm: 0, accuracy: 100, progress: 0 });
       setResults(null);
       setEloChanges({});
+      const countdownSeconds = Number.isFinite(data?.countdownSeconds) ? data.countdownSeconds : 3;
+      setGameStatus('starting');
+      showBattleStatus(`Get ready... Starting in ${countdownSeconds} seconds.`, 'info');
       
       // Réinitialiser le scroll du conteneur de texte au début
       if (textContainerRef.current) {
         textContainerRef.current.scrollTop = 0;
       }
       
-      // Mettre à jour le texte et démarrer la partie
-      if (data.text) {
-        setText(data.text);
-      }
-      setGameStatus('playing');
-      setStartTime(data.startTime || Date.now());
-      typingStartTimeRef.current = Date.now();
-      setTypingStartTime(Date.now());
-      
-      // Réinitialiser le timer si nécessaire
-      if (data.mode === 'timer' && data.timerDuration) {
-        setTimeLeft(data.timerDuration);
-        // Démarrer le timer
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current);
+      const startRematchNow = () => {
+        // Mettre à jour le texte et démarrer la partie
+        if (data.text) {
+          setText(data.text);
         }
-        timerIntervalRef.current = setInterval(() => {
-          setTimeLeft(prev => {
-            if (prev === null || prev <= 1) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-      
-      // Focus sur l'input
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
+        setGameStatus('playing');
+        const safeStartTime = data.startTime && data.startTime > Date.now() ? data.startTime : Date.now();
+        setStartTime(safeStartTime);
+        typingStartTimeRef.current = null;
+        setTypingStartTime(null);
+        
+        // Réinitialiser le timer si nécessaire
+        if (data.mode === 'timer' && data.timerDuration) {
+          setTimeLeft(data.timerDuration);
+          // Démarrer le timer
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+          }
+          timerIntervalRef.current = setInterval(() => {
+            setTimeLeft(prev => {
+              if (prev === null || prev <= 1) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
         }
-      }, 100);
+        
+        // Focus sur l'input
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+          }
+        }, 100);
+      };
+
+      startPreGameCountdown(countdownSeconds, startRematchNow);
     });
     
     // Gérer les déconnexions avec reconnexion automatique
@@ -1733,6 +1805,29 @@ export default function BattleRoom() {
 
       {/* Main content - ONEPAGE sans scroll */}
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Overlay plein écran: compte à rebours avant le start */}
+        {preStartCountdown && preStartCountdown > 0 && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-bg-primary/80 backdrop-blur-sm">
+            <div className="text-center">
+              <div className="text-text-secondary text-xs uppercase tracking-wider mb-2">
+                Match starts in
+              </div>
+              <div className="relative inline-flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border border-accent-primary/30 animate-pulse"></div>
+                <div
+                  key={preStartCountdown}
+                  className="text-6xl sm:text-7xl font-bold text-accent-primary px-6 py-4 animate-pulse"
+                  style={{ fontFamily: 'JetBrains Mono' }}
+                >
+                  {preStartCountdown}
+                </div>
+              </div>
+              <div className="text-text-secondary text-xs mt-3">
+                Stay ready. The timer starts after the countdown.
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           {/* Statut global pour guider l'utilisateur pendant le flow en ligne */}
           {battleStatus.visible && battleStatus.message && (

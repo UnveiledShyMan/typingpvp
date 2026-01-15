@@ -167,6 +167,10 @@ const defaultTexts = [
   "Les algorithmes et structures de données sont fondamentaux pour résoudre efficacement les problèmes informatiques."
 ];
 
+// Délai avant le début réel d'une partie (synchronisation des joueurs).
+const PRESTART_COUNTDOWN_SECONDS = 3;
+const PRESTART_COUNTDOWN_MS = PRESTART_COUNTDOWN_SECONDS * 1000;
+
 function getRandomText() {
   return defaultTexts[Math.floor(Math.random() * defaultTexts.length)];
 }
@@ -849,10 +853,12 @@ io.on('connection', (socket) => {
       room.difficulty = mode === 'phrases' ? difficulty : null;
 
       room.status = 'playing';
-      room.startTime = Date.now();
+      // Décaler le startTime pour afficher un countdown client.
+      room.startTime = Date.now() + PRESTART_COUNTDOWN_MS;
 
       io.to(roomId).emit('game-started', {
         startTime: room.startTime,
+        countdownSeconds: PRESTART_COUNTDOWN_SECONDS,
         text: newText,
         mode: mode,
         timerDuration: room.timerDuration,
@@ -1077,13 +1083,15 @@ io.on('connection', (socket) => {
       }
       
       room.text = newText;
-      room.startTime = Date.now();
+      // Décaler le startTime pour afficher un countdown client.
+      room.startTime = Date.now() + PRESTART_COUNTDOWN_MS;
       room.status = 'playing';
       
       // Démarrer la partie
       io.to(roomId).emit('rematch-start', {
         text: newText,
         startTime: room.startTime,
+        countdownSeconds: PRESTART_COUNTDOWN_SECONDS,
         mode: room.mode,
         timerDuration: room.timerDuration,
         difficulty: room.difficulty
