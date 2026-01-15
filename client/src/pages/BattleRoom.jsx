@@ -2107,22 +2107,32 @@ export default function BattleRoom() {
 
           {gameStatus === 'finished' && results && safePlayers && safePlayers.length > 0 && (
             <div className="flex-1 min-h-0 overflow-hidden">
-              {/* Résultats - conteneur simple et cohérent avec la main page */}
-              <div className="max-w-5xl mx-auto w-full space-y-4 pb-6">
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40 ui-card ui-fade-up">
-                  <div className="text-text-secondary text-xs uppercase tracking-wider mb-1">
-                    Match Summary
+              {/* Résultats - conteneur aligné avec la direction artistique */}
+              <div className="max-w-5xl mx-auto w-full space-y-3 sm:space-y-4 pb-4">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border-secondary/40 ui-card ui-fade-up">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="text-text-secondary text-xs uppercase tracking-wider">
+                      Match Summary
+                    </div>
+                    <div className="inline-flex items-center gap-2 text-xs font-semibold">
+                      <span className="px-2 py-1 rounded-full border border-border-secondary/40 bg-bg-primary/40 text-text-secondary">
+                        {((currentLocationStateFromRef && currentLocationStateFromRef.matchmaking) === true) ? 'Matchmaking' : 'Private Room'}
+                      </span>
+                      {((currentLocationStateFromRef && currentLocationStateFromRef.matchmaking) === true) && (
+                        <span className={`px-2 py-1 rounded-full border ${
+                          (currentLocationStateFromRef && currentLocationStateFromRef.ranked) === true
+                            ? 'bg-accent-primary/10 text-accent-primary border-accent-primary/30'
+                            : 'bg-bg-primary/40 text-text-secondary border-border-secondary/40'
+                        }`}>
+                          {(currentLocationStateFromRef && currentLocationStateFromRef.ranked) === true ? 'Ranked' : 'Unrated'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-text-primary text-sm font-medium">
-                    <span>{((currentLocationStateFromRef && currentLocationStateFromRef.matchmaking) === true) ? 'Matchmaking' : 'Private Room'}</span>
-                    <span className="text-text-secondary/50">•</span>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-text-primary text-sm font-medium">
                     <span>{results?.mode === 'phrases' ? 'Phrases' : 'Timer'}</span>
-                    {results?.duration && (
-                      <>
-                        <span className="text-text-secondary/50">•</span>
-                        <span>{results.duration}s</span>
-                      </>
-                    )}
+                    <span className="text-text-secondary/50">•</span>
+                    <span>{results?.duration ? `${results.duration}s` : '—'}</span>
                   </div>
                 </div>
 
