@@ -1737,7 +1737,7 @@ export default function BattleRoom() {
           {/* Statut global pour guider l'utilisateur pendant le flow en ligne */}
           {battleStatus.visible && battleStatus.message && (
             <div className="mb-4">
-              <div className={`px-4 py-2 rounded-lg text-sm font-medium ${getBattleStatusClasses(battleStatus.type)}`}>
+              <div className={`px-4 py-2 rounded-lg text-sm font-medium ui-card ui-fade-up ${getBattleStatusClasses(battleStatus.type)}`}>
                 <span className="text-text-secondary text-xs uppercase tracking-wider mr-2">Status</span>
                 {battleStatus.message}
               </div>

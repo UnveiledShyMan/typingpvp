@@ -442,7 +442,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
           </div>
           
           {/* Header avec avatar et infos principales - Style osu! */}
-          <div className="relative mb-6 sm:mb-8">
+          <div className="relative mb-6 sm:mb-8 ui-section">
             {/* Bannière de fond avec gradient */}
             <div 
               className="absolute inset-0 rounded-2xl opacity-20"
@@ -451,7 +451,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
               }}
             ></div>
             
-            <div className="relative bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8">
+            <div className="relative bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8 ui-card ui-fade-up">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 {/* Avatar large */}
                 <div className="relative">
@@ -509,7 +509,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                 <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h1 className="text-4xl md:text-5xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+                  <h1 className="text-4xl md:text-5xl font-bold text-text-primary mb-2 ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
                     {user.username}
                   </h1>
                   <div className="flex items-center gap-4 flex-wrap">
@@ -734,7 +734,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
             <>
               {/* Stats Cards - Style osu! */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 sm:mb-8">
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60 ui-card ui-card-hover">
                   <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Total Matches</div>
                   <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
                     {user.stats.totalMatches}
@@ -744,7 +744,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                   </div>
                 </div>
                 
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60 ui-card ui-card-hover">
                   <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Win Rate</div>
                   <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: winRate >= 50 ? '#10b981' : '#f472b6' }}>
                     {winRate}%
@@ -754,7 +754,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                   </div>
                 </div>
                 
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60 ui-card ui-card-hover">
                   <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Best WPM</div>
                   <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#fbbf24' }}>
                     {user.stats.bestWPM}
@@ -764,7 +764,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                   </div>
                 </div>
                 
-                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60">
+                <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 transition-all hover:bg-bg-secondary/60 ui-card ui-card-hover">
                   <div className="text-text-secondary text-xs uppercase tracking-wider mb-2 font-semibold">Accuracy</div>
                   <div className="text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono', color: '#06b6d4' }}>
                     {user.stats?.averageAccuracy !== undefined && user.stats?.averageAccuracy !== null 

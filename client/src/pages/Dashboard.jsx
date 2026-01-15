@@ -133,7 +133,7 @@ export default function Dashboard({ user, onSectionChange }) {
   return (
     <div className="page-container p-6 md:p-8 space-y-6">
       {/* Header avec stats principales - Style osu! */}
-      <div className="bg-bg-secondary rounded-2xl border border-border-secondary p-6 md:p-8 shadow-xl">
+      <div className="bg-bg-secondary rounded-2xl border border-border-secondary p-6 md:p-8 shadow-xl ui-card ui-fade-up">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           {/* Infos utilisateur */}
           <div className="flex items-center gap-4">
@@ -199,7 +199,7 @@ export default function Dashboard({ user, onSectionChange }) {
       {/* Stats cards - Style Aimlab */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {/* WPM card */}
-        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200">
+        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200 ui-card ui-card-hover">
           <div className="text-text-secondary text-xs sm:text-sm font-medium mb-1 sm:mb-2">Best WPM</div>
           <div className="text-3xl sm:text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
             {stats.bestWPM || 0}
@@ -208,7 +208,7 @@ export default function Dashboard({ user, onSectionChange }) {
         </div>
 
         {/* Winrate card */}
-        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200">
+        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200 ui-card ui-card-hover">
           <div className="text-text-secondary text-xs sm:text-sm font-medium mb-1 sm:mb-2">Winrate</div>
           <div className="text-3xl sm:text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
             {winrate}%
@@ -219,7 +219,7 @@ export default function Dashboard({ user, onSectionChange }) {
         </div>
 
         {/* Accuracy card */}
-        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200">
+        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200 ui-card ui-card-hover">
           <div className="text-text-secondary text-xs sm:text-sm font-medium mb-1 sm:mb-2">Accuracy</div>
           <div className="text-3xl sm:text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
             {Math.round(stats.averageAccuracy) || 100}%
@@ -228,7 +228,7 @@ export default function Dashboard({ user, onSectionChange }) {
         </div>
 
         {/* Matches card */}
-        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200">
+        <div className="bg-bg-secondary rounded-lg sm:rounded-xl border border-border-secondary p-4 sm:p-6 hover:border-accent-primary/50 transition-all duration-200 ui-card ui-card-hover">
           <div className="text-text-secondary text-xs sm:text-sm font-medium mb-1 sm:mb-2">Total Matches</div>
           <div className="text-3xl sm:text-4xl font-bold text-text-primary mb-1" style={{ fontFamily: 'JetBrains Mono' }}>
             {stats.totalMatches || 0}
@@ -242,7 +242,7 @@ export default function Dashboard({ user, onSectionChange }) {
         {/* Left column - Quick actions */}
         <div className="lg:col-span-2 space-y-6">
           {/* Quick play options */}
-          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6">
+          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6 ui-card ui-fade-up">
             <h2 className="text-xl font-bold text-text-primary mb-4" style={{ fontFamily: 'Inter', letterSpacing: '-0.01em' }}>
               Quick Play
             </h2>
@@ -294,7 +294,7 @@ export default function Dashboard({ user, onSectionChange }) {
           </div>
 
           {/* Recent matches */}
-          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6">
+          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6 ui-card ui-fade-up">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-text-primary" style={{ fontFamily: 'Inter', letterSpacing: '-0.01em' }}>
                 Recent Matches
@@ -350,7 +350,7 @@ export default function Dashboard({ user, onSectionChange }) {
         {/* Right column - Additional info */}
         <div className="space-y-6">
           {/* Language selector */}
-          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6">
+          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6 ui-card ui-fade-up">
             <h3 className="text-lg font-semibold text-text-primary mb-4">Language</h3>
             <select
               value={selectedLang}
@@ -366,7 +366,7 @@ export default function Dashboard({ user, onSectionChange }) {
           </div>
 
           {/* Rank info */}
-          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6">
+          <div className="bg-bg-secondary rounded-xl border border-border-secondary p-6 ui-card ui-fade-up">
             <h3 className="text-lg font-semibold text-text-primary mb-4">Current Rank</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">

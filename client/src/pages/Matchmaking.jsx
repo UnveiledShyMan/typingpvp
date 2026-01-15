@@ -367,18 +367,18 @@ export default function Matchmaking() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
-      <div className="mb-6 flex-shrink-0">
-        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+      <div className="mb-6 flex-shrink-0 ui-section">
+        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-2 ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
           Matchmaking
         </h1>
-        <p className="text-text-secondary text-sm">
+        <p className="text-text-secondary text-sm ui-subtitle">
           Find an opponent with similar skill level and compete in real-time
         </p>
       </div>
       
       {/* Résumé rapide des paramètres pour rassurer l'utilisateur */}
-      <div className="mb-6 flex-shrink-0">
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40">
+      <div className="mb-6 flex-shrink-0 ui-section">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40 ui-card ui-card-hover ui-fade-up">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="text-text-secondary">Mode:</span>
             <span className="text-text-primary font-semibold">

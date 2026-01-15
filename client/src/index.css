@@ -36,6 +36,20 @@
   --typing-font: 'JetBrains Mono', monospace;
   --typing-transition-duration: 200ms; /* Smoothness par défaut */
   --cursor-lag-duration: 0ms; /* Délai du curseur - contrôlé par smoothness */
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  /* Radius scale */
+  --radius-1: 0.5rem;
+  --radius-2: 0.75rem;
+  --radius-3: 1rem;
+  /* Shadows */
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 14px 40px rgba(0, 0, 0, 0.28);
 }
 
 html, body {
@@ -70,6 +84,53 @@ body {
   to {
     opacity: 1;
   }
+}
+
+@keyframes fadeUpSoft {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Utility classes for consistent spacing and subtle motion */
+.ui-section {
+  margin-bottom: var(--space-5);
+}
+
+.ui-title {
+  font-size: clamp(1.8rem, 1.4rem + 1vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ui-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #9ca3b8);
+}
+
+.ui-card {
+  background: rgba(19, 24, 37, 0.4);
+  border: 1px solid var(--border-secondary, rgba(156, 163, 184, 0.1));
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-soft);
+}
+
+.ui-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ui-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.ui-fade-up {
+  animation: fadeUpSoft 0.4s ease-out;
 }
 
 /* Animation pour les toasts */

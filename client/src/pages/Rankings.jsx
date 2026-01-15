@@ -70,14 +70,14 @@ export default function Rankings() {
         jsonLd={rankingsJsonLd}
       />
       <div className="h-full w-full flex flex-col overflow-hidden">
-      <div className="mb-4 sm:mb-6 flex-shrink-0">
-        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-1 animate-slide-up" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+      <div className="mb-4 sm:mb-6 flex-shrink-0 ui-section">
+        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-1 animate-slide-up ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
           Rankings
         </h1>
-        <p className="text-text-secondary/70 text-xs sm:text-sm">Compete with the best typists</p>
+        <p className="text-text-secondary/70 text-xs sm:text-sm ui-subtitle">Compete with the best typists</p>
       </div>
 
-        <div className="mb-4 sm:mb-6 flex-shrink-0">
+        <div className="mb-4 sm:mb-6 flex-shrink-0 ui-section">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               <select
@@ -135,7 +135,7 @@ export default function Rankings() {
               {rankings.slice(0, 3).map((player, index) => (
                 <div
                   key={`top-${player.id}`}
-                  className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40 hover:border-accent-primary/50 transition-all cursor-pointer"
+                  className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 border border-border-secondary/40 hover:border-accent-primary/50 transition-all cursor-pointer ui-card ui-card-hover ui-fade-up"
                   onClick={() => navigate(`/profile/${player.username}`)}
                   role="button"
                   tabIndex={0}
@@ -169,7 +169,7 @@ export default function Rankings() {
               ))}
             </div>
 
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg overflow-hidden animate-slide-up flex-1 min-h-0 flex flex-col">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg overflow-hidden animate-slide-up flex-1 min-h-0 flex flex-col ui-card ui-fade-up">
             <div className="overflow-auto flex-1">
               <table className="w-full">
                 <thead className="bg-bg-primary/40">
