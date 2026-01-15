@@ -11,20 +11,21 @@ function ShareButtons({ result, type = 'solo' }) {
   const [copied, setCopied] = useState(false);
 
   // Générer le texte de partage selon le type
+  // Objectif: style simple et sans emojis pour rester cohérent avec la UI épurée.
   const getShareText = () => {
     if (type === 'solo') {
-      return `Just scored ${result.wpm} WPM with ${result.accuracy}% accuracy on TypingPVP! 🎯`;
+      return `Just scored ${result.wpm} WPM with ${result.accuracy}% accuracy on TypingPVP.`;
     } else if (type === 'battle') {
       const winner = result.isWinner ? 'Won' : 'Lost';
-      return `Just ${winner} a typing battle with ${result.wpm} WPM and ${result.accuracy}% accuracy on TypingPVP! ⚔️`;
+      return `Just ${winner} a typing battle with ${result.wpm} WPM and ${result.accuracy}% accuracy on TypingPVP.`;
     } else if (type === 'competition') {
       if (result.isWinner) {
-        return `🏆 Won a typing competition! Finished #${result.position} with ${result.wpm} WPM and ${result.accuracy}% accuracy on TypingPVP!`;
+        return `Won a typing competition. Finished #${result.position} with ${result.wpm} WPM and ${result.accuracy}% accuracy on TypingPVP.`;
       } else {
-        return `Finished #${result.position} in a typing competition with ${result.wpm} WPM and ${result.accuracy}% accuracy on TypingPVP! 🎯`;
+        return `Finished #${result.position} in a typing competition with ${result.wpm} WPM and ${result.accuracy}% accuracy on TypingPVP.`;
       }
     }
-    return `Check out my typing results on TypingPVP!`;
+    return `Check out my typing results on TypingPVP.`;
   };
 
   // Générer l'URL de partage
@@ -71,13 +72,13 @@ function ShareButtons({ result, type = 'solo' }) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Bouton Copier */}
+      {/* Bouton Copier - style sobre et cohérent */}
       <button
         onClick={copyToClipboard}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium border ui-press ${
           copied
-            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-            : 'bg-bg-primary/50 hover:bg-bg-primary/70 text-text-primary border border-border-secondary/30'
+            ? 'bg-green-500/10 text-green-400 border-green-500/30'
+            : 'bg-bg-secondary/40 hover:bg-bg-secondary/60 text-text-primary border-border-secondary/40'
         }`}
         title="Copy to clipboard"
       >
@@ -86,7 +87,7 @@ function ShareButtons({ result, type = 'solo' }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>Copied!</span>
+            <span>Copied</span>
           </>
         ) : (
           <>
@@ -98,11 +99,11 @@ function ShareButtons({ result, type = 'solo' }) {
         )}
       </button>
 
-      {/* Bouton Partage Natif (mobile) */}
+      {/* Bouton Partage Natif (mobile) - discret */}
       {navigator.share && (
         <button
           onClick={shareNative}
-          className="flex items-center gap-2 px-4 py-2 bg-accent-primary/20 hover:bg-accent-primary/30 text-accent-primary rounded-lg transition-colors text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium border bg-bg-secondary/30 hover:bg-bg-secondary/50 text-text-secondary hover:text-text-primary border-border-secondary/40 ui-press"
           title="Share"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

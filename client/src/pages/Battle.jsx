@@ -95,85 +95,120 @@ export default function Battle() {
   };
 
   return (
-    <div className="h-full w-full flex items-center justify-center overflow-hidden">
-      <div className="w-full max-w-2xl mx-auto">
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 sm:p-8 lg:p-10">
-          <div className="mb-6 text-center">
-            <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>1v1 Battle</h1>
-            <p className="text-text-secondary/70 text-xs sm:text-sm">Challenge a friend or join a room</p>
-          </div>
+    <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
+      <div className="ui-section mb-6">
+        <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-2 ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+          1v1 Rooms
+        </h1>
+        <p className="text-text-secondary text-sm ui-subtitle">
+          Create a private room or join a friend instantly.
+        </p>
+      </div>
 
-          <div className="space-y-4 sm:space-y-6">
-            {!user && (
-              <div>
-                <label className="block text-text-primary mb-2 text-sm">Your name</label>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  className="input-modern"
-                  placeholder="Enter your name"
-                />
-              </div>
-            )}
-            {user && (
-              <div className="p-4 bg-bg-primary/30 backdrop-blur-sm rounded-lg">
-                <p className="text-text-secondary text-sm mb-1">Playing as</p>
-                <p className="text-text-primary font-semibold text-lg">{user.username}</p>
-              </div>
-            )}
-
-            <div className="pt-6 mt-6 border-t border-text-secondary/5">
-              <h2 className="text-xl font-semibold text-text-primary mb-4">Create room</h2>
-              <button
-                onClick={handleCreateRoom}
-                className="btn-primary w-full"
-              >
-                Create Room
-              </button>
-              {createdRoomId && (
-                <div className="mt-4 p-4 bg-bg-primary/30 backdrop-blur-sm rounded-lg">
-                  <p className="text-text-primary mb-2 text-sm">Room created!</p>
-                  <div className="flex gap-2">
+      <div className="flex-1 min-h-0">
+        <div className="max-w-5xl mx-auto w-full">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-6">
+              {/* Identité joueur - simple, clair, aligné avec la main page */}
+              <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 border border-border-secondary/40 ui-card ui-fade-up">
+                <div className="text-text-secondary text-xs uppercase tracking-wider mb-2">Player</div>
+                {!user && (
+                  <div>
+                    <label className="block text-text-primary mb-2 text-sm">Your name</label>
                     <input
                       type="text"
-                      value={createdRoomId}
-                      readOnly
-                      className="flex-1 p-2 bg-bg-secondary/40 backdrop-blur-sm border-none rounded-lg text-text-primary font-mono text-sm"
+                      value={playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      className="input-modern"
+                      placeholder="Enter your name"
                     />
-                    <button
-                      onClick={copyRoomId}
-                      className="bg-accent-primary hover:bg-accent-hover text-accent-text px-4 rounded text-sm font-semibold transition-colors"
-                    >
-                      copy
-                    </button>
                   </div>
-                  <p className="text-text-secondary text-xs mt-2">
-                    Share this ID with your opponent
-                  </p>
-                </div>
-              )}
+                )}
+                {user && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-text-secondary text-sm mb-1">Playing as</p>
+                      <p className="text-text-primary font-semibold text-lg">{user.username}</p>
+                    </div>
+                    <div className="text-xs px-3 py-1 rounded-full bg-bg-primary/50 text-text-secondary">
+                      Logged in
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Create Room */}
+              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 border border-border-secondary/30 ui-card ui-card-hover ui-fade-up">
+                <h2 className="text-xl font-semibold text-text-primary mb-2">Create room</h2>
+                <p className="text-text-secondary text-sm mb-4">
+                  Share the room ID to start a private duel.
+                </p>
+                <button
+                  onClick={handleCreateRoom}
+                  className="btn-primary w-full ui-press"
+                >
+                  Create Room
+                </button>
+                {createdRoomId && (
+                  <div className="mt-4 p-4 bg-bg-secondary/40 backdrop-blur-sm rounded-lg border border-border-secondary/30">
+                    <p className="text-text-primary mb-2 text-sm">Room created</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={createdRoomId}
+                        readOnly
+                        className="flex-1 p-2 bg-bg-secondary/60 backdrop-blur-sm border border-border-secondary/40 rounded-lg text-text-primary font-mono text-sm"
+                      />
+                      <button
+                        onClick={copyRoomId}
+                        className="bg-accent-primary hover:bg-accent-hover text-accent-text px-4 py-2 rounded text-sm font-semibold transition-colors ui-press"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="text-text-secondary text-xs mt-2">
+                      Share this ID with your opponent.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="pt-6 mt-6 border-t border-text-secondary/5">
-              <h2 className="text-xl font-semibold text-text-primary mb-4">Join room</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-text-primary mb-2 text-sm">Room ID</label>
-                  <input
-                    type="text"
-                    value={roomId}
-                    onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                    className="input-modern font-mono uppercase"
-                    placeholder="Enter room ID"
-                  />
+            <div className="space-y-6">
+              {/* Join Room */}
+              <div className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-6 border border-border-secondary/30 ui-card ui-card-hover ui-fade-up">
+                <h2 className="text-xl font-semibold text-text-primary mb-2">Join room</h2>
+                <p className="text-text-secondary text-sm mb-4">
+                  Paste a room ID and jump straight in.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-text-primary mb-2 text-sm">Room ID</label>
+                    <input
+                      type="text"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                      className="input-modern font-mono uppercase"
+                      placeholder="Enter room ID"
+                    />
+                  </div>
+                  <button
+                    onClick={handleJoinRoom}
+                    className="btn-primary w-full ui-press"
+                  >
+                    Join Room
+                  </button>
                 </div>
-                <button
-                  onClick={handleJoinRoom}
-                  className="btn-primary w-full"
-                >
-                  Join Room
-                </button>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-bg-secondary/30 backdrop-blur-sm rounded-lg p-6 border border-border-secondary/30 ui-card ui-fade-up">
+                <div className="text-text-secondary text-xs uppercase tracking-wider mb-2">Tips</div>
+                <ul className="space-y-2 text-sm text-text-secondary">
+                  <li>Use the same room ID for rematches.</li>
+                  <li>Invite friends via chat or Discord.</li>
+                  <li>Want ranked? Use matchmaking.</li>
+                </ul>
               </div>
             </div>
           </div>
