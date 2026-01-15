@@ -1006,7 +1006,7 @@ export default function Profile({ userId: currentUserId, username: currentUserna
                             {allMatches.map((match) => (
                             <div
                               key={match.id}
-                              className={`bg-bg-primary rounded-xl p-4 border transition-all hover:scale-[1.02] ${
+                              className={`bg-bg-primary/30 rounded-xl p-4 border transition-all ui-card-hover hover:bg-bg-primary/40 ${
                                 match.won 
                                   ? 'border-correct-char/30 hover:border-correct-char/50' 
                                   : match.type === 'solo'

@@ -320,15 +320,15 @@ export default function CompetitionRoom() {
 
   return (
     <div className="page-container p-8" style={{ maxWidth: 'min(1280px, calc(100vw - 320px))' }}>
-      <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-10 relative overflow-hidden">
+      <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-10 relative overflow-hidden ui-card ui-fade-up">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent-primary rounded-full blur-3xl animate-pulse-subtle"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-secondary rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '1s' }}></div>
         </div>
         
         <div className="relative z-10">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-text-primary mb-2" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+          <div className="mb-8 text-center ui-section">
+            <h1 className="text-3xl font-bold text-text-primary mb-2 ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
               <span className="text-accent-primary">COMPETITION</span> #{competitionId}
             </h1>
             <p className="text-text-secondary text-sm">{players.length} players</p>
@@ -410,7 +410,7 @@ export default function CompetitionRoom() {
 
                 <div 
                   ref={textContainerRef}
-                  className="typing-text bg-bg-card/40 backdrop-blur-sm rounded-lg p-6 min-h-[200px] max-h-[300px] overflow-y-auto mb-4 text-lg leading-relaxed"
+                  className="typing-text bg-bg-card/40 backdrop-blur-sm rounded-lg p-6 min-h-[200px] max-h-[300px] overflow-y-auto mb-4 text-lg leading-relaxed scrollbar-on-hover"
                   style={{ scrollBehavior: 'smooth' }}
                 >
                   {renderText()}
@@ -429,12 +429,12 @@ export default function CompetitionRoom() {
 
               {/* Classement - Design amélioré */}
               <div className="lg:col-span-1">
-                <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-5 border border-border-secondary/30 shadow-lg sticky top-4">
+                <div className="bg-bg-secondary/60 backdrop-blur-sm rounded-lg p-5 border border-border-secondary/30 shadow-lg sticky top-4 ui-card">
                   <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
                     <span className="w-1 h-5 bg-gradient-to-b from-accent-primary to-transparent rounded-full"></span>
                     Leaderboard
                   </h2>
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-on-hover">
                     {leaderboard.slice(0, 20).map((player, index) => {
                       const isTopThree = player.position <= 3;
                       const isMe = player.name === username;

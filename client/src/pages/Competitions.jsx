@@ -4,7 +4,7 @@ import DiscordIcon from '../components/icons/DiscordIcon'
 export default function Competitions() {
   return (
     <div className="h-full w-full flex items-center justify-center p-4 sm:p-6">
-      <div className="text-center space-y-6 max-w-md">
+      <div className="text-center space-y-6 max-w-md ui-section">
         {/* Icône de compétition */}
         <div className="flex justify-center">
           <div className="relative">
@@ -19,18 +19,18 @@ export default function Competitions() {
         </div>
 
         {/* Titre */}
-        <h1 className="text-4xl sm:text-5xl font-bold text-text-primary" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+        <h1 className="text-4xl sm:text-5xl font-bold text-text-primary ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
           Coming Soon
         </h1>
 
         {/* Description */}
-        <p className="text-text-secondary text-lg leading-relaxed">
+        <p className="text-text-secondary text-lg leading-relaxed ui-subtitle">
           We're working hard to bring you exciting competitive typing tournaments. 
           Stay tuned for updates!
         </p>
 
         {/* Message Discord */}
-        <div className="bg-bg-secondary/40 backdrop-blur-sm border border-accent-primary/20 rounded-lg p-4 max-w-md mx-auto">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm border border-accent-primary/20 rounded-lg p-4 max-w-md mx-auto ui-card ui-fade-up">
           <p className="text-text-secondary text-sm leading-relaxed">
             Pour patienter et être informé des mises à jour, rejoignez notre{' '}
             <a

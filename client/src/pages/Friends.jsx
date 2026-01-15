@@ -287,12 +287,12 @@ export default function Friends() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden p-4 sm:p-6">
-      <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4 sm:mb-6 flex-shrink-0" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
+      <h1 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4 sm:mb-6 flex-shrink-0 ui-section ui-title" style={{ fontFamily: 'Inter', letterSpacing: '-0.02em' }}>
         Friends
       </h1>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4 sm:mb-6 flex-shrink-0">
+      <div className="flex gap-2 mb-4 sm:mb-6 flex-shrink-0 ui-section">
         <button
           onClick={() => setActiveTab('friends')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -349,10 +349,10 @@ export default function Friends() {
       )}
 
       {/* Contenu scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-on-hover">
       {/* Friends List */}
       {activeTab === 'friends' && (
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-4 sm:p-6 ui-card ui-fade-up">
           {loading ? (
             <FriendsListSkeleton count={5} />
           ) : friends.length === 0 ? (
@@ -370,7 +370,7 @@ export default function Friends() {
               {friends.map((friend) => (
                 <div
                   key={friend.id}
-                  className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between"
+                  className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between ui-card-hover"
                 >
                   <div className="flex items-center gap-4">
                     {friend.avatar ? (
@@ -386,9 +386,20 @@ export default function Friends() {
                       </div>
                     )}
                     <div>
-                      <div className="text-text-primary font-semibold">{friend.username}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-text-primary font-semibold">{friend.username}</div>
+                        <span
+                          className={`w-2 h-2 rounded-full ${friend.isOnline ? 'bg-accent-secondary' : 'bg-text-muted'}`}
+                          title={friend.isOnline ? 'Online' : 'Offline'}
+                        ></span>
+                      </div>
                       <div className="text-text-secondary text-sm">
                         ELO: <span className="font-mono">{friend.mmr?.en || 1000}</span>
+                        {friend.isOnline !== undefined && (
+                          <span className={`ml-2 text-xs ${friend.isOnline ? 'text-accent-secondary' : 'text-text-muted'}`}>
+                            {friend.isOnline ? 'Online' : 'Offline'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -429,13 +440,13 @@ export default function Friends() {
         <div className="space-y-6">
           {/* Received Requests */}
           {friendRequests.received.length > 0 && (
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 ui-card ui-fade-up">
               <h2 className="text-xl font-bold text-text-primary mb-4">Received Requests</h2>
               <div className="space-y-3">
                 {friendRequests.received.map((request) => (
                   <div
                     key={request.id}
-                    className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between"
+                    className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between ui-card-hover"
                   >
                     <div className="flex items-center gap-4">
                       {request.avatar ? (
@@ -486,13 +497,13 @@ export default function Friends() {
 
           {/* Sent Requests */}
           {friendRequests.sent.length > 0 && (
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 ui-card ui-fade-up">
               <h2 className="text-xl font-bold text-text-primary mb-4">Sent Requests</h2>
               <div className="space-y-3">
                 {friendRequests.sent.map((request) => (
                   <div
                     key={request.id}
-                    className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between"
+                    className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between ui-card-hover"
                   >
                     <div className="flex items-center gap-4">
                       {request.avatar ? (
@@ -522,7 +533,7 @@ export default function Friends() {
           )}
 
           {friendRequests.received.length === 0 && friendRequests.sent.length === 0 && (
-            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-12 text-center">
+            <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-12 text-center ui-card ui-fade-up">
               <p className="text-text-secondary">No friend requests</p>
             </div>
           )}
@@ -531,7 +542,7 @@ export default function Friends() {
 
       {/* Search Results */}
       {activeTab === 'search' && (
-        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6">
+        <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg p-6 ui-card ui-fade-up">
           {searchQuery.length < 2 ? (
             <div className="text-center py-12">
               <p className="text-text-secondary">Start typing to search for users...</p>
@@ -545,7 +556,7 @@ export default function Friends() {
               {searchResults.map((user) => (
                 <div
                   key={user.id}
-                  className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between"
+                  className="bg-bg-primary/30 backdrop-blur-sm rounded-lg p-4 hover:bg-bg-primary/50 transition-all flex items-center justify-between ui-card-hover"
                 >
                   <div className="flex items-center gap-4">
                     {user.avatar ? (

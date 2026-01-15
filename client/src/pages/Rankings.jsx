@@ -170,7 +170,7 @@ export default function Rankings() {
             </div>
 
             <div className="bg-bg-secondary/40 backdrop-blur-sm rounded-lg overflow-hidden animate-slide-up flex-1 min-h-0 flex flex-col ui-card ui-fade-up">
-            <div className="overflow-auto flex-1">
+            <div className="overflow-auto flex-1 scrollbar-on-hover">
               <table className="w-full">
                 <thead className="bg-bg-primary/40">
                   <tr>
@@ -187,7 +187,9 @@ export default function Rankings() {
                   {rankings.map((player, index) => (
                     <tr
                       key={player.id}
-                      className="hover:bg-bg-primary/30 transition-all duration-200 cursor-pointer group"
+                      className={`transition-all duration-200 cursor-pointer group ${
+                        index % 2 === 0 ? 'bg-bg-primary/10' : 'bg-transparent'
+                      } hover:bg-bg-primary/30`}
                       onClick={() => {
                         navigate(`/profile/${player.username}`);
                       }}

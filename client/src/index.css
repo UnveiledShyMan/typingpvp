@@ -434,6 +434,39 @@ code {
   display: none; /* Chrome, Safari, Opera */
 }
 
+/* Scrollbar visible uniquement au survol (utilisable sur containers scrollables) */
+.scrollbar-on-hover {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE et Edge */
+}
+
+.scrollbar-on-hover::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-on-hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-on-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.scrollbar-on-hover:hover {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(139, 92, 246, 0.5) transparent;
+}
+
+.scrollbar-on-hover:hover::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+.scrollbar-on-hover:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
 /* Animations et effets éthérés modernes */
 @keyframes pulseGlow {
   0%, 100% {
